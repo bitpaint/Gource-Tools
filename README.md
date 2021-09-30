@@ -2,18 +2,18 @@
  <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg" alt="Combined" width="690px"> <br> <br>
 
 
-<b>🍩 What is Gource-Tools?</b><br>
+# <b>🍩 What is Gource-Tools?</b><br>
 <br>
 Gource Tools is a toolbox made for Gource.<br>
 It's main purpose it to download multiple repos, create logs, combine logs and download avatars automatically. <br>
 It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 <br>
-<b>⚙️ What do I need for Gource-Tools to work?</b><br>
+# <b>⚙️ What do I need for Gource-Tools to work?</b><br>
 <b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> git | gource | FFmpeg | imagemagick<br>
 <br>
 <br>
-<b>✔️ How to use Gource-Tools?</b><br>
+# <b>✔️ How to use Gource-Tools?</b><br>
 1) 📜  Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
 2) 🧰  Open <b>_Gource-tools.sh</b> and select <b>"Initialize from _List.txt"</b> <br>
 3) ⌛   Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
