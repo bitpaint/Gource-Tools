@@ -1,9 +1,9 @@
 # Gource-Tools
 
- !(https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)<br><br>
+ ![alt text](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)<br><br>
 
 
-  !(https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg)
+  ![alt text](https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg)
 
 #How to use Gource-Tools?
 
