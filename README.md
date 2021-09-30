@@ -1,4 +1,5 @@
 # Gource-Tools
+ <img src="https://img.shields.io/badge/License-MIT-orange.svg"> <br> <br>
 
 
  <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg" alt="Combined" width="690px"> <br> <br>
@@ -11,7 +12,7 @@ Gource Tools is a toolbox made for Gource.
 It's main purpose it to download repos, create logs, combine logs and download avatars.
 
 
-<b>What do i need for Gource-Tools to work?</b>
+<b>What do I need for Gource-Tools to work?</b>
 You need: git | gource | ffmpeg | imagemagick<br>
 <br>
 
