@@ -1,7 +1,12 @@
 cd ..
 mkdir renders
-
+cd src
 mkdir repos
+mkdir logs
+cd avatars
+mkdir converted
+mkdir raw
+cd ..
 
 source repos_dl.sh
 echo repos_dl done
