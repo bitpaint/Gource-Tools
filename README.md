@@ -13,7 +13,7 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 <br>
 <b>What do I need for Gource-Tools to work?</b><br>
-You need: git | gource | ffmpeg | imagemagick<br>
+<b>You need:</b> git | gource | FFmpeg | imagemagick<br>
 <br>
 <br>
 <b>How to use Gource-Tools?</b><br>
