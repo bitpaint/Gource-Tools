@@ -32,8 +32,4 @@ Original music file from <b>chriszabriskie.com/vendaface/</b><br>
 <br> <br>
 <br>
 🙋‍♂️ Need help? Telegram: <b>@bitpaint</b> | Twitter: <b>@bitpaintclub<br></b>
-<br>
-<br>
-<br>
-
  <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/4k/2.png" alt="Big Gource" width="690px"> <br> <br>
