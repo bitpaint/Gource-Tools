@@ -6,12 +6,20 @@
 <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/mainmenu.jpg" alt="Main menu" width="230px">   <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/rendermenu.jpg" alt="Render menu" width="230px">   <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg" alt="Initialize menu" width="230px">
 
 
-<b>How to use Gource-Tools?</b>
+<b>What is Gource-Tools?</b>
+Gource Tools is a toolbox made for Gource.
+It's main purpose it to download repos, create logs, combine logs and download avatars.
 
-- Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
-- Open <b>_Gource-tools.sh</b> and select <b>"1) Initialize from _List.txt"</b> <br>
-- Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
-- You should be able to <b>EXPLORE</b> and <b>RENDER</b> now.<br>
+
+<b>What do i need for Gource-Tools to work?</b>
+You need: git | gource | ffmpeg | imagemagick<br>
+<br>
+
+<b>How to use Gource-Tools?</b>
+1) Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
+2) Open <b>_Gource-tools.sh</b> and select <b>"1) Initialize from _List.txt"</b> <br>
+3) Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
+4) You should be able to <b>EXPLORE</b> and <b>RENDER</b> now.<br>
 <br>
 
 You can change the <b>_audio.mp3</b> file with a custom audio file, so you have your own audio on render.<br>
