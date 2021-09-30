@@ -18,7 +18,7 @@ You need: git | gource | ffmpeg | imagemagick<br>
 <br>
 <b>How to use Gource-Tools?</b><br>
 1) Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
-2) Open <b>_Gource-tools.sh</b> and select <b>"1) Initialize from _List.txt"</b> <br>
+2) Open <b>_Gource-tools.sh</b> and select <b>"Initialize from _List.txt"</b> <br>
 3) Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
 4) You should be able to <b>EXPLORE</b> and <b>RENDER</b> now.<br>
 <br>
