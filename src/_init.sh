@@ -1,3 +1,8 @@
+cd ..
+mkdir renders
+
+mkdir repos
+
 source repos_dl.sh
 echo repos_dl done
 
