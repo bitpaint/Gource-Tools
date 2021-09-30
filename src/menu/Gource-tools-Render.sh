@@ -42,7 +42,7 @@ case $choice in
       source Render-combined-last-week.sh ;;
   # Pattern 4
   4)  echo "Render Combined last year"
-      source Gource-tools-last-year.sh ;;
+      source Render-combined-last-year.sh ;;
   # Pattern 4
   5)  echo "Back to main menu"
       source Gource-tools-Main.sh ;;
