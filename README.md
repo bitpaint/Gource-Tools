@@ -2,8 +2,7 @@
 
  ![alt text](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)<br><br>
 
-
-  ![alt text](https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg)
+![](https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg | width=100)
 
 #How to use Gource-Tools?
 
