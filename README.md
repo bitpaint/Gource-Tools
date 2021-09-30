@@ -9,7 +9,8 @@ It's main purpose it to download multiple repos, create logs, combine logs and d
 It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 <br>
-## <b>⚙️ What do I need for Gource-Tools to work?</b><br>
+
+ <b>⚙️ What do I need for Gource-Tools to work?</b><br>
 <b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> git | gource | FFmpeg | imagemagick<br>
 <br>
 <br>
