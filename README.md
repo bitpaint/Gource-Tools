@@ -3,7 +3,9 @@
  ![alt text](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)<br><br>
 
 
-<img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg" alt="Initialize menu" width="100px">
+<img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/mainmenu.jpg" alt="Main menu" width="230px">
+<img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/rendermenu.jpg" alt="Render menu" width="230px">
+<img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg" alt="Initialize menu" width="230px">
 
 
 #How to use Gource-Tools?
