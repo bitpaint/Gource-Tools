@@ -28,7 +28,7 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 
 
 Change the <b>_audio.mp3</b> file with a custom audio file for your own audio on render.<br>
-Original music file from <b>chriszabriskie.com/vendaface/</b>br>
+Original music file from <b>chriszabriskie.com/vendaface/</b><br>
 <br> <br>
 <br>
 Need help? Telegram: <b>@bitpaint</b> | Twitter: <b>@bitpaintclub<br></b>
