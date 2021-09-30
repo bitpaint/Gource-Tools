@@ -43,8 +43,7 @@ case $choice in
       source Gource-tools-Render.sh ;;
   # Pattern 3
   3)  echo "Explore freely"
-      cd ..
-      source repos_update.sh;;
+      source Explore-configurator.sh;;
   # Pattern 4
   4)  echo "Update repos"
       cd ..

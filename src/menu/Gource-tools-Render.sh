@@ -15,11 +15,10 @@ echo "   ├──────────────────────�
 echo "   │    2) Render 1minute video of the last 24hrs     │";
 echo "   │    3) Render 1minute video of the last week      │";
 echo "   │    4) Render 1minute video of the last year      │";
-echo "   │    5) Render from start                          │";
 echo "   ├──────────────────────────────────────────────────┤";
-echo "   │    6) Back to  main menu                         │";
+echo "   │    5) Back to  main menu                         │";
 echo "   └──────────────────────────────────────────────────┘";
-echo -n "     └─> Enter your choice [1-4]:";
+echo -n "     └─> Enter your choice [1-5]:";
 
 # Running a forever loop using while statement
 # This loop will run untill select the exit option.
@@ -33,9 +32,8 @@ read choice
 # case statement is used to compare one value with the multiple cases.
 case $choice in
   # Pattern 1
-  1)  echo "Initialize new project"
-      cd src
-      source _init.sh ;;
+  1)  echo "Render-configurator"
+      source Render-configurator.sh ;;
   # Pattern 2
   2)  echo "Render Combined today"
       source Render-combined-today.sh ;;
@@ -43,18 +41,14 @@ case $choice in
   3)  echo "Render Combined last week"
       source Render-combined-last-week.sh ;;
   # Pattern 4
-  4)  echo "Back to main menu"
-      source Gource-tools-Main.sh ;;
+  4)  echo "Render Combined last year"
+      source Gource-tools-last-year.sh ;;
   # Pattern 4
-  4)  echo "Back to main menu"
+  5)  echo "Back to main menu"
       source Gource-tools-Main.sh ;;
-  # Pattern 4
-  4)  echo "Back to main menu"
-      source Gource-tools-Main.sh ;;
-
   # Default Pattern
   *) echo "     Invalid number..."
-    echo "     └─> Enter your choice [1-7]:";;
+    echo "     └─> Enter your choice [1-5]:";;
 esac
   echo
 done

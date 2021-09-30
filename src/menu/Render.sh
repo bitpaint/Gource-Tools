@@ -11,7 +11,7 @@ while true; do
         printf '%d) %s\n' "$i" "$pathname" >&2
     done
 
-    printf 'Select file to render: ' >&2
+    printf '	Select file to render: ' >&2
     read -r reply
 
     number=$(printf '%s\n' "$reply" | tr -dc '[:digit:]')

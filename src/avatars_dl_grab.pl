@@ -31,9 +31,9 @@ while(<GITLOG>) {
 
     #try and fetch image
 
-    my $grav_url = "http://www.gravatar.com/avatar/".md5_hex(lc $email)."?d=404&size=".$size; 
+    my $grav_url = "http://www.gravatar.com/avatar/".md5_hex(lc $email)."?d=404&size=".$size;
 
-    warn "fetching image for '$author' $email ($grav_url)...\n";
+    warn "  Fetching avatar for $author \n";
 
     my $rc = getstore($grav_url, $author_image_file);
 
