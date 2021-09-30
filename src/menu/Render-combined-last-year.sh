@@ -1,6 +1,6 @@
 ## Create CURRENTDATE & LASTYEAR variable ##
 CURRENTDATE=`date +"%Y-%m-%d"`
-LASTYEAREAR=`date -d '-7day' +"%Y-%m-%d"`
+LASTYEAR=`date -d '-7day' +"%Y-%m-%d"`
 echo Current Date: ${CURRENTDATE}
 echo Last Year: ${LASTYEARYEAR}
 
