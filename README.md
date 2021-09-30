@@ -8,13 +8,14 @@
 
 <b>How to use Gource-Tools?</b>
 
-- Open _List.txt and replace links with your repos URLs - one link per line.<br>
-- Open _Gource-tools.sh and select 1) Initialize from _List.txt<br>
-- Wait until you see the "Project succesfully initialized" message.<br>
-- You should be able to EXPLOE and RENDER now.<br>
+- Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
+- Open <b>_Gource-tools.sh</b> and select <b>"1) Initialize from _List.txt"</b> <br>
+- Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
+- You should be able to <b>EXPLORE</b> and <b>RENDER</b> now.<br>
+<br>
 
-You can change the _audio.mp3 file with a custom audio file, so you have your own audio on render.
-Original music file from chriszabriskie.com/vendaface/
+You can change the <b>_audio.mp3</b> file with a custom audio file, so you have your own audio on render.<br>
+Original music file from <b>chriszabriskie.com/vendaface/</b>
 <br>
 <br> <br>
 <br>
