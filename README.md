@@ -13,7 +13,7 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 
  <b>⚙️ What do I need for Gource-Tools to work?</b><br>
 <b>You need:</b><br> 
--- `git` & `gource`. <br>
+- `git` & `gource`. <br>
 
 Optional: <br>
 - `FFmpeg` for videos<br>
