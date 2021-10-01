@@ -21,9 +21,9 @@ Optional: <br>
 
 <br>
 
- `git` : https://git-scm.com/download/win "64-bit Git for Windows Setup"  <br>
+ `git` : https://gitforwindows.org/ "64-bit Git for Windows Setup"  <br>
  `gource` : https://github.com/acaudwell/Gource/releases/tag/gource-0.51  "gource-VERSION.win64-setup.exe"  <br>
- `sed` : https://sourceforge.net/projects/gnuwin32/files/sed/4.2.1/?sort=filename&sortdir=asc "sed-VERSION-setup.exe"  <br>
+ `sed` : https://sourceforge.net/projects/gnuwin32/files//sed/4.2.1/sed-4.2.1-setup.exe/download "sed-VERSION-setup.exe"  <br>
  `perl` : https://strawberryperl.com/ "strawberry-perl-VERSION-64bit.msi"  <br>
  `imagemagick` : https://imagemagick.org/script/download.php#windows "Win64 dynamic at 16 bits-per-pixel..."   <br>
  `FFmpeg` : FFmpeg is included in imagemagick. Get `imagemagick` and check the "install FFmpeg" box when asked.  <br>
