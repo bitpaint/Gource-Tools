@@ -9,13 +9,10 @@ Gource-Tools                         <br>
 It's main purpose it to download multiple repos, create logs, combine logs and download avatars automatically. <br>
 It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
-<br>
+
 # <b>⚙️ Requierements:</b><br>
-
 - `git` & `gource` for basic usage (Explore only, you won't be able to make videos) <br>
-
 Optional: <br>
-
 - `FFmpeg` for videos<br>
 -  `imagemagick` | `perl` for avatars badges.<br>
 
