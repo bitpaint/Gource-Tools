@@ -12,7 +12,8 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 
  <b>⚙️ What do I need for Gource-Tools to work?</b><br>
-<b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> `git` & `gource`. Optional: `FFmpeg` to do videos & `imagemagick` | `perl` for avatars badges.<br>
+<b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> `git` & `gource`. <br>
+Optional: `FFmpeg` to do videos & `imagemagick` | `perl` for avatars badges.<br>
 <br>
 <br>
 ## <b>✔️ How to use Gource-Tools?</b><br>
