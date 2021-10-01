@@ -5,7 +5,7 @@ Gource-Tools                         <br>
 
 ## <b>🍩 What is Gource-Tools?</b><br>
 <br>
-Gource Tools is a toolbox made for Gource.<br>
+<b>Gource Tools is a toolbox made for Gource.</b><br>
 It's main purpose it to download multiple repos, create logs, combine logs and download avatars automatically. <br>
 It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
