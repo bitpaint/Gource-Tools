@@ -11,8 +11,11 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 <br>
 <b>⚙️ Requierements:</b><br>
+
 - `git` & `gource`. <br>
+- 
 Optional: <br>
+
 - `FFmpeg` for videos<br>
 -  `imagemagick` | `perl` for avatars badges.<br>
 <br>
