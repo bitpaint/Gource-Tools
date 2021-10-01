@@ -13,7 +13,7 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <b>⚙️ Requierements:</b><br>
 
 - `git` & `gource`. <br>
-- 
+
 Optional: <br>
 
 - `FFmpeg` for videos<br>
