@@ -11,11 +11,20 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 
 # <b>⚙️ Requirements:</b><br>
-- `git` & `gource` for basic usage (Explore only, you won't be able to make videos) <br>
+- `git` , `gource` & `sed`  for basic usage (Explore only, you won't be able to make videos) <br>
 Optional: <br>
 - `FFmpeg` for videos<br>
 -  `imagemagick` | `perl` for avatars badges.<br>
-
+<br>
+Links (for Windows10 users): <br>
+- `git` : https://git-scm.com/download/win "64-bit Git for Windows Setup" <br>
+- `gource` : https://github.com/acaudwell/Gource/releases/tag/gource-0.51  "gource-VERSION.win64-setup.exe" <br>
+- `sed` : https://sourceforge.net/projects/gnuwin32/files/sed/4.2.1/?sort=filename&sortdir=asc "sed-VERSION-setup.exe" <br>
+- `FFmpeg` : FFmpeg is included in imagemagick. Get `imagemagick` instead and check the "install FFmpeg" when asked. <br>
+- `perl` : https://strawberryperl.com/ "strawberry-perl-VERSION-64bit.msi" <br>
+- `imagemagick` : https://imagemagick.org/script/download.php#windows "Win64 dynamic at 16 bits-per-pixel component with High-dynamic-range imaging enabled" <br>
+ <br>
+ 
 # <b>✔️ How to use Gource-Tools?</b><br>
 1) 📜  Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
 2) 🧰  Open <b>_Gource-tools.sh</b> and select <b>"Initialize from _List.txt"</b> <br>
