@@ -1,29 +1,34 @@
-Gource-Tools  
-![](https://img.shields.io/badge/License-MIT-orange.svg)  
-  
-![Combined](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)  
-  
-\## **🍩 What is Gource-Tools?**  
-  
-**Gource Tools is a toolbox made for Gource.**  
-It's main purpose it to download multiple repos, create logs, combine logs and download avatars automatically.  
-It's specially usefull for big projects with a lot of differents repos.  
-  
-  
-**⚙️ What do I need for Gource-Tools to work?**  
- **You need:** git | gource | sed | FFmpeg | imagemagick  
-  
-  
-\## **✔️ How to use Gource-Tools?**  
-1) 📜 Open **\_List.txt** and replace links with your repos URLs - one link per line.  
-2) 🧰 Open **\_Gource-tools.sh** and select **"Initialize from \_List.txt"**  
-3) ⌛ Wait until you see the **"Project succesfully initialized"** message.  
-4) 😃 You should be able to **EXPLORE** and **RENDER** now.  
-  
-![Main menu](https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/mainmenu.jpg) ![Initialize menu](https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg) ![Render menu](https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/rendermenu.jpg) 🎵 Change the **\_audio.mp3** file with a custom audio file for your own audio on render.  
-     _Original music file from **chriszabriskie.com/vendaface**  
-_  
-  
-  
-🙋‍♂️ Need help? Telegram: **@bitpaint** | Twitter: **@bitpaintclub  
-**![Big Gource](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/4k/2.png)
+Gource-Tools                         <br>
+<img src="https://img.shields.io/badge/License-MIT-orange.svg"> <br> <br>
+ <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg" alt="Combined" width="690px"> <br> <br>
+
+
+## <b>🍩 What is Gource-Tools?</b><br>
+<br>
+<b>Gource Tools is a toolbox made for Gource.</b><br>
+It's main purpose it to download multiple repos, create logs, combine logs and download avatars automatically. <br>
+It's specially usefull for big projects with a lot of differents repos.<br>
+<br>
+<br>
+
+ <b>⚙️ What do I need for Gource-Tools to work?</b><br>
+<b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> git | gource | sed | FFmpeg | imagemagick <br>
+<br>
+<br>
+## <b>✔️ How to use Gource-Tools?</b><br>
+1) 📜  Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
+2) 🧰  Open <b>_Gource-tools.sh</b> and select <b>"Initialize from _List.txt"</b> <br>
+3) ⌛   Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
+4) 😃  You should be able to <b>EXPLORE</b> and <b>RENDER</b> now.<br>
+<br>
+
+
+<img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/mainmenu.jpg" alt="Main menu" width="230px">      <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg" alt="Initialize menu" width="230px">      <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/rendermenu.jpg" alt="Render menu" width="230px">
+
+
+🎵 Change the <b>_audio.mp3</b> file with a custom audio file for your own audio on render.<br>
+&nbsp;&nbsp;&nbsp;&nbsp; <i> Original music file from <b>chriszabriskie.com/vendaface</b><br> </i>
+<br> <br>
+<br>
+🙋‍♂️ Need help? Telegram: <b>@bitpaint</b> | Twitter: <b>@bitpaintclub<br></b>
+ <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/4k/2.png" alt="Big Gource" width="690px"> <br> <br>
