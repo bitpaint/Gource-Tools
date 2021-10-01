@@ -12,7 +12,7 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 <b>⚙️ Requierements:</b><br>
 
-- `git` & `gource` <br> for basic usage (Explore only, you won't be able to make videos)
+- `git` & `gource` for basic usage (Explore only, you won't be able to make videos) <br>
 
 Optional: <br>
 
