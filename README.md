@@ -10,17 +10,15 @@ It's main purpose it to download multiple repos, create logs, combine logs and d
 It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 <br>
-
- <b>⚙️ What do I need for Gource-Tools to work?</b><br>
-<b>You need:</b><br> 
+<b>⚙️ Requierements:</b><br>
 - `git` & `gource`. <br>
-
 Optional: <br>
 - `FFmpeg` for videos<br>
 -  `imagemagick` | `perl` for avatars badges.<br>
 <br>
 <br>
-## <b>✔️ How to use Gource-Tools?</b><br>
+
+# <b>✔️ How to use Gource-Tools?</b><br>
 1) 📜  Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
 2) 🧰  Open <b>_Gource-tools.sh</b> and select <b>"Initialize from _List.txt"</b> <br>
 3) ⌛   Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
