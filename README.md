@@ -18,8 +18,6 @@ Optional: <br>
 
 - `FFmpeg` for videos<br>
 -  `imagemagick` | `perl` for avatars badges.<br>
-<br>
-<br>
 
 # <b>✔️ How to use Gource-Tools?</b><br>
 1) 📜  Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
