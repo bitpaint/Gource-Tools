@@ -12,7 +12,7 @@ It's specially usefull for big projects with a lot of differents repos.<br>
 <br>
 
  <b>⚙️ What do I need for Gource-Tools to work?</b><br>
-<b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> git | gource | sed | FFmpeg | imagemagick <br>
+<b>&nbsp;&nbsp;&nbsp;&nbsp;You need:</b> git | gource | sed | perl | FFmpeg | imagemagick <br>
 <br>
 <br>
 ## <b>✔️ How to use Gource-Tools?</b><br>
