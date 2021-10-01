@@ -17,8 +17,10 @@ Optional: <br>
 -  `imagemagick` | `perl` for avatars badges.<br>
 <br>
 
-# Links (for Windows10 users): <br>
+# Links (for Windows users): 
+
 <br>
+
  `git` : https://git-scm.com/download/win "64-bit Git for Windows Setup"  <br>
  `gource` : https://github.com/acaudwell/Gource/releases/tag/gource-0.51  "gource-VERSION.win64-setup.exe"  <br>
  `sed` : https://sourceforge.net/projects/gnuwin32/files/sed/4.2.1/?sort=filename&sortdir=asc "sed-VERSION-setup.exe"  <br>
