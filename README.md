@@ -3,7 +3,7 @@ Gource-Tools                         <br>
  <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg" alt="Combined" width="690px"> <br> <br>
 
 
-## <b>🍩 What is Gource-Tools?</b><br>
+# <b>🍩 What is Gource-Tools?</b><br>
 <br>
 <b>Gource Tools is a toolbox made for Gource.</b><br>
 It's main purpose it to download multiple repos, create logs, combine logs and download avatars automatically. <br>
