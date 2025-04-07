@@ -52,12 +52,12 @@ const ToggleButton = styled.button`
   }
 `;
 
-const ContentArea = styled.div<{ isOpen: boolean }>`
+const ContentArea = styled.div<{ $isOpen: boolean }>`
   overflow: hidden;
-  max-height: ${props => props.isOpen ? '500px' : '0'};
-  opacity: ${props => props.isOpen ? '1' : '0'};
+  max-height: ${props => props.$isOpen ? '500px' : '0'};
+  opacity: ${props => props.$isOpen ? '1' : '0'};
   transition: all 0.4s ease-in-out;
-  margin-top: ${props => props.isOpen ? props.theme.spacing.md : '0'};
+  margin-top: ${props => props.$isOpen ? props.theme.spacing.md : '0'};
 `;
 
 const StepContainer = styled.div`
@@ -84,18 +84,18 @@ const StepsWrapper = styled.div`
   }
 `;
 
-const ProgressBar = styled.div<{ progress: number }>`
+const ProgressBar = styled.div<{ $progress: number }>`
   position: absolute;
   height: 2px;
   background-color: #4CAF50;
   top: 2rem;
   left: 2rem;
-  width: ${props => (props.progress * (100 - (4 * 2)))}%;
+  width: ${props => (props.$progress * (100 - (4 * 2)))}%;
   z-index: 2;
   transition: width 0.5s ease-in-out;
 `;
 
-const Step = styled.div<{ active: boolean; completed: boolean }>`
+const Step = styled.div<{ $active: boolean; $completed: boolean }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -104,24 +104,24 @@ const Step = styled.div<{ active: boolean; completed: boolean }>`
   width: 25%;
 `;
 
-const StepIcon = styled.div<{ active: boolean; completed: boolean }>`
+const StepIcon = styled.div<{ $active: boolean; $completed: boolean }>`
   width: 4rem;
   height: 4rem;
   border-radius: 50%;
-  background-color: ${props => props.completed ? '#4CAF50' : props.active ? props.theme.colors.light : props.theme.colors.borderColor};
-  color: ${props => props.completed ? 'white' : props.active ? props.theme.colors.dark : props.theme.colors.textLight};
+  background-color: ${props => props.$completed ? '#4CAF50' : props.$active ? props.theme.colors.light : props.theme.colors.borderColor};
+  color: ${props => props.$completed ? 'white' : props.$active ? props.theme.colors.dark : props.theme.colors.textLight};
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: 1.5rem;
   margin-bottom: ${props => props.theme.spacing.sm};
-  border: 2px solid ${props => props.completed ? '#4CAF50' : props.active ? props.theme.colors.dark : 'transparent'};
+  border: 2px solid ${props => props.$completed ? '#4CAF50' : props.$active ? props.theme.colors.dark : 'transparent'};
   transition: all 0.3s ease-in-out;
 `;
 
-const StepTitle = styled.div<{ active: boolean; completed: boolean }>`
-  font-weight: ${props => (props.active || props.completed) ? props.theme.typography.fontWeight.bold : props.theme.typography.fontWeight.regular};
-  color: ${props => props.completed ? '#4CAF50' : props.active ? props.theme.colors.dark : props.theme.colors.textLight};
+const StepTitle = styled.div<{ $active: boolean; $completed: boolean }>`
+  font-weight: ${props => (props.$active || props.$completed) ? props.theme.typography.fontWeight.bold : props.theme.typography.fontWeight.regular};
+  color: ${props => props.$completed ? '#4CAF50' : props.$active ? props.theme.colors.dark : props.theme.colors.textLight};
   text-align: center;
   margin-bottom: ${props => props.theme.spacing.xs};
 `;
@@ -232,16 +232,16 @@ const QuickStart: React.FC<QuickStartProps> = ({ projectCount, repositoryCount, 
         </ToggleButton>
       </Header>
       
-      <ContentArea isOpen={isOpen}>
+      <ContentArea $isOpen={isOpen}>
         <StepContainer>
           <StepsWrapper>
-            <ProgressBar progress={progress} />
+            <ProgressBar $progress={progress} />
             
-            <Step active={activeStep === 1} completed={activeStep > 1}>
-              <StepIcon active={activeStep === 1} completed={activeStep > 1}>
+            <Step $active={activeStep === 1} $completed={activeStep > 1}>
+              <StepIcon $active={activeStep === 1} $completed={activeStep > 1}>
                 {activeStep > 1 ? <FaCheck /> : <FaGithub />}
               </StepIcon>
-              <StepTitle active={activeStep === 1} completed={activeStep > 1}>
+              <StepTitle $active={activeStep === 1} $completed={activeStep > 1}>
                 Copy a Repo
               </StepTitle>
               <StepDescription>
@@ -249,11 +249,11 @@ const QuickStart: React.FC<QuickStartProps> = ({ projectCount, repositoryCount, 
               </StepDescription>
             </Step>
             
-            <Step active={activeStep === 2} completed={activeStep > 2}>
-              <StepIcon active={activeStep === 2} completed={activeStep > 2}>
+            <Step $active={activeStep === 2} $completed={activeStep > 2}>
+              <StepIcon $active={activeStep === 2} $completed={activeStep > 2}>
                 {activeStep > 2 ? <FaCheck /> : <FaFolder />}
               </StepIcon>
-              <StepTitle active={activeStep === 2} completed={activeStep > 2}>
+              <StepTitle $active={activeStep === 2} $completed={activeStep > 2}>
                 Create a Project
               </StepTitle>
               <StepDescription>
@@ -261,11 +261,11 @@ const QuickStart: React.FC<QuickStartProps> = ({ projectCount, repositoryCount, 
               </StepDescription>
             </Step>
             
-            <Step active={activeStep === 3} completed={activeStep > 3}>
-              <StepIcon active={activeStep === 3} completed={activeStep > 3}>
+            <Step $active={activeStep === 3} $completed={activeStep > 3}>
+              <StepIcon $active={activeStep === 3} $completed={activeStep > 3}>
                 {activeStep > 3 ? <FaCheck /> : <FaCode />}
               </StepIcon>
-              <StepTitle active={activeStep === 3} completed={activeStep > 3}>
+              <StepTitle $active={activeStep === 3} $completed={activeStep > 3}>
                 Configure Gource
               </StepTitle>
               <StepDescription>
@@ -273,11 +273,11 @@ const QuickStart: React.FC<QuickStartProps> = ({ projectCount, repositoryCount, 
               </StepDescription>
             </Step>
             
-            <Step active={activeStep === 4} completed={activeStep > 4}>
-              <StepIcon active={activeStep === 4} completed={activeStep > 4}>
+            <Step $active={activeStep === 4} $completed={activeStep > 4}>
+              <StepIcon $active={activeStep === 4} $completed={activeStep > 4}>
                 {activeStep > 4 ? <FaCheck /> : <FaVideo />}
               </StepIcon>
-              <StepTitle active={activeStep === 4} completed={activeStep > 4}>
+              <StepTitle $active={activeStep === 4} $completed={activeStep > 4}>
                 Render
               </StepTitle>
               <StepDescription>

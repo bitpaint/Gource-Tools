@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import api from '../services/api';
+import ReactConfetti from 'react-confetti';
+import { useSpring, animated } from '@react-spring/web';
 
 interface FormData {
   name: string;
@@ -12,6 +14,14 @@ interface FormData {
 interface ImportData {
   username: string;
   platform: 'github' | 'gitlab';
+}
+
+interface ImportResult {
+  id: string;
+  name: string;
+  url: string;
+  success: boolean;
+  error?: string;
 }
 
 const Container = styled.div`
@@ -203,6 +213,139 @@ const RemoveButton = styled.button`
   }
 `;
 
+const WarningMessage = styled.div`
+  background-color: #fff8e1;
+  color: #f57f17;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border: 1px solid #ffe082;
+`;
+
+// Animations and success UI
+const SuccessCardBase = styled.div`
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 2rem;
+  max-width: 600px;
+  text-align: center;
+  margin-top: 2rem;
+  position: relative;
+  overflow: hidden;
+`;
+
+const SuccessCard = animated(SuccessCardBase);
+
+const SuccessIcon = styled.div`
+  background-color: ${({ theme }) => theme.colors.success || '#28a745'};
+  color: white;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto 1.5rem auto;
+  font-size: 2.5rem;
+`;
+
+const SuccessTitle = styled.h2`
+  color: ${({ theme }) => theme.colors.text};
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+`;
+
+const SuccessDescription = styled.p`
+  color: ${({ theme }) => theme.colors.text}99;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+`;
+
+const ResultsList = styled.div`
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 2rem;
+  text-align: left;
+  border: 1px solid ${({ theme }) => theme.colors.background};
+  border-radius: 4px;
+`;
+
+const ResultItem = styled.div<{ $success: boolean }>`
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.background};
+  display: flex;
+  align-items: center;
+  
+  &:last-child {
+    border-bottom: none;
+  }
+  
+  &::before {
+    content: ${({ $success }) => $success ? '"✅"' : '"❌"'};
+    margin-right: 0.75rem;
+  }
+  
+  color: ${({ $success, theme }) => $success ? theme.colors.text : theme.colors.danger};
+`;
+
+const ActionButton = styled(Button)`
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: white;
+  font-weight: 600;
+  padding: 0.875rem 1.75rem;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.primary}cc;
+  }
+`;
+
+const LoadingOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+`;
+
+const LoadingSpinner = styled.div`
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid ${({ theme }) => theme.colors.primary};
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+const LoadingText = styled.p`
+  font-size: 1.25rem;
+  color: ${({ theme }) => theme.colors.text};
+  margin-top: 1rem;
+`;
+
+const ActionButtonsContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+`;
+
+/**
+ * AddRepository - Component for downloading new Git repositories to Gource Tools
+ * This component is specifically for adding new repositories to the system
+ * NOT for associating existing repositories with projects (use LinkRepositoryToProject for that)
+ */
 const AddRepository: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'quick' | 'bulk'>('quick');
   const [quickUrl, setQuickUrl] = useState('');
@@ -219,10 +362,37 @@ const AddRepository: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [importResults, setImportResults] = useState<ImportResult[]>([]);
+  const [showSuccessCard, setShowSuccessCard] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState('');
+  
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const projectId = searchParams.get('project_id');
+
+  // If there's a project ID, redirect to the LinkRepositoryToProject page
+  useEffect(() => {
+    if (projectId) {
+      navigate(`/projects/${projectId}/link-repositories`);
+    }
+  }, [projectId, navigate]);
+
+  // Animation for success card
+  const successCardAnimation = useSpring({
+    from: { opacity: 0, transform: 'translateY(30px)' },
+    to: { opacity: showSuccessCard ? 1 : 0, transform: showSuccessCard ? 'translateY(0px)' : 'translateY(30px)' },
+    config: { tension: 280, friction: 20 }
+  });
+  
+  // Reset state when switching tabs
+  useEffect(() => {
+    setError(null);
+    setSuccess(null);
+    setShowSuccessCard(false);
+    setShowConfetti(false);
+  }, [activeTab]);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -242,20 +412,66 @@ const AddRepository: React.FC = () => {
     }
   };
 
+  // Function to normalize Git URLs
+  const normalizeGitUrl = (url: string): string => {
+    // If it's already a valid URL
+    if (isValidUrl(url)) {
+      const urlObj = new URL(url);
+      
+      // If it's a GitHub or GitLab URL
+      if (urlObj.hostname === 'github.com' || urlObj.hostname === 'gitlab.com') {
+        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+        
+        // If it's a web page URL (not .git)
+        if (pathParts.length >= 2 && !url.endsWith('.git')) {
+          // Convert to clone URL
+          return `https://${urlObj.hostname}/${pathParts[0]}/${pathParts[1]}.git`;
+        }
+      }
+      
+      return url;
+    }
+    
+    // If it might be a username or organization
+    if (url.indexOf('/') === -1 && url.indexOf('.') === -1) {
+      // Suggest bulk import
+      setActiveTab('bulk');
+      setImportData(prev => ({ ...prev, username: url }));
+      setError('This appears to be a username. Please use the bulk import tab instead.');
+      return '';
+    }
+    
+    // If it might be a repo name without full URL
+    if (url.includes('/') && !url.includes('://')) {
+      // Convert to GitHub URL by default
+      return `https://github.com/${url}.git`;
+    }
+    
+    return url;
+  };
+
   const addRepository = () => {
     if (!quickUrl.trim()) return;
     
-    if (!isValidUrl(quickUrl)) {
-      setError('Repository URL is invalid');
+    // Normalize the URL
+    const normalizedUrl = normalizeGitUrl(quickUrl);
+    
+    // If normalization suggested a bulk import
+    if (!normalizedUrl) {
       return;
     }
     
-    // Extract name from URL
-    const urlObj = new URL(quickUrl);
+    if (!isValidUrl(normalizedUrl)) {
+      setError('Invalid repository URL. Please enter a valid URL or use the format "username/repo".');
+      return;
+    }
+    
+    // Extract repository name from URL
+    const urlObj = new URL(normalizedUrl);
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
     let name = pathParts[pathParts.length - 1].replace(/\.git$/, '');
     
-    const newRepo = { url: quickUrl, name };
+    const newRepo = { url: normalizedUrl, name };
     setRepositories(prev => [...prev, newRepo]);
     setQuickUrl('');
     setError(null);
@@ -276,29 +492,34 @@ const AddRepository: React.FC = () => {
     setSubmitting(true);
     setError(null);
     setSuccess(null);
+    setLoadingProgress(`Discovering repositories for ${importData.username}...`);
 
     try {
       const response = await api.post('/repositories/import', {
         username: importData.username,
-        platform: importData.platform,
-        project_id: projectId || undefined
+        platform: importData.platform
       });
       
-      setSuccess(`Successfully imported repositories from ${importData.username}`);
+      // Show success UI
+      setShowSuccessCard(true);
+      setShowConfetti(true);
+      setImportResults(response.data.results || []);
+      
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 5000);
+      
+      // Reset form
       setImportData({
         username: '',
         platform: 'github'
       });
-      
-      // Optionally redirect if projectId was provided
-      if (projectId) {
-        navigate(`/projects/${projectId}`);
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error importing repositories:', err);
-      setError('An error occurred while importing repositories. Please try again.');
+      setError(err.response?.data?.error || 'An error occurred while importing repositories. Please try again.');
     } finally {
       setSubmitting(false);
+      setLoadingProgress('');
     }
   };
 
@@ -311,7 +532,7 @@ const AddRepository: React.FC = () => {
     }
     
     if (repositories.length === 0) {
-      setError('At least one repository URL is required');
+      setError('You must specify at least one repository URL');
       return;
     }
     
@@ -319,32 +540,52 @@ const AddRepository: React.FC = () => {
       setSubmitting(true);
       setError(null);
       setSuccess(null);
+      setLoadingProgress(`Downloading repositories...`);
       
-      const promises = repositories.map(repo => 
-        api.post('/repositories', {
-          name: repo.name,
-          url: repo.url,
-          branch_default: 'main',
-          project_id: projectId || undefined
-        })
-      );
+      const results: ImportResult[] = [];
       
-      await Promise.all(promises);
-      
-      // Show success message and clear form
-      setSuccess(`Successfully added ${repositories.length} repositories`);
-      setRepositories([]);
-      
-      // Optionally redirect if projectId was provided
-      if (projectId) {
-        navigate(`/projects/${projectId}`);
+      for (let i = 0; i < repositories.length; i++) {
+        const repo = repositories[i];
+        setLoadingProgress(`Downloading ${repo.name} (${i+1}/${repositories.length})...`);
+        
+        try {
+          const response = await api.post('/repositories', {
+            name: repo.name,
+            url: repo.url
+          });
+          
+          results.push({
+            id: response.data.id,
+            name: repo.name,
+            url: repo.url,
+            success: true
+          });
+        } catch (err: any) {
+          results.push({
+            id: '',
+            name: repo.name,
+            url: repo.url,
+            success: false,
+            error: err.response?.data?.error || 'Unknown error'
+          });
+        }
       }
       
-    } catch (err) {
+      // Show success UI
+      setImportResults(results);
+      setShowSuccessCard(true);
+      setShowConfetti(true);
+      setRepositories([]);
+      
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 5000);
+    } catch (err: any) {
       console.error('Error creating repositories:', err);
-      setError('An error occurred while creating repositories. Please try again.');
+      setError(err.response?.data?.error || 'An error occurred while creating repositories. Please try again.');
     } finally {
       setSubmitting(false);
+      setLoadingProgress('');
     }
   };
 
@@ -365,33 +606,41 @@ const AddRepository: React.FC = () => {
       setSubmitting(true);
       setError(null);
       setSuccess(null);
+      setLoadingProgress(`Downloading repository ${formData.name}...`);
       
-      // Create the repository
       const response = await api.post('/repositories', {
         name: formData.name,
         url: formData.url || null,
-        branch_default: formData.branch_default,
-        project_id: projectId || undefined
+        branch_default: formData.branch_default
       });
       
-      // Show success message and clear form
-      setSuccess(`Successfully added repository ${formData.name}`);
+      // Show success UI with one result
+      setImportResults([{
+        id: response.data.id,
+        name: formData.name,
+        url: formData.url,
+        success: true
+      }]);
+      
+      setShowSuccessCard(true);
+      setShowConfetti(true);
+      
+      // Reset form
       setFormData({
         name: '',
         url: '',
         branch_default: 'main'
       });
       
-      // Optionally redirect if projectId was provided
-      if (projectId) {
-        navigate(`/projects/${projectId}`);
-      }
-      
-    } catch (err) {
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 5000);
+    } catch (err: any) {
       console.error('Error creating repository:', err);
-      setError('An error occurred while creating the repository. Please try again.');
+      setError(err.response?.data?.error || 'An error occurred while creating the repository. Please try again.');
     } finally {
       setSubmitting(false);
+      setLoadingProgress('');
     }
   };
 
@@ -403,132 +652,195 @@ const AddRepository: React.FC = () => {
       return false;
     }
   };
+  
+  const handleGoToProjects = () => {
+    navigate('/projects');
+  };
+  
+  const handleAddAnother = () => {
+    setShowSuccessCard(false);
+    setShowConfetti(false);
+    setSuccess(null);
+    setError(null);
+  };
 
   return (
     <Container>
+      {/* Confetti effect on success */}
+      {showConfetti && (
+        <ReactConfetti
+          width={window.innerWidth}
+          height={window.innerHeight}
+          recycle={false}
+          numberOfPieces={500}
+          gravity={0.1}
+        />
+      )}
+      
+      {/* Loading overlay */}
+      {submitting && (
+        <LoadingOverlay>
+          <LoadingSpinner />
+          <LoadingText>{loadingProgress || 'Processing...'}</LoadingText>
+        </LoadingOverlay>
+      )}
+      
       <Header>
-        <Title>Add Repository</Title>
-        <Subtitle>Add a Git repository to use in your projects</Subtitle>
+        <Title>Download Git Repository</Title>
+        <Subtitle>Add a new Git repository to Gource Tools</Subtitle>
       </Header>
       
-      <Tabs>
-        <Tab 
-          $active={activeTab === 'quick'} 
-          onClick={() => setActiveTab('quick')}
-        >
-          Quick Add
-        </Tab>
-        <Tab 
-          $active={activeTab === 'bulk'} 
-          onClick={() => setActiveTab('bulk')}
-        >
-          Bulk Import
-        </Tab>
-      </Tabs>
-      
-      {activeTab === 'quick' ? (
-        <Form onSubmit={handleQuickSubmit}>
-          <UrlForm>
-            <UrlInput
-              value={quickUrl}
-              onChange={(e) => setQuickUrl(e.target.value)}
-              onKeyDown={handleUrlKeyDown}
-              placeholder="Enter repository URL and press Enter"
-              disabled={submitting}
-            />
-            <AddButton 
-              type="button" 
-              onClick={addRepository}
-              disabled={submitting}
-            >
-              Add
-            </AddButton>
-          </UrlForm>
+      {/* Success card UI */}
+      {showSuccessCard ? (
+        <SuccessCard style={successCardAnimation}>
+          <SuccessIcon>✓</SuccessIcon>
+          <SuccessTitle>Repositories Downloaded Successfully!</SuccessTitle>
+          <SuccessDescription>
+            {importResults.filter(r => r.success).length} of {importResults.length} repositories were downloaded successfully.
+          </SuccessDescription>
           
-          {repositories.length > 0 && (
-            <RepositoryList>
-              {repositories.map((repo, index) => (
-                <RepositoryItem key={index}>
-                  <div>
-                    <strong>{repo.name}</strong>
-                    <div><small>{repo.url}</small></div>
-                  </div>
-                  <RemoveButton 
-                    type="button" 
-                    onClick={() => removeRepository(index)}
-                    disabled={submitting}
-                  >
-                    Remove
-                  </RemoveButton>
-                </RepositoryItem>
+          {importResults.length > 0 && (
+            <ResultsList>
+              {importResults.map((result, index) => (
+                <ResultItem key={index} $success={result.success}>
+                  <strong>{result.name}</strong> - {result.success ? 'Downloaded successfully' : result.error}
+                </ResultItem>
               ))}
-            </RepositoryList>
+            </ResultsList>
           )}
           
-          {error && <ErrorMessage>{error}</ErrorMessage>}
-          {success && <SuccessMessage>{success}</SuccessMessage>}
-          
-          <ButtonContainer>
-            <CancelButton 
-              type="button" 
-              onClick={() => projectId ? navigate(`/projects/${projectId}`) : navigate('/repositories')} 
-              disabled={submitting}
-            >
-              Cancel
+          <ActionButtonsContainer>
+            <CancelButton onClick={handleAddAnother}>
+              Download More
             </CancelButton>
-            <SubmitButton type="submit" disabled={submitting}>
-              {submitting ? 'Adding...' : 'Add Repositories'}
-            </SubmitButton>
-          </ButtonContainer>
-        </Form>
+            <ActionButton onClick={handleGoToProjects}>
+              Go to Projects
+            </ActionButton>
+          </ActionButtonsContainer>
+        </SuccessCard>
       ) : (
-        <Form onSubmit={(e) => { e.preventDefault(); handleImport(); }}>
-          <FormGroup>
-            <Label htmlFor="platform">Platform</Label>
-            <Select
-              id="platform"
-              name="platform"
-              value={importData.platform}
-              onChange={handleImportDataChange}
-              disabled={submitting}
+        <>
+          <Tabs>
+            <Tab 
+              $active={activeTab === 'quick'} 
+              onClick={() => setActiveTab('quick')}
             >
-              <option value="github">GitHub</option>
-              <option value="gitlab">GitLab</option>
-            </Select>
-          </FormGroup>
-          
-          <FormGroup>
-            <Label htmlFor="username">Username/Organization</Label>
-            <Input
-              id="username"
-              name="username"
-              value={importData.username}
-              onChange={handleImportDataChange}
-              placeholder={`Enter ${importData.platform === 'github' ? 'GitHub' : 'GitLab'} username or organization`}
-              disabled={submitting}
-              required
-            />
-            <InfoText>
-              All public repositories from this {importData.platform === 'github' ? 'GitHub' : 'GitLab'} user/organization will be imported.
-            </InfoText>
-          </FormGroup>
-          
-          {error && <ErrorMessage>{error}</ErrorMessage>}
-          {success && <SuccessMessage>{success}</SuccessMessage>}
-          
-          <ButtonContainer>
-            <CancelButton 
-              type="button" 
-              onClick={() => projectId ? navigate(`/projects/${projectId}`) : navigate('/repositories')} 
-              disabled={submitting}
+              Quick Add
+            </Tab>
+            <Tab 
+              $active={activeTab === 'bulk'} 
+              onClick={() => setActiveTab('bulk')}
             >
-              Cancel
-            </CancelButton>
-            <SubmitButton type="submit" disabled={submitting}>
-              {submitting ? 'Importing...' : 'Import Repositories'}
-            </SubmitButton>
-          </ButtonContainer>
-        </Form>
+              Bulk Import
+            </Tab>
+          </Tabs>
+          
+          {activeTab === 'quick' && (
+            <Form onSubmit={handleQuickSubmit}>
+              <FormGroup>
+                <Label>Repository URL or "username/repo"</Label>
+                <UrlForm>
+                  <UrlInput 
+                    type="text" 
+                    value={quickUrl} 
+                    onChange={(e) => setQuickUrl(e.target.value)}
+                    onKeyDown={handleUrlKeyDown}
+                    placeholder="e.g., https://github.com/username/repo.git or username/repo"
+                  />
+                  <AddButton 
+                    type="button" 
+                    onClick={addRepository}
+                    disabled={!quickUrl.trim()}
+                  >
+                    Add
+                  </AddButton>
+                </UrlForm>
+                {error && <ErrorMessage>{error}</ErrorMessage>}
+                {success && <SuccessMessage>{success}</SuccessMessage>}
+                <InfoText>
+                  Enter the full URL of a Git repository or use the "username/repo" format for GitHub repositories.
+                  To import all repositories from a user, use the Bulk Import tab.
+                </InfoText>
+              </FormGroup>
+
+              {repositories.length > 0 && (
+                <FormGroup>
+                  <Label>Repositories to download</Label>
+                  <RepositoryList>
+                    {repositories.map((repo, index) => (
+                      <RepositoryItem key={index}>
+                        <div>{repo.name} ({repo.url})</div>
+                        <RemoveButton 
+                          type="button" 
+                          onClick={() => removeRepository(index)}
+                        >
+                          Remove
+                        </RemoveButton>
+                      </RepositoryItem>
+                    ))}
+                  </RepositoryList>
+                </FormGroup>
+              )}
+              
+              <ButtonContainer>
+                <CancelButton type="button" onClick={() => navigate(-1)}>
+                  Cancel
+                </CancelButton>
+                <SubmitButton 
+                  type="submit" 
+                  disabled={submitting || repositories.length === 0}
+                >
+                  {submitting ? 'Downloading...' : 'Download Repositories'}
+                </SubmitButton>
+              </ButtonContainer>
+            </Form>
+          )}
+          
+          {activeTab === 'bulk' && (
+            <Form onSubmit={(e) => { e.preventDefault(); handleImport(); }}>
+              <FormGroup>
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  type="text"
+                  id="username"
+                  name="username"
+                  value={importData.username}
+                  onChange={handleImportDataChange}
+                  placeholder="e.g., octocat"
+                  required
+                />
+                <InfoText>
+                  Enter the username or organization whose public repositories you want to import.
+                </InfoText>
+              </FormGroup>
+              
+              <FormGroup>
+                <Label htmlFor="platform">Platform</Label>
+                <Select
+                  id="platform"
+                  name="platform"
+                  value={importData.platform}
+                  onChange={handleImportDataChange}
+                >
+                  <option value="github">GitHub</option>
+                  <option value="gitlab">GitLab</option>
+                </Select>
+              </FormGroup>
+              
+              {error && <ErrorMessage>{error}</ErrorMessage>}
+              {success && <SuccessMessage>{success}</SuccessMessage>}
+              
+              <ButtonContainer>
+                <CancelButton type="button" onClick={() => navigate(-1)}>
+                  Cancel
+                </CancelButton>
+                <SubmitButton type="submit" disabled={submitting || !importData.username}>
+                  {submitting ? 'Importing...' : 'Import Repositories'}
+                </SubmitButton>
+              </ButtonContainer>
+            </Form>
+          )}
+        </>
       )}
     </Container>
   );

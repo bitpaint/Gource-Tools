@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder } from 'react-icons/fa';
+import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder, FaSearch, FaTags, FaTimes } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 
 interface Repository {
   id: string;
   name: string;
+  username: string | null;
   url: string | null;
   local_path: string | null;
   branch_default: string;
+  tags: string | null;
   last_updated: string;
+}
+
+// Type pour les dépôts groupés par nom d'utilisateur
+interface GroupedRepositories {
+  [username: string]: Repository[];
 }
 
 const Container = styled.div`
@@ -242,16 +249,227 @@ const ErrorMessage = styled.div`
   color: ${({ theme }) => theme.colors.danger};
 `;
 
+const UserGroup = styled.div`
+  margin-bottom: 2rem;
+`;
+
+const UserHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: ${({ theme }) => theme.colors.background};
+  border-radius: 4px;
+  border-left: 4px solid ${({ theme }) => theme.colors.primary};
+`;
+
+const UserName = styled.h2`
+  margin: 0;
+  font-size: 1.3rem;
+  color: ${({ theme }) => theme.colors.text};
+`;
+
+const TagsContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const Tag = styled.span`
+  background-color: ${({ theme }) => theme.colors.light};
+  color: ${({ theme }) => theme.colors.text};
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+`;
+
+const SearchContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+`;
+
+const SearchRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const SearchInput = styled.div`
+  position: relative;
+  flex: 1;
+  
+  input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border: 1px solid ${({ theme }) => theme.colors.borderColor};
+    border-radius: 4px;
+    font-size: 1rem;
+    
+    &:focus {
+      outline: none;
+      border-color: ${({ theme }) => theme.colors.primary};
+      box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primary}30;
+    }
+  }
+`;
+
+const SearchIcon = styled.div`
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${({ theme }) => theme.colors.textLight};
+  display: flex;
+  align-items: center;
+`;
+
+const ActiveFiltersContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+`;
+
+const FilterTag = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: ${({ theme }) => theme.colors.primary}20;
+  border: 1px solid ${({ theme }) => theme.colors.primary}40;
+  color: ${({ theme }) => theme.colors.primary};
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  
+  button {
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: ${({ theme }) => theme.colors.primary};
+    font-size: 0.8rem;
+    
+    &:hover {
+      color: ${({ theme }) => theme.colors.danger};
+    }
+  }
+`;
+
+const ExpandableTagsList = styled.div`
+  margin-top: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  animation: fadeIn 0.3s ease;
+  
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+const TagFilterButton = styled.button<{ isActive: boolean }>`
+  background-color: ${({ theme, isActive }) => isActive ? theme.colors.primary : theme.colors.light};
+  color: ${({ theme, isActive }) => isActive ? theme.colors.white : theme.colors.text};
+  border: none;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background-color: ${({ theme, isActive }) => isActive ? theme.colors.primary : theme.colors.border};
+  }
+`;
+
+const TagFilterToggle = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.primary};
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  transition: color 0.2s;
+  
+  &:hover {
+    color: ${({ theme }) => theme.colors.primaryDark};
+    text-decoration: underline;
+  }
+`;
+
 const RepositoryList: React.FC = () => {
   const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [groupedRepositories, setGroupedRepositories] = useState<GroupedRepositories>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showTagFilters, setShowTagFilters] = useState(false);
   const navigate = useNavigate();
   const { addNotification } = useNotification();
 
   useEffect(() => {
     fetchRepositories();
   }, []);
+
+  useEffect(() => {
+    // Extraire et regrouper les tags disponibles
+    const tagsSet = new Set<string>();
+    repositories.forEach(repo => {
+      if (repo.tags) {
+        const repoTags = repo.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+        repoTags.forEach(tag => tagsSet.add(tag));
+      }
+    });
+    setAvailableTags(Array.from(tagsSet).sort());
+  }, [repositories]);
+
+  useEffect(() => {
+    // Filtrer les dépôts en fonction de la recherche et des tags sélectionnés
+    const filteredRepos = repositories.filter(repo => {
+      // Filtre par terme de recherche
+      const matchesSearch = searchTerm === '' || 
+        repo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (repo.username && repo.username.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      // Filtre par tags
+      const matchesTags = selectedTags.length === 0 || 
+        (repo.tags && selectedTags.every(tag => 
+          repo.tags!.split(',').map(t => t.trim()).includes(tag)
+        ));
+      
+      return matchesSearch && matchesTags;
+    });
+    
+    // Regrouper les dépôts filtrés par nom d'utilisateur
+    const grouped: GroupedRepositories = {};
+    
+    filteredRepos.forEach(repo => {
+      const username = repo.username || 'Autres';
+      if (!grouped[username]) {
+        grouped[username] = [];
+      }
+      grouped[username].push(repo);
+    });
+    
+    setGroupedRepositories(grouped);
+  }, [repositories, searchTerm, selectedTags]);
 
   const fetchRepositories = async () => {
     try {
@@ -364,6 +582,37 @@ const RepositoryList: React.FC = () => {
     document.body.removeChild(textArea);
   };
 
+  // Fonction pour afficher les tags d'un dépôt
+  const renderTags = (tags: string | null) => {
+    if (!tags) return null;
+    const tagList = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    
+    return (
+      <TagsContainer>
+        {tagList.map((tag, index) => (
+          <Tag key={`${tag}-${index}`}>{tag}</Tag>
+        ))}
+      </TagsContainer>
+    );
+  };
+
+  const handleTagFilter = (tag: string) => {
+    setSelectedTags(prevTags => 
+      prevTags.includes(tag)
+        ? prevTags.filter(t => t !== tag)
+        : [...prevTags, tag]
+    );
+  };
+
+  const removeTagFilter = (tag: string) => {
+    setSelectedTags(prevTags => prevTags.filter(t => t !== tag));
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedTags([]);
+  };
+
   return (
     <Container>
       <Header>
@@ -375,6 +624,75 @@ const RepositoryList: React.FC = () => {
           <FaPlus /> Add Repository
         </AddButton>
       </Header>
+
+      <SearchContainer>
+        <SearchRow>
+          <SearchInput>
+            <SearchIcon>
+              <FaSearch />
+            </SearchIcon>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Rechercher un dépôt ou un utilisateur..."
+            />
+          </SearchInput>
+        </SearchRow>
+        
+        {(selectedTags.length > 0 || searchTerm) && (
+          <ActiveFiltersContainer>
+            {searchTerm && (
+              <FilterTag>
+                Recherche: {searchTerm}
+                <button onClick={() => setSearchTerm('')}>
+                  <FaTimes />
+                </button>
+              </FilterTag>
+            )}
+            
+            {selectedTags.map(tag => (
+              <FilterTag key={tag}>
+                {tag}
+                <button onClick={() => removeTagFilter(tag)}>
+                  <FaTimes />
+                </button>
+              </FilterTag>
+            ))}
+            
+            {(selectedTags.length > 0 || searchTerm) && (
+              <FilterTag>
+                <button onClick={clearFilters}>
+                  Effacer tous les filtres
+                </button>
+              </FilterTag>
+            )}
+          </ActiveFiltersContainer>
+        )}
+        
+        {availableTags.length > 0 && (
+          <>
+            <TagFilterToggle onClick={() => setShowTagFilters(!showTagFilters)}>
+              <FaTags />
+              {showTagFilters ? 'Masquer les tags' : 'Filtrer par tags'}
+            </TagFilterToggle>
+            
+            {showTagFilters && (
+              <ExpandableTagsList>
+                {availableTags.map(tag => (
+                  <TagFilterButton
+                    key={tag}
+                    isActive={selectedTags.includes(tag)}
+                    onClick={() => handleTagFilter(tag)}
+                  >
+                    {tag}
+                  </TagFilterButton>
+                ))}
+              </ExpandableTagsList>
+            )}
+          </>
+        )}
+      </SearchContainer>
 
       {loading ? (
         <LoadingIndicator>Loading repositories...</LoadingIndicator>
@@ -393,77 +711,99 @@ const RepositoryList: React.FC = () => {
             <FaPlus /> Add Repository
           </AddButton>
         </EmptyState>
+      ) : Object.keys(groupedRepositories).length === 0 ? (
+        <EmptyState>
+          <EmptyIcon>
+            <FaSearch />
+          </EmptyIcon>
+          <EmptyTitle>Aucun résultat</EmptyTitle>
+          <EmptyText>
+            Aucun dépôt ne correspond aux critères de recherche.
+          </EmptyText>
+          <button onClick={clearFilters}>Effacer les filtres</button>
+        </EmptyState>
       ) : (
-        <ListContainer>
-          <ListHeader>
-            <ListHeaderItem>
-              <FaGithub /> Repository
-            </ListHeaderItem>
-            <ListHeaderItem>
-              <FaFolder /> Path
-            </ListHeaderItem>
-            <ListHeaderItem>
-              <FaCalendarAlt /> Last Updated
-            </ListHeaderItem>
-            <div>Actions</div>
-          </ListHeader>
-          {repositories.map((repo) => (
-            <ListItem key={repo.id}>
-              <RepoNameCell>
-                <RepoIconWrapper>
-                  <FaGithub />
-                </RepoIconWrapper>
-                <RepoName>{repo.name}</RepoName>
-              </RepoNameCell>
-              <PathContainer>
-                {repo.local_path ? (
-                  <>
-                    <PathValue title={repo.local_path}>
-                      {repo.local_path}
-                    </PathValue>
-                    <CopyButton 
-                      onClick={() => copyToClipboard(repo.local_path || '')}
-                      title="Copy path to clipboard"
+        Object.entries(groupedRepositories).map(([username, repos]) => (
+          <UserGroup key={username}>
+            <UserHeader>
+              <FaGithub size={20} />
+              <UserName>{username}</UserName>
+            </UserHeader>
+            <ListContainer>
+              <ListHeader>
+                <ListHeaderItem>
+                  <FaGithub /> Repository
+                </ListHeaderItem>
+                <ListHeaderItem>
+                  <FaFolder /> Path
+                </ListHeaderItem>
+                <ListHeaderItem>
+                  <FaCalendarAlt /> Last Updated
+                </ListHeaderItem>
+                <div>Actions</div>
+              </ListHeader>
+              {repos.map((repo) => (
+                <ListItem key={repo.id}>
+                  <RepoNameCell>
+                    <RepoIconWrapper>
+                      <FaGithub />
+                    </RepoIconWrapper>
+                    <div>
+                      <RepoName>{repo.name}</RepoName>
+                      {repo.tags && renderTags(repo.tags)}
+                    </div>
+                  </RepoNameCell>
+                  <PathContainer>
+                    {repo.local_path ? (
+                      <>
+                        <PathValue title={repo.local_path}>
+                          {repo.local_path}
+                        </PathValue>
+                        <CopyButton 
+                          onClick={() => copyToClipboard(repo.local_path || '')}
+                          title="Copy path to clipboard"
+                        >
+                          <FaCopy size={14} />
+                        </CopyButton>
+                      </>
+                    ) : (
+                      'Not available'
+                    )}
+                  </PathContainer>
+                  <DateCell>
+                    <DateIcon><FaCalendarAlt size={14} /></DateIcon>
+                    {formatDate(repo.last_updated)}
+                  </DateCell>
+                  <Actions>
+                    <ActionButton 
+                      className="edit" 
+                      onClick={() => navigate(`/repositories/${repo.id}`)}
+                      title="Edit"
                     >
-                      <FaCopy size={14} />
-                    </CopyButton>
-                  </>
-                ) : (
-                  'Not available'
-                )}
-              </PathContainer>
-              <DateCell>
-                <DateIcon><FaCalendarAlt size={14} /></DateIcon>
-                {formatDate(repo.last_updated)}
-              </DateCell>
-              <Actions>
-                <ActionButton 
-                  className="edit" 
-                  onClick={() => navigate(`/repositories/${repo.id}`)}
-                  title="Edit"
-                >
-                  <FaEdit />
-                </ActionButton>
-                {repo.local_path && (
-                  <ActionButton 
-                    className="sync" 
-                    onClick={() => handleSyncRepository(repo.id)}
-                    title="Synchronize"
-                  >
-                    <FaSync />
-                  </ActionButton>
-                )}
-                <ActionButton 
-                  className="delete" 
-                  onClick={() => handleDeleteRepository(repo.id)}
-                  title="Delete"
-                >
-                  <FaTrash />
-                </ActionButton>
-              </Actions>
-            </ListItem>
-          ))}
-        </ListContainer>
+                      <FaEdit />
+                    </ActionButton>
+                    {repo.local_path && (
+                      <ActionButton 
+                        className="sync" 
+                        onClick={() => handleSyncRepository(repo.id)}
+                        title="Synchronize"
+                      >
+                        <FaSync />
+                      </ActionButton>
+                    )}
+                    <ActionButton 
+                      className="delete" 
+                      onClick={() => handleDeleteRepository(repo.id)}
+                      title="Delete"
+                    >
+                      <FaTrash />
+                    </ActionButton>
+                  </Actions>
+                </ListItem>
+              ))}
+            </ListContainer>
+          </UserGroup>
+        ))
       )}
     </Container>
   );

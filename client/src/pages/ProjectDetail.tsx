@@ -235,7 +235,7 @@ const ProjectDetail = () => {
   };
   
   const handleAddRepository = () => {
-    navigate(`/repositories/add?project_id=${safeProjectId}`);
+    navigate(`/projects/${safeProjectId}/link-repositories`);
   };
   
   const handleEditRepository = (repoId: string) => {
@@ -328,7 +328,7 @@ const ProjectDetail = () => {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <SectionTitle>Repositories</SectionTitle>
           <AddRepoButton onClick={handleAddRepository}>
-            + Add Repository
+            + Link Repository
           </AddRepoButton>
         </div>
         

@@ -11,6 +11,7 @@ import AddRepository from '../pages/AddRepository';
 import EditRepository from '../pages/EditRepository';
 import GourceConfig from '../pages/GourceConfig';
 import NotFound from '../pages/NotFound';
+import LinkRepositoriesToProject from '../pages/LinkRepositoriesToProject';
 
 const AppRouter: React.FC = () => {
   return (
@@ -24,7 +25,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       
-      {/* Routes pour les projets */}
+      {/* Project routes */}
       <Route 
         path="/projects" 
         element={
@@ -65,8 +66,16 @@ const AppRouter: React.FC = () => {
           </Layout>
         } 
       />
+      <Route 
+        path="/projects/:projectId/link-repositories" 
+        element={
+          <Layout>
+            <LinkRepositoriesToProject />
+          </Layout>
+        } 
+      />
       
-      {/* Routes pour les dépôts */}
+      {/* Repository routes */}
       <Route 
         path="/repositories" 
         element={
@@ -92,7 +101,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       
-      {/* Routes pour les rendus */}
+      {/* Render routes */}
       <Route 
         path="/renders" 
         element={
@@ -118,7 +127,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       
-      {/* Routes pour les paramètres */}
+      {/* Settings routes */}
       <Route 
         path="/settings" 
         element={
@@ -144,7 +153,7 @@ const AppRouter: React.FC = () => {
         }
       />
       
-      {/* Route 404 */}
+      {/* 404 route */}
       <Route 
         path="*" 
         element={

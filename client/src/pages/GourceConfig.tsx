@@ -29,6 +29,13 @@ interface GourceConfig {
   updated_at: string;
 }
 
+interface Repository {
+  id: string;
+  name: string;
+  url: string | null;
+  project_id: string;
+}
+
 interface RenderOptions {
   config_id: string;
   output_format: 'mp4' | 'webm' | 'gif';
@@ -141,6 +148,41 @@ const LoadingState = styled.div`
   font-size: 1.1rem;
 `;
 
+const ErrorMessage = styled.div`
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border: 1px solid #ef9a9a;
+`;
+
+const WarningMessage = styled.div`
+  background-color: #fff8e1;
+  color: #f57f17;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  border: 1px solid #ffe082;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+`;
+
+const ActionButton = styled.button`
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: #ff9800;
+  color: white;
+  cursor: pointer;
+  
+  &:hover {
+    background-color: #f57c00;
+  }
+`;
+
 const GourceConfigPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
@@ -150,6 +192,8 @@ const GourceConfigPage = () => {
   const [showRenderForm, setShowRenderForm] = useState(false);
   const [currentConfig, setCurrentConfig] = useState<GourceConfig | null>(null);
   const [project, setProject] = useState<Project | null>(null);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [hasRepositories, setHasRepositories] = useState(false);
   
   // S'assurer que projectId n'est pas undefined
   const safeProjectId = projectId || '';
@@ -157,6 +201,7 @@ const GourceConfigPage = () => {
   // Définir les fonctions d'API de manière stable
   const getProject = useCallback(() => api.projects.getById(safeProjectId), [safeProjectId]);
   const getConfigs = useCallback(() => api.gource.getConfigsByProject(safeProjectId), [safeProjectId]);
+  const getRepositories = useCallback(() => api.repositories.getAll(safeProjectId), [safeProjectId]);
   
   // Charger les détails du projet
   const [projectState, fetchProject] = useApi(
@@ -170,6 +215,12 @@ const GourceConfigPage = () => {
     true
   );
   
+  // Charger les repositories du projet
+  const [repositoriesState, fetchRepositories] = useApi(
+    getRepositories,
+    true
+  );
+  
   // État pour les actions en cours
   const [savingConfig, setSavingConfig] = useState(false);
   const [creatingRender, setCreatingRender] = useState(false);
@@ -179,6 +230,14 @@ const GourceConfigPage = () => {
       setProject(projectState.data as Project);
     }
   }, [projectState.data]);
+
+  useEffect(() => {
+    if (repositoriesState.data) {
+      const repos = repositoriesState.data as Repository[];
+      setRepositories(repos);
+      setHasRepositories(repos.length > 0);
+    }
+  }, [repositoriesState.data]);
 
   const handleCreateConfig = () => {
     setCurrentConfig(null);
@@ -199,6 +258,15 @@ const GourceConfigPage = () => {
   };
   
   const handleConfigRender = (config: GourceConfig) => {
+    // Check if the project has repositories before showing the render form
+    if (!hasRepositories) {
+      addNotification({
+        type: 'error',
+        message: 'Cannot create a render: this project has no repositories'
+      });
+      return;
+    }
+    
     setCurrentConfig(config);
     setShowRenderForm(true);
   };
@@ -268,6 +336,10 @@ const GourceConfigPage = () => {
     }
   };
   
+  const handleAddRepository = () => {
+    navigate(`/repositories/add?project_id=${safeProjectId}`);
+  };
+  
   if (projectState.loading) {
     return <LoadingState>Loading project...</LoadingState>;
   }
@@ -296,6 +368,17 @@ const GourceConfigPage = () => {
           New configuration
         </Button>
       </Header>
+      
+      {!hasRepositories && (
+        <WarningMessage>
+          <div>
+            <strong>No repositories found!</strong> You need to add at least one repository to this project before creating a Gource visualization.
+          </div>
+          <ActionButton onClick={handleAddRepository}>
+            Add Repository
+          </ActionButton>
+        </WarningMessage>
+      )}
       
       <PageContent>
         {configsState.loading ? (

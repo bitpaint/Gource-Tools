@@ -27,6 +27,9 @@ router.delete('/repositories/:id', repositoryController.deleteRepository);
 router.post('/repositories/:id/sync', repositoryController.syncRepository);
 router.get('/repositories/:id/branches', repositoryController.getRepositoryBranches);
 
+// Route spécifique pour la liaison entre projets et dépôts
+router.post('/project-repositories', repositoryController.linkRepositoryToProject);
+
 // Routes pour Gource
 router.get('/gource/configs', gourceController.getAllConfigs);
 router.get('/gource/configs/:id', gourceController.getConfigById);

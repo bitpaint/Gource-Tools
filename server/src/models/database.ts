@@ -37,9 +37,11 @@ function initializeTables() {
       CREATE TABLE IF NOT EXISTS repositories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        username TEXT,
         url TEXT,
         local_path TEXT,
         branch_default TEXT DEFAULT 'main',
+        tags TEXT,
         last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);

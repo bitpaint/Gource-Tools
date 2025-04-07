@@ -20,13 +20,13 @@ const NavList = styled.ul`
   align-items: center;
 `;
 
-const NavItem = styled.li<{ active: boolean }>`
+const NavItem = styled.li<{ $active: boolean }>`
   margin-right: 1.5rem;
   
   a {
-    color: ${({ active, theme }) => active ? theme.colors.white : 'rgba(255, 255, 255, 0.7)'};
+    color: ${({ $active, theme }) => $active ? theme.colors.white : 'rgba(255, 255, 255, 0.7)'};
     text-decoration: none;
-    font-weight: ${({ active }) => active ? 'bold' : 'normal'};
+    font-weight: ${({ $active }) => $active ? 'bold' : 'normal'};
     padding: 0.5rem 0;
     position: relative;
     transition: color 0.2s;
@@ -40,7 +40,7 @@ const NavItem = styled.li<{ active: boolean }>`
       position: absolute;
       bottom: 0;
       left: 0;
-      width: ${({ active }) => active ? '100%' : '0'};
+      width: ${({ $active }) => $active ? '100%' : '0'};
       height: 2px;
       background-color: ${({ theme }) => theme.colors.white};
       transition: width 0.2s;
@@ -72,13 +72,13 @@ const RightLinks = styled.div`
   align-items: center;
 `;
 
-const RightNavItem = styled.div<{ active?: boolean }>`
+const RightNavItem = styled.div<{ $active?: boolean }>`
   margin-left: 1.5rem;
   display: flex;
   align-items: center;
   
   a {
-    color: ${({ active, theme }) => active ? theme.colors.white : 'rgba(255, 255, 255, 0.7)'};
+    color: ${({ $active, theme }) => $active ? theme.colors.white : 'rgba(255, 255, 255, 0.7)'};
     text-decoration: none;
     display: flex;
     align-items: center;
@@ -102,18 +102,18 @@ const Navbar: React.FC = () => {
           <img src="/gource-tools.png" alt="Gource Tools Logo" />
           Gource Tools
         </Logo>
-        <NavItem active={path === '/repositories' || path.startsWith('/repositories/')}>
+        <NavItem $active={path === '/repositories' || path.startsWith('/repositories/')}>
           <Link to="/repositories">REPOS</Link>
         </NavItem>
-        <NavItem active={path === '/projects' || path.startsWith('/projects/')}>
+        <NavItem $active={path === '/projects' || path.startsWith('/projects/')}>
           <Link to="/projects">PROJECTS</Link>
         </NavItem>
-        <NavItem active={path === '/renders' || path.startsWith('/renders/')}>
+        <NavItem $active={path === '/renders' || path.startsWith('/renders/')}>
           <Link to="/renders">RENDERS</Link>
         </NavItem>
       </NavList>
       <RightLinks>
-        <RightNavItem active={path === '/settings' || path.startsWith('/settings/')}>
+        <RightNavItem $active={path === '/settings' || path.startsWith('/settings/')}>
           <Link to="/settings">
             <FaCog />
             SETTINGS

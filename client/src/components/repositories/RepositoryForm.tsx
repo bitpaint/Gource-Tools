@@ -109,6 +109,12 @@ const HelpText = styled.div`
   font-size: ${props => props.theme.typography.fontSize.small};
 `;
 
+const WarningMessage = styled.div`
+  color: ${props => props.theme.colors.warning};
+  margin-top: ${props => props.theme.spacing.sm};
+  font-size: ${props => props.theme.typography.fontSize.small};
+`;
+
 interface RepositoryFormProps {
   repositoryId?: string;
   projectId?: string;
@@ -118,6 +124,7 @@ interface RepositoryFormProps {
 interface RepositoryFormData {
   project_id: string;
   url: string;
+  tags?: string;
 }
 
 interface Project {
@@ -128,9 +135,11 @@ interface Project {
 interface Repository {
   id: string;
   name: string;
+  username: string | null;
   url: string | null;
   project_id: string;
   local_path: string | null;
+  tags: string | null;
 }
 
 // Fonction pour extraire le nom du dépôt à partir de l'URL Git
@@ -152,24 +161,45 @@ const RepositoryForm: React.FC<RepositoryFormProps> = ({ repositoryId, projectId
   const [formData, setFormData] = useState<RepositoryFormData>({
     project_id: projectId || '',
     url: '',
+    tags: '',
   });
+  // Checking if repository URL already exists
+  const [existingRepositories, setExistingRepositories] = useState<Repository[]>([]);
+  const [urlExists, setUrlExists] = useState(false);
 
   // Liste des projets disponibles
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Charger la liste des projets au démarrage
+  // Charger la liste des projets et des repositories au démarrage
   useEffect(() => {
-    const loadProjects = async () => {
+    const loadProjectsAndRepositories = async () => {
       try {
-        const response = await api.projects.getAll();
-        setProjects(response.data);
+        const [projectsResponse, repositoriesResponse] = await Promise.all([
+          api.projects.getAll(),
+          api.get('/repositories')
+        ]);
+        setProjects(projectsResponse.data);
+        setExistingRepositories(repositoriesResponse.data);
       } catch (err) {
-        console.error('Erreur lors du chargement des projets:', err);
+        console.error('Erreur lors du chargement des données:', err);
       }
     };
     
-    loadProjects();
+    loadProjectsAndRepositories();
   }, []);
+
+  // Check if URL already exists when it changes
+  useEffect(() => {
+    if (formData.url.trim()) {
+      const exists = existingRepositories.some(repo => 
+        repo.url && repo.url.toLowerCase() === formData.url.toLowerCase() && 
+        (!repositoryId || repo.id !== repositoryId) // Ignore current repository when editing
+      );
+      setUrlExists(exists);
+    } else {
+      setUrlExists(false);
+    }
+  }, [formData.url, existingRepositories, repositoryId]);
 
   useEffect(() => {
     // Si repositoryId est fourni, charger les données du dépôt pour l'édition
@@ -180,8 +210,9 @@ const RepositoryForm: React.FC<RepositoryFormProps> = ({ repositoryId, projectId
           const response = await api.repositories.getById(repositoryId);
           const repository = response.data;
           setFormData({
-            project_id: repository.project_id,
+            project_id: repository.project_id || projectId || '',
             url: repository.url || '',
+            tags: repository.tags || '',
           });
           setLoading(false);
         } catch (error) {
@@ -192,7 +223,7 @@ const RepositoryForm: React.FC<RepositoryFormProps> = ({ repositoryId, projectId
 
       fetchRepository();
     }
-  }, [repositoryId]);
+  }, [repositoryId, projectId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -202,59 +233,67 @@ const RepositoryForm: React.FC<RepositoryFormProps> = ({ repositoryId, projectId
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.project_id) {
+      setError('Le projet est requis');
+      return;
+    }
+    
+    if (!formData.url.trim()) {
+      setError('L\'URL du dépôt est requise');
+      return;
+    }
+    
+    if (!isValidUrl(formData.url)) {
+      setError('L\'URL du dépôt est invalide');
+      return;
+    }
+
+    // Check if URL already exists
+    if (urlExists) {
+      setError('Ce dépôt existe déjà. Veuillez utiliser celui existant.');
+      return;
+    }
+    
     try {
       setLoading(true);
+      setError(null);
       
-      if (!formData.project_id) {
-        setError('Le projet est requis');
-        setLoading(false);
-        return;
-      }
-      
-      if (!formData.url.trim()) {
-        setError("L'URL du dépôt Git est requise");
-        setLoading(false);
-        return;
-      }
-      
-      // Extraire le nom du dépôt à partir de l'URL
-      const name = extractRepoName(formData.url);
-      
-      if (!name) {
-        setError("Impossible d'extraire le nom du dépôt à partir de l'URL");
-        setLoading(false);
-        return;
-      }
-      
-      const repositoryData = {
-        ...formData,
-        name,
-      };
-      
+      // Création ou mise à jour du dépôt
       if (repositoryId) {
-        // Mise à jour d'un dépôt existant
-        await api.repositories.update(repositoryId, repositoryData);
+        await api.repositories.update(repositoryId, formData);
       } else {
-        // Création d'un nouveau dépôt
-        await api.repositories.create(repositoryData);
+        await api.repositories.create(formData);
       }
       
-      setLoading(false);
-      
+      // Redirection ou callback de succès
       if (onSuccess) {
         onSuccess();
       } else {
-        navigate('/repositories');
+        navigate(`/projects/${formData.project_id}`);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Une erreur est survenue';
-      setError(errorMessage);
+      console.error('Erreur lors de la sauvegarde du dépôt:', error);
+      setError('Une erreur est survenue lors de la sauvegarde du dépôt');
+    } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
-    navigate('/repositories');
+    if (projectId) {
+      navigate(`/projects/${projectId}`);
+    } else {
+      navigate('/repositories');
+    }
+  };
+  
+  const isValidUrl = (url: string): boolean => {
+    try {
+      new URL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
   };
 
   return (
@@ -262,6 +301,11 @@ const RepositoryForm: React.FC<RepositoryFormProps> = ({ repositoryId, projectId
       <FormTitle>{repositoryId ? 'Modifier le dépôt' : 'Ajouter un dépôt Git'}</FormTitle>
       
       {error && <ErrorMessage>{error}</ErrorMessage>}
+      {urlExists && (
+        <WarningMessage>
+          Cette URL de dépôt existe déjà dans le système. Veuillez utiliser le dépôt existant au lieu d'en créer un nouveau.
+        </WarningMessage>
+      )}
       
       <form onSubmit={handleSubmit}>
         <FormGroup>
@@ -297,6 +341,22 @@ const RepositoryForm: React.FC<RepositoryFormProps> = ({ repositoryId, projectId
           />
           <HelpText>
             L'URL de clonage du dépôt Git. Par exemple, https://github.com/username/repo.git
+          </HelpText>
+        </FormGroup>
+        
+        <FormGroup>
+          <Label htmlFor="tags">Tags (séparés par des virgules)</Label>
+          <Input
+            type="text"
+            id="tags"
+            name="tags"
+            value={formData.tags || ''}
+            onChange={handleChange}
+            placeholder="frontend, react, ui, etc."
+            disabled={loading}
+          />
+          <HelpText>
+            Ajoutez des tags pour mieux organiser vos dépôts. Ces tags ne seront pas écrasés lors des synchronisations.
           </HelpText>
         </FormGroup>
         

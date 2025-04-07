@@ -33,31 +33,115 @@ export const sanitizeRepoName = (url: string): string => {
 };
 
 /**
- * Clone un dépôt Git distant vers un répertoire local
- * Ne clone que si le dépôt n'existe pas déjà
+ * Normalise une URL de dépôt Git
+ * Transforme différents formats d'URL en URL de clonage standard
  */
-export const cloneRepository = async (url: string): Promise<string> => {
+export const normalizeGitUrl = (url: string): string => {
   try {
-    // Générer un identifiant cohérent et un nom de répertoire basé sur l'URL
-    const repoId = generateRepoId(url);
-    const repoName = sanitizeRepoName(url);
-    const repoPath = path.join(REPO_BASE_DIR, `${repoId}_${repoName}`);
-    
-    // Vérifier si le dépôt existe déjà
-    if (fs.existsSync(repoPath)) {
-      console.log(`Le dépôt existe déjà: ${repoPath}`);
-      return repoPath;
+    // Vérifier si c'est une URL complète
+    let urlObj: URL;
+    try {
+      urlObj = new URL(url);
+    } catch {
+      // Si ce n'est pas une URL valide, essayer de la convertir
+      if (url.includes('/') && !url.includes('://')) {
+        // Format utilisateur/repo -> URL GitHub
+        return `https://github.com/${url}.git`;
+      }
+      return url; // Impossible de normaliser
     }
     
-    console.log(`Clonage du dépôt ${url} vers ${repoPath}`);
+    // Normaliser les URL de GitHub et GitLab
+    if (urlObj.hostname === 'github.com' || urlObj.hostname === 'gitlab.com') {
+      const pathParts = urlObj.pathname.split('/').filter(Boolean);
+      
+      // Si c'est une URL de page web (et non une URL de clonage .git)
+      if (pathParts.length >= 2 && !url.endsWith('.git')) {
+        return `https://${urlObj.hostname}/${pathParts[0]}/${pathParts[1]}.git`;
+      }
+    }
     
-    // Cloner le dépôt
-    await execAsync(`git clone ${url} "${repoPath}"`);
-    console.log(`Dépôt cloné avec succès: ${repoPath}`);
+    return url;
+  } catch (e) {
+    console.warn(`Impossible de normaliser l'URL: ${url}`, e);
+    return url;
+  }
+};
+
+/**
+ * Downloads a remote Git repository to a local directory
+ * Only downloads if the repository doesn't already exist
+ */
+export const downloadRepository = async (url: string): Promise<string> => {
+  try {
+    // Normalize the URL
+    const normalizedUrl = normalizeGitUrl(url);
     
-    return repoPath;
-  } catch (error) {
-    console.error(`Erreur lors du clonage du dépôt: ${error}`);
+    // Generate a consistent ID and directory name based on the URL
+    const repoId = generateRepoId(normalizedUrl);
+    const repoName = sanitizeRepoName(normalizedUrl);
+    const repoPath = path.join(REPO_BASE_DIR, `${repoId}_${repoName}`);
+    
+    // Check if repository already exists
+    if (fs.existsSync(repoPath)) {
+      console.log(`Repository already exists: ${repoPath}`);
+      
+      // Verify that it's a valid Git repository
+      try {
+        await execAsync('git status', { cwd: repoPath });
+        return repoPath;
+      } catch (e: any) {
+        console.warn(`Directory exists but is not a valid Git repository. Removing and re-cloning...`);
+        fs.rmSync(repoPath, { recursive: true, force: true });
+      }
+    }
+    
+    // Ensure parent directory exists
+    if (!fs.existsSync(REPO_BASE_DIR)) {
+      fs.mkdirSync(REPO_BASE_DIR, { recursive: true });
+    }
+    
+    console.log(`Cloning repository ${normalizedUrl} to ${repoPath}`);
+    
+    try {
+      // Clone the repository with a 3-minute timeout
+      await execAsync(`git clone --depth 1 ${normalizedUrl} "${repoPath}"`, {
+        timeout: 3 * 60 * 1000 // 3 minutes
+      });
+      console.log(`Repository successfully cloned: ${repoPath}`);
+      
+      return repoPath;
+    } catch (error: any) {
+      console.error(`Error during cloning: ${error.message}`);
+      
+      // If repository was partially created, remove it
+      if (fs.existsSync(repoPath)) {
+        try {
+          fs.rmSync(repoPath, { recursive: true, force: true });
+          console.log(`Removed partially cloned repository: ${repoPath}`);
+        } catch (e: any) {
+          console.error(`Unable to remove partially cloned repository: ${e.message}`);
+        }
+      }
+      
+      // Check if error is about invalid URL
+      if (error.message.includes('not found') || 
+          error.message.includes('does not exist') ||
+          error.message.includes('couldn\'t find remote repository')) {
+        throw new Error(`Repository does not exist or is private: ${normalizedUrl}`);
+      }
+      
+      // Check if error is about authentication issues
+      if (error.message.includes('Authentication failed') || 
+          error.message.includes('could not read Username')) {
+        throw new Error(`Authentication required to clone this repository: ${normalizedUrl}`);
+      }
+      
+      // Forward the error
+      throw error;
+    }
+  } catch (error: any) {
+    console.error(`Error downloading repository: ${error.message}`);
     throw error;
   }
 };

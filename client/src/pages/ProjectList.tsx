@@ -341,7 +341,7 @@ const ProjectList: React.FC = () => {
                 </ActionButton>
                 <ActionButton 
                   className="play"
-                  onClick={() => navigate(`/gource/${project.id}`)}
+                  onClick={() => navigate(`/projects/${project.id}/gource`)}
                   title="Configure Gource"
                 >
                   <FaPlay />

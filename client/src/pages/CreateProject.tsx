@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import api from '../services/api';
 
@@ -91,24 +91,30 @@ const RepositoryList = styled.div`
   border-radius: 4px;
 `;
 
-const RepositoryItem = styled.div<{ selected: boolean }>`
+const RepositoryItem = styled.div`
   padding: 0.75rem 1rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.background};
   display: flex;
   align-items: center;
-  background-color: ${({ selected, theme }) => selected ? `${theme.colors.primary}20` : 'transparent'};
   
   &:last-child {
     border-bottom: none;
   }
-  
-  &:hover {
-    background-color: ${({ selected, theme }) => selected ? `${theme.colors.primary}30` : `${theme.colors.background}`};
-  }
 `;
 
-const Checkbox = styled.input`
+const RepositoryCheckbox = styled.input`
   margin-right: 1rem;
+`;
+
+const RepositoryLabel = styled.label`
+  display: block;
+  cursor: pointer;
+  
+  .url {
+    font-size: 0.85rem;
+    color: ${({ theme }) => theme.colors.text}99;
+    margin-top: 0.25rem;
+  }
 `;
 
 const RepoName = styled.span`
@@ -177,6 +183,75 @@ const NoReposMessage = styled.div`
   color: ${({ theme }) => theme.colors.text}99;
 `;
 
+const HelperText = styled.div`
+  font-size: 0.85rem;
+  color: ${({ theme }) => theme.colors.secondary};
+  margin-top: 0.5rem;
+`;
+
+const EmptyState = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  background: ${({ theme }) => theme.colors.background};
+  border-radius: 4px;
+  text-align: center;
+`;
+
+const EmptyMessage = styled.p`
+  margin-bottom: 1rem;
+  color: ${({ theme }) => theme.colors.text}99;
+`;
+
+const AddLink = styled(Link)`
+  color: ${({ theme }) => theme.colors.primary};
+  text-decoration: none;
+  font-weight: 500;
+  
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
+const RepositoriesWrapper = styled.div`
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid ${({ theme }) => theme.colors.background};
+  border-radius: 4px;
+`;
+
+const LoadingIndicator = styled.div`
+  text-align: center;
+  padding: 1rem;
+  color: ${({ theme }) => theme.colors.text}99;
+`;
+
+const FormContainer = styled.div`
+  max-width: 800px;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+`;
+
+const TextArea = styled.textarea`
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid ${({ theme }) => theme.colors.background};
+  border-radius: 4px;
+  font-size: 1rem;
+  resize: vertical;
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
+`;
+
 const CreateProject: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -229,35 +304,36 @@ const CreateProject: React.FC = () => {
       return;
     }
     
+    if (formData.selectedRepositories.length === 0) {
+      setError('You must select at least one repository for your project');
+      return;
+    }
+    
     try {
       setSubmitting(true);
       setError(null);
       
-      // 1. Create the project
-      const projectResponse = await api.post('/projects', {
+      const response = await api.post('/projects', {
         name: formData.name,
         description: formData.description
       });
       
-      const projectId = projectResponse.data.id;
+      const projectId = response.data.id;
       
-      // 2. Associate selected repositories with the project
-      if (formData.selectedRepositories.length > 0) {
-        for (const repoId of formData.selectedRepositories) {
-          await api.post('/repositories', {
-            project_id: projectId,
-            repository_id: repoId
-          });
-        }
-      }
+      const linkPromises = formData.selectedRepositories.map(repoId => 
+        api.post('/project-repositories', {
+          project_id: projectId,
+          repository_id: repoId
+        })
+      );
       
-      // Redirect to the created project page
+      await Promise.all(linkPromises);
+      
       navigate(`/projects/${projectId}`);
       
-    } catch (err) {
-      console.error('Error creating project:', err);
+    } catch (error) {
+      console.error('Error creating project:', error);
       setError('An error occurred while creating the project. Please try again.');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -297,7 +373,7 @@ const CreateProject: React.FC = () => {
         
         <FormGroup>
           <Label>Repositories to Include</Label>
-          <RepositoryList>
+          <RepositoriesWrapper>
             {loading ? (
               <LoadingMessage>Loading repositories...</LoadingMessage>
             ) : repositories.length === 0 ? (
@@ -308,21 +384,22 @@ const CreateProject: React.FC = () => {
               repositories.map(repo => (
                 <RepositoryItem 
                   key={repo.id} 
-                  selected={formData.selectedRepositories.includes(repo.id)}
                   onClick={() => handleRepoToggle(repo.id)}
                 >
-                  <Checkbox 
+                  <RepositoryCheckbox 
                     type="checkbox" 
                     checked={formData.selectedRepositories.includes(repo.id)}
                     onChange={() => {}} // Handled by parent onClick
                     disabled={submitting}
                   />
-                  <RepoName>{repo.name}</RepoName>
-                  {repo.url && <RepoUrl>{repo.url}</RepoUrl>}
+                  <RepositoryLabel>
+                    <RepoName>{repo.name}</RepoName>
+                    {repo.url && <RepoUrl>{repo.url}</RepoUrl>}
+                  </RepositoryLabel>
                 </RepositoryItem>
               ))
             )}
-          </RepositoryList>
+          </RepositoriesWrapper>
         </FormGroup>
         
         {error && <ErrorMessage>{error}</ErrorMessage>}
@@ -331,7 +408,7 @@ const CreateProject: React.FC = () => {
           <CancelButton type="button" onClick={() => navigate('/projects')} disabled={submitting}>
             Cancel
           </CancelButton>
-          <SubmitButton type="submit" disabled={submitting || loading}>
+          <SubmitButton type="submit" disabled={submitting || loading || formData.selectedRepositories.length === 0}>
             {submitting ? 'Creating...' : 'Create Project'}
           </SubmitButton>
         </ButtonContainer>
