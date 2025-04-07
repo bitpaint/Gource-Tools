@@ -95,7 +95,7 @@ function Visualize() {
     try {
       // Cette API n'est pas encore implémentée dans le backend
       // À implémenter: POST /api/gource/preview
-      const response = await axios.post('/api/gource/preview', {
+      await axios.post('/api/gource/preview', {
         log: selectedLog,
         options
       });

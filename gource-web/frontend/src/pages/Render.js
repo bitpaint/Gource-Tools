@@ -23,14 +23,12 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Divider,
-  Chip
+  Divider
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   PlayArrow as PlayIcon,
-  Download as DownloadIcon,
-  Settings as SettingsIcon
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -126,7 +124,7 @@ function Render() {
     try {
       // Cette API n'est pas encore implémentée dans le backend
       // À implémenter: POST /api/renders/start
-      const response = await axios.post('/api/renders/start', {
+      await axios.post('/api/renders/start', {
         log: selectedLog,
         options: renderOptions
       });

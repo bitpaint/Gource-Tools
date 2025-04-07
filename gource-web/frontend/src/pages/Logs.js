@@ -14,11 +14,6 @@ import {
   Divider,
   CircularProgress,
   Alert,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   Snackbar
 } from '@mui/material';
 import axios from 'axios';
@@ -30,7 +25,6 @@ function Logs() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false);
 
   useEffect(() => {
     fetchRepositories();
@@ -79,7 +73,7 @@ function Logs() {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post('/api/logs/generate', {
+      await axios.post('/api/logs/generate', {
         repositories: selectedRepos.length > 0 ? selectedRepos : undefined
       });
       setSuccess("Logs générés avec succès");
@@ -96,7 +90,7 @@ function Logs() {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post('/api/logs/combine');
+      await axios.post('/api/logs/combine');
       setSuccess("Logs combinés avec succès");
       fetchLogs();
     } catch (err) {

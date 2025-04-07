@@ -1,168 +1,46 @@
-# Gource-Tools
+Gource-Tools                         <br>
+<img src="https://img.shields.io/badge/License-MIT-orange.svg"> <br> <br>
+ <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg" alt="Combined" width="690px"> <br> <br>
 
-Une interface web moderne pour Gource, un outil de visualisation de l'historique des dépôts Git.
 
-![Gource-Tools Screenshot](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)
+# <b>🍩 What is Gource-Tools?</b><br>
+<br>
+Gource Tools is a comprehensive toolkit designed specifically for Gource. Its primary function is to streamline the process of downloading multiple repositories, generating log files, and merging them into a single, large file named ACombinedLog.txt. Additionally, Gource Tools automates the downloading of avatars from Gravatar. This toolkit is particularly useful for managing large-scale projects with numerous distinct repositories.
+<br>
 
-## 🍩 Qu'est-ce que Gource-Tools?
+# <b>⚙️ Requirements:</b><br>
+- `git` , `gource` & `sed`  for basic usage (Explore only, you won't be able to make videos) <br>
+- Optional: `FFmpeg` for videos<br>
+- Optional: `imagemagick` & `perl` `cpan` with `cpan install Parallel::ForkManager` for avatars.<br>
+<br>
 
-Gource-Tools est une boîte à outils complète conçue pour Gource. Sa fonction principale est de simplifier le processus de téléchargement de plusieurs dépôts, la génération de fichiers logs, et leur fusion en un seul fichier global nommé ACombinedLog.txt. De plus, Gource-Tools automatise le téléchargement des avatars depuis Gravatar. Cette boîte à outils est particulièrement utile pour gérer des projets à grande échelle avec de nombreux dépôts distincts.
+# Links (for Windows users): 
 
-## ⚙️ Prérequis
+<br>
 
-- `git` : Pour cloner et interagir avec les dépôts
-- `gource` : Pour générer les visualisations
-- `Python 3.6+` : Pour le backend
-- `Node.js 14+` et `npm` : Pour le frontend
-- `FFmpeg` : Pour le rendu vidéo
-- `perl` et `cpan` avec `Parallel::ForkManager` : Pour télécharger les avatars
+ `git` :    https://gitforwindows.org/ "64-bit Git for Windows Setup"  <br>
+ `gource` : https://github.com/acaudwell/Gource/releases/tag/gource-0.51  "gource-VERSION.win64-setup.exe"  <br>
+ `sed` :    https://sourceforge.net/projects/gnuwin32/files//sed/4.2.1/sed-4.2.1-setup.exe/download "sed-VERSION-setup.exe"  <br>
+ `perl` :   https://strawberryperl.com/ "strawberry-perl-VERSION-64bit.msi"  <br>
+ `imagemagick` : https://imagemagick.org/script/download.php#windows "Win64 dynamic at 16 bits-per-pixel..."   <br>
+ `FFmpeg` : FFmpeg is included in imagemagick. Get `imagemagick` and check the "install FFmpeg" box when asked.  <br>
 
-## 🚀 Installation
+ <br>
+ 
+# <b>✔️ How to use Gource-Tools?</b><br>
+1) 📜  Open <b>_List.txt</b> and replace links with your repos URLs - one link per line.<br>
+2) 🧰  Open <b>_Gource-tools.sh</b> and select <b>"Initialize from _List.txt"</b> <br>
+3) ⌛   Wait until you see the <b>"Project succesfully initialized" </b>message.<br>
+4) 😃  You should be able to <b>EXPLORE</b> and <b>RENDER</b> now.<br>
+<br>
 
-### Installation rapide
 
-#### Sur Linux/macOS
+<img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/mainmenu.jpg" alt="Main menu" width="230px">      <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/initmenu.jpg" alt="Initialize menu" width="230px">      <img src="https://raw.githubusercontent.com/bitpaint/Gource-Tools/main/src/img/rendermenu.jpg" alt="Render menu" width="230px"><br>
 
-```bash
-# Installer les dépendances
-./install.sh
 
-# Démarrer l'application
-./run.sh
-```
-
-#### Sur Windows
-
-```
-# Installer les dépendances
-install.bat
-
-# Démarrer l'application
-run.bat
-```
-
-### Installation manuelle
-
-#### Backend (Flask)
-
-```bash
-cd gource-web/backend
-pip install -r requirements.txt
-python app.py
-```
-
-#### Frontend (React)
-
-```bash
-cd gource-web/frontend
-npm install
-npm start
-```
-
-L'application sera accessible à l'adresse [http://localhost:3000](http://localhost:3000).
-
-## 🧰 Architecture
-
-Gource-Tools est divisé en deux parties principales :
-
-### Backend (Python/Flask)
-
-Le backend gère :
-- L'interaction avec les dépôts Git
-- La génération des logs Gource
-- Le téléchargement des avatars
-- Le rendu des visualisations via Gource et FFmpeg
-
-### Frontend (React)
-
-Le frontend fournit :
-- Une interface utilisateur moderne et intuitive
-- Des formulaires faciles à utiliser pour configurer les visualisations
-- Une gestion visuelle des dépôts et des logs
-- Des paramètres de rendu personnalisables
-
-## 📋 Fonctionnalités
-
-- **Gestion de dépôts**
-  - Ajout de dépôts à partir d'URLs
-  - Suppression de dépôts
-  - Vue d'ensemble des dépôts disponibles
-
-- **Génération de logs**
-  - Création de logs pour chaque dépôt
-  - Combinaison de logs pour une visualisation multi-projets
-  - Configuration des options de log
-
-- **Téléchargement d'avatars**
-  - Récupération automatique des avatars depuis Gravatar
-  - Association aux contributeurs dans la visualisation
-
-- **Visualisation**
-  - Prévisualisation interactive directement dans l'interface
-  - Nombreuses options de configuration (dates, vitesse, etc.)
-  - Support pour les résolutions HD et 4K
-
-- **Rendu vidéo**
-  - Export au format MP4 haute qualité
-  - Configuration avancée du rendu
-  - Support pour l'audio personnalisé
-
-- **Configuration**
-  - Paramètres globaux pour les API
-  - Options de rendu par défaut
-  - Personnalisation de l'interface
-
-## 📝 Instructions pour les développeurs
-
-### Structure du projet
-
-```
-gource-web/
-├── backend/               # API Flask
-│   ├── app.py             # Point d'entrée de l'API
-│   └── requirements.txt   # Dépendances Python
-├── frontend/              # Application React
-│   ├── public/            # Fichiers statiques
-│   ├── src/               # Code source React
-│   │   ├── components/    # Composants réutilisables
-│   │   ├── pages/         # Pages de l'application
-│   │   └── App.js         # Composant racine
-│   └── package.json       # Configuration npm
-├── repos/                 # Dépôts Git clonés (créé automatiquement)
-├── logs/                  # Logs générés (créé automatiquement)
-├── avatars/               # Avatars téléchargés (créé automatiquement)
-├── renders/               # Rendus vidéo (créé automatiquement)
-└── config/                # Fichiers de configuration
-```
-
-### Développement du backend
-
-Le backend est construit avec Flask et fournit une API REST pour interagir avec Gource et les dépôts Git. Pour ajouter de nouvelles fonctionnalités :
-
-1. Modifiez `app.py` pour ajouter de nouveaux endpoints
-2. Installez les dépendances nécessaires dans `requirements.txt`
-3. Testez vos modifications avec Postman ou curl
-
-### Développement du frontend
-
-Le frontend utilise React avec Material-UI pour l'interface utilisateur. Pour modifier l'interface :
-
-1. Modifiez les composants existants dans `src/components/`
-2. Ajoutez de nouvelles pages dans `src/pages/`
-3. Mettez à jour les routes dans `App.js`
-
-### Tests
-
-Pour tester l'application complète :
-
-1. Lancez le backend : `cd backend && python app.py`
-2. Dans un autre terminal, lancez le frontend : `cd frontend && npm start`
-3. Accédez à [http://localhost:3000](http://localhost:3000)
-
-## 📄 Licence
-
-Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
-
-## 🙋‍♂️ Aide et support
-
-Pour toute question ou assistance, veuillez ouvrir une issue sur GitHub.
+🎵 Change the <b>_audio.mp3</b> file with a custom audio file for your own audio on render.<br>
+&nbsp;&nbsp;&nbsp;&nbsp; <i> Original music file from <b>chriszabriskie.com/vendaface</b><br> </i>
+<br> <br>
+<br>
+🙋‍♂️ Need help? Telegram: <b>@bitpaint</b> | Twitter: <b>@bitpaintclub<br></b>
+ <img src="https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/4k/2.png" alt="Big Gource" width="690px"> <br> <br>
