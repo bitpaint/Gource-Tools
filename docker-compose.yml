@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  gource-tools:
+    build: .
+    container_name: gource-tools
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./data:/app/data
+      - gource-repos:/app/repositories
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  gource-repos:
+    driver: local 

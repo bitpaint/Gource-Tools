@@ -1,0 +1,41 @@
+{
+  "name": "gource-tools",
+  "version": "1.0.0",
+  "description": "Application moderne pour visualiser l'historique Git à travers Gource",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm-run-all --parallel start:client start:server",
+    "start:client": "cd client && npm start",
+    "start:server": "cd server && npm run dev",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && npm run build",
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install && cd ../electron && npm install",
+    "electron": "cd electron && npm start",
+    "electron:build": "cd electron && npm run build",
+    "docker:build": "docker build -t gource-tools .",
+    "docker:start": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/gource-tools.git"
+  },
+  "keywords": [
+    "gource",
+    "git",
+    "visualization",
+    "electron",
+    "react",
+    "node"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+} 

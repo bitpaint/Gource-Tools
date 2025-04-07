@@ -1,0 +1,41 @@
+{
+  "name": "gource-tools-desktop",
+  "version": "1.0.0",
+  "description": "Gource Tools Desktop Application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.gource-tools.app",
+    "productName": "Gource Tools",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "../client/build/**/*",
+      "../server/dist/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  }
+} 
