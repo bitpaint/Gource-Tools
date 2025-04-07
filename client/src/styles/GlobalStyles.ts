@@ -1,49 +1,64 @@
 import { createGlobalStyle } from 'styled-components';
-import theme from './theme';
 
 const GlobalStyles = createGlobalStyle`
   * {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
   }
-
+  
   html, body, #root {
     height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   body {
-    font-family: ${theme.typography.fontFamily};
-    font-size: ${theme.typography.fontSize.regular};
-    color: ${theme.colors.text};
-    background-color: ${theme.colors.background};
+    font-family: ${props => props.theme.typography.fontFamily.main};
+    font-size: ${props => props.theme.typography.fontSize.base};
+    color: ${props => props.theme.colors.text};
+    background-color: ${props => props.theme.colors.background};
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  
+  button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+  }
+  
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    margin-bottom: ${theme.spacing.md};
-    font-weight: ${theme.typography.fontWeight.bold};
+    margin-bottom: ${props => props.theme.spacing.md};
+    font-weight: ${props => props.theme.typography.fontWeight.bold};
     line-height: 1.2;
   }
 
   h1 {
-    font-size: ${theme.typography.fontSize.xxlarge};
+    font-size: ${props => props.theme.typography.fontSize.xxlarge};
   }
 
   h2 {
-    font-size: ${theme.typography.fontSize.xlarge};
+    font-size: ${props => props.theme.typography.fontSize.xlarge};
   }
 
   h3 {
-    font-size: ${theme.typography.fontSize.large};
+    font-size: ${props => props.theme.typography.fontSize.large};
   }
 
   p {
-    margin-bottom: ${theme.spacing.md};
+    margin-bottom: ${props => props.theme.spacing.md};
   }
 
   a {
-    color: ${theme.colors.primary};
+    color: ${props => props.theme.colors.primary};
     text-decoration: none;
     
     &:hover {

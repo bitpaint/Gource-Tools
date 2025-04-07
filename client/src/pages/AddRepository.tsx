@@ -112,6 +112,13 @@ const InfoText = styled.div`
   color: ${({ theme }) => theme.colors.text}99;
 `;
 
+const SuccessMessage = styled.div`
+  color: ${({ theme }) => theme.colors.success || '#28a745'};
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+`;
+
 const Tabs = styled.div`
   display: flex;
   margin-bottom: 2rem;
@@ -196,16 +203,6 @@ const RemoveButton = styled.button`
   }
 `;
 
-const ErrorContainer = styled.div`
-  background-color: ${({ theme }) => theme.colors.danger}22;
-  border: 1px solid ${({ theme }) => theme.colors.danger};
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 2rem;
-  color: ${({ theme }) => theme.colors.danger};
-  font-weight: 500;
-`;
-
 const AddRepository: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'quick' | 'bulk'>('quick');
   const [quickUrl, setQuickUrl] = useState('');
@@ -221,6 +218,7 @@ const AddRepository: React.FC = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -234,6 +232,7 @@ const AddRepository: React.FC = () => {
   const handleImportDataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setImportData(prev => ({ ...prev, [name]: value }));
+    setSuccess(null);
   };
 
   const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -260,10 +259,12 @@ const AddRepository: React.FC = () => {
     setRepositories(prev => [...prev, newRepo]);
     setQuickUrl('');
     setError(null);
+    setSuccess(null);
   };
 
   const removeRepository = (index: number) => {
     setRepositories(prev => prev.filter((_, i) => i !== index));
+    setSuccess(null);
   };
 
   const handleImport = async () => {
@@ -272,27 +273,31 @@ const AddRepository: React.FC = () => {
       return;
     }
 
-    // Vérifier si le project_id est défini
-    if (!projectId) {
-      setError('Project ID is required. Please access this page from a project.');
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const response = await api.post('/repositories/import', {
         username: importData.username,
         platform: importData.platform,
-        project_id: projectId
+        project_id: projectId || undefined
       });
       
-      // Redirect to the repository list or project page
-      navigate(`/projects/${projectId}`);
+      setSuccess(`Successfully imported repositories from ${importData.username}`);
+      setImportData({
+        username: '',
+        platform: 'github'
+      });
+      
+      // Optionally redirect if projectId was provided
+      if (projectId) {
+        navigate(`/projects/${projectId}`);
+      }
     } catch (err) {
       console.error('Error importing repositories:', err);
       setError('An error occurred while importing repositories. Please try again.');
+    } finally {
       setSubmitting(false);
     }
   };
@@ -313,27 +318,27 @@ const AddRepository: React.FC = () => {
     try {
       setSubmitting(true);
       setError(null);
-      
-      // Vérifier si le project_id est défini
-      if (!projectId) {
-        setError('Project ID is required. Please access this page from a project.');
-        setSubmitting(false);
-        return;
-      }
+      setSuccess(null);
       
       const promises = repositories.map(repo => 
         api.post('/repositories', {
           name: repo.name,
           url: repo.url,
           branch_default: 'main',
-          project_id: projectId
+          project_id: projectId || undefined
         })
       );
       
       await Promise.all(promises);
       
-      // Redirect to the project page
-      navigate(`/projects/${projectId}`);
+      // Show success message and clear form
+      setSuccess(`Successfully added ${repositories.length} repositories`);
+      setRepositories([]);
+      
+      // Optionally redirect if projectId was provided
+      if (projectId) {
+        navigate(`/projects/${projectId}`);
+      }
       
     } catch (err) {
       console.error('Error creating repositories:', err);
@@ -356,26 +361,31 @@ const AddRepository: React.FC = () => {
       return;
     }
     
-    // Vérifier si le project_id est défini
-    if (!projectId) {
-      setError('Project ID is required. Please access this page from a project.');
-      return;
-    }
-    
     try {
       setSubmitting(true);
       setError(null);
+      setSuccess(null);
       
       // Create the repository
       const response = await api.post('/repositories', {
         name: formData.name,
         url: formData.url || null,
         branch_default: formData.branch_default,
-        project_id: projectId
+        project_id: projectId || undefined
       });
       
-      // Redirect to the project page
-      navigate(`/projects/${projectId}`);
+      // Show success message and clear form
+      setSuccess(`Successfully added repository ${formData.name}`);
+      setFormData({
+        name: '',
+        url: '',
+        branch_default: 'main'
+      });
+      
+      // Optionally redirect if projectId was provided
+      if (projectId) {
+        navigate(`/projects/${projectId}`);
+      }
       
     } catch (err) {
       console.error('Error creating repository:', err);
@@ -401,130 +411,124 @@ const AddRepository: React.FC = () => {
         <Subtitle>Add a Git repository to use in your projects</Subtitle>
       </Header>
       
-      {!projectId ? (
-        <ErrorContainer>
-          This page must be accessed from a project. Please go to a project and select "Add Repository".
-        </ErrorContainer>
-      ) : (
-        <>
-          <Tabs>
-            <Tab 
-              $active={activeTab === 'quick'} 
-              onClick={() => setActiveTab('quick')}
+      <Tabs>
+        <Tab 
+          $active={activeTab === 'quick'} 
+          onClick={() => setActiveTab('quick')}
+        >
+          Quick Add
+        </Tab>
+        <Tab 
+          $active={activeTab === 'bulk'} 
+          onClick={() => setActiveTab('bulk')}
+        >
+          Bulk Import
+        </Tab>
+      </Tabs>
+      
+      {activeTab === 'quick' ? (
+        <Form onSubmit={handleQuickSubmit}>
+          <UrlForm>
+            <UrlInput
+              value={quickUrl}
+              onChange={(e) => setQuickUrl(e.target.value)}
+              onKeyDown={handleUrlKeyDown}
+              placeholder="Enter repository URL and press Enter"
+              disabled={submitting}
+            />
+            <AddButton 
+              type="button" 
+              onClick={addRepository}
+              disabled={submitting}
             >
-              Quick Add
-            </Tab>
-            <Tab 
-              $active={activeTab === 'bulk'} 
-              onClick={() => setActiveTab('bulk')}
-            >
-              Bulk Import
-            </Tab>
-          </Tabs>
+              Add
+            </AddButton>
+          </UrlForm>
           
-          {activeTab === 'quick' ? (
-            <Form onSubmit={handleQuickSubmit}>
-              <UrlForm>
-                <UrlInput
-                  value={quickUrl}
-                  onChange={(e) => setQuickUrl(e.target.value)}
-                  onKeyDown={handleUrlKeyDown}
-                  placeholder="Enter repository URL and press Enter"
-                  disabled={submitting}
-                />
-                <AddButton 
-                  type="button" 
-                  onClick={addRepository}
-                  disabled={submitting}
-                >
-                  Add
-                </AddButton>
-              </UrlForm>
-              
-              {repositories.length > 0 && (
-                <RepositoryList>
-                  {repositories.map((repo, index) => (
-                    <RepositoryItem key={index}>
-                      <div>
-                        <strong>{repo.name}</strong>
-                        <div><small>{repo.url}</small></div>
-                      </div>
-                      <RemoveButton 
-                        type="button" 
-                        onClick={() => removeRepository(index)}
-                        disabled={submitting}
-                      >
-                        Remove
-                      </RemoveButton>
-                    </RepositoryItem>
-                  ))}
-                </RepositoryList>
-              )}
-              
-              {error && <ErrorMessage>{error}</ErrorMessage>}
-              
-              <ButtonContainer>
-                <CancelButton 
-                  type="button" 
-                  onClick={() => navigate(`/projects/${projectId}`)} 
-                  disabled={submitting}
-                >
-                  Cancel
-                </CancelButton>
-                <SubmitButton type="submit" disabled={submitting}>
-                  {submitting ? 'Adding...' : 'Add Repositories'}
-                </SubmitButton>
-              </ButtonContainer>
-            </Form>
-          ) : (
-            <Form onSubmit={(e) => { e.preventDefault(); handleImport(); }}>
-              <FormGroup>
-                <Label htmlFor="platform">Platform</Label>
-                <Select
-                  id="platform"
-                  name="platform"
-                  value={importData.platform}
-                  onChange={handleImportDataChange}
-                  disabled={submitting}
-                >
-                  <option value="github">GitHub</option>
-                  <option value="gitlab">GitLab</option>
-                </Select>
-              </FormGroup>
-              
-              <FormGroup>
-                <Label htmlFor="username">Username/Organization</Label>
-                <Input
-                  id="username"
-                  name="username"
-                  value={importData.username}
-                  onChange={handleImportDataChange}
-                  placeholder={`Enter ${importData.platform === 'github' ? 'GitHub' : 'GitLab'} username or organization`}
-                  disabled={submitting}
-                  required
-                />
-                <InfoText>
-                  All public repositories from this {importData.platform === 'github' ? 'GitHub' : 'GitLab'} user/organization will be imported.
-                </InfoText>
-              </FormGroup>
-              
-              {error && <ErrorMessage>{error}</ErrorMessage>}
-              
-              <ButtonContainer>
-                <CancelButton 
-                  type="button" 
-                  onClick={() => navigate(`/projects/${projectId}`)} 
-                  disabled={submitting}
-                >
-                  Cancel
-                </CancelButton>
-                <SubmitButton type="submit" disabled={submitting}>
-                  {submitting ? 'Importing...' : 'Import Repositories'}
-                </SubmitButton>
-              </ButtonContainer>
-            </Form>
+          {repositories.length > 0 && (
+            <RepositoryList>
+              {repositories.map((repo, index) => (
+                <RepositoryItem key={index}>
+                  <div>
+                    <strong>{repo.name}</strong>
+                    <div><small>{repo.url}</small></div>
+                  </div>
+                  <RemoveButton 
+                    type="button" 
+                    onClick={() => removeRepository(index)}
+                    disabled={submitting}
+                  >
+                    Remove
+                  </RemoveButton>
+                </RepositoryItem>
+              ))}
+            </RepositoryList>
           )}
-        </>
+          
+          {error && <ErrorMessage>{error}</ErrorMessage>}
+          {success && <SuccessMessage>{success}</SuccessMessage>}
+          
+          <ButtonContainer>
+            <CancelButton 
+              type="button" 
+              onClick={() => projectId ? navigate(`/projects/${projectId}`) : navigate('/repositories')} 
+              disabled={submitting}
+            >
+              Cancel
+            </CancelButton>
+            <SubmitButton type="submit" disabled={submitting}>
+              {submitting ? 'Adding...' : 'Add Repositories'}
+            </SubmitButton>
+          </ButtonContainer>
+        </Form>
+      ) : (
+        <Form onSubmit={(e) => { e.preventDefault(); handleImport(); }}>
+          <FormGroup>
+            <Label htmlFor="platform">Platform</Label>
+            <Select
+              id="platform"
+              name="platform"
+              value={importData.platform}
+              onChange={handleImportDataChange}
+              disabled={submitting}
+            >
+              <option value="github">GitHub</option>
+              <option value="gitlab">GitLab</option>
+            </Select>
+          </FormGroup>
+          
+          <FormGroup>
+            <Label htmlFor="username">Username/Organization</Label>
+            <Input
+              id="username"
+              name="username"
+              value={importData.username}
+              onChange={handleImportDataChange}
+              placeholder={`Enter ${importData.platform === 'github' ? 'GitHub' : 'GitLab'} username or organization`}
+              disabled={submitting}
+              required
+            />
+            <InfoText>
+              All public repositories from this {importData.platform === 'github' ? 'GitHub' : 'GitLab'} user/organization will be imported.
+            </InfoText>
+          </FormGroup>
+          
+          {error && <ErrorMessage>{error}</ErrorMessage>}
+          {success && <SuccessMessage>{success}</SuccessMessage>}
+          
+          <ButtonContainer>
+            <CancelButton 
+              type="button" 
+              onClick={() => projectId ? navigate(`/projects/${projectId}`) : navigate('/repositories')} 
+              disabled={submitting}
+            >
+              Cancel
+            </CancelButton>
+            <SubmitButton type="submit" disabled={submitting}>
+              {submitting ? 'Importing...' : 'Import Repositories'}
+            </SubmitButton>
+          </ButtonContainer>
+        </Form>
       )}
     </Container>
   );

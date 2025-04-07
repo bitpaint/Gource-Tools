@@ -19,6 +19,7 @@ declare module 'styled-components' {
       textLight: string;
       borderColor: string;
       border: string;
+      accent: string;
     };
     spacing: {
       xs: string;

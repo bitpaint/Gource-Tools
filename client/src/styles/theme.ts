@@ -17,7 +17,8 @@ const theme: DefaultTheme = {
     text: '#333333',
     textLight: '#666666',
     borderColor: '#e0e0e0',
-    border: '#e0e0e0'
+    border: '#e0e0e0',
+    accent: '#00a8ff'
   },
   spacing: {
     xs: '0.25rem',

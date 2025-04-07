@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import api from '../services/api';
+import QuickStart from '../components/ui/QuickStart';
 
-const DashboardContainer = styled.div`
+const Container = styled.div`
+  width: 100%;
+`;
+
+const WelcomeText = styled.div`
+  margin-bottom: ${props => props.theme.spacing.lg};
+`;
+
+const Title = styled.h1`
+  font-size: ${props => props.theme.typography.fontSize.xxlarge};
+  margin-bottom: ${props => props.theme.spacing.sm};
+`;
+
+const Subtitle = styled.p`
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.fontSize.medium};
+`;
+
+const DashboardGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: ${props => props.theme.spacing.lg};
@@ -49,9 +68,11 @@ const Dashboard: React.FC = () => {
   // Local state to store data
   const [projects, setProjects] = useState<any[]>([]);
   const [repositories, setRepositories] = useState<any[]>([]);
+  const [renders, setRenders] = useState<any[]>([]);
   const [loading, setLoading] = useState({
     projects: true,
-    repositories: true
+    repositories: true,
+    renders: true
   });
 
   // Load data on component mount
@@ -67,9 +88,15 @@ const Dashboard: React.FC = () => {
         const repositoriesResponse = await api.repositories.getAll();
         setRepositories(repositoriesResponse.data);
         setLoading(prev => ({ ...prev, repositories: false }));
+        
+        // Simulate loading renders (replace with actual API call when implemented)
+        setTimeout(() => {
+          setRenders([]);
+          setLoading(prev => ({ ...prev, renders: false }));
+        }, 500);
       } catch (error) {
         console.error('Error loading data:', error);
-        setLoading({ projects: false, repositories: false });
+        setLoading({ projects: false, repositories: false, renders: false });
       }
     };
 
@@ -79,13 +106,22 @@ const Dashboard: React.FC = () => {
   // Calculate statistics
   const projectCount = projects.length || 0;
   const repositoryCount = repositories.length || 0;
+  const renderCount = renders.length || 0;
 
   return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome to Gource-Tools. Manage your projects and create Gource visualizations easily.</p>
+    <Container>
+      <WelcomeText>
+        <Title>Dashboard</Title>
+        <Subtitle>Welcome to Gource-Tools. Manage your projects and create Gource visualizations easily.</Subtitle>
+      </WelcomeText>
       
-      <DashboardContainer>
+      <QuickStart 
+        projectCount={projectCount}
+        repositoryCount={repositoryCount}
+        renderCount={renderCount}
+      />
+      
+      <DashboardGrid>
         <DashboardCard>
           <CardTitle>Projects</CardTitle>
           <CardContent>
@@ -107,25 +143,13 @@ const Dashboard: React.FC = () => {
         <DashboardCard>
           <CardTitle>Renders</CardTitle>
           <CardContent>
-            <StatsNumber>0</StatsNumber>
+            <StatsNumber>{renderCount}</StatsNumber>
             <StatsLabel>Generated visualizations</StatsLabel>
+            {loading.renders && <LoadingIndicator>Loading...</LoadingIndicator>}
           </CardContent>
         </DashboardCard>
-        
-        <DashboardCard>
-          <CardTitle>Quick Start</CardTitle>
-          <CardContent>
-            {projectCount === 0 ? (
-              <p>To get started, create a new project and add a Git repository to it.</p>
-            ) : repositoryCount === 0 ? (
-              <p>You have created {projectCount} project(s). Now add a Git repository to create visualizations.</p>
-            ) : (
-              <p>You have {projectCount} project(s) and {repositoryCount} repository(ies). You can now create Gource visualizations!</p>
-            )}
-          </CardContent>
-        </DashboardCard>
-      </DashboardContainer>
-    </div>
+      </DashboardGrid>
+    </Container>
   );
 };
 

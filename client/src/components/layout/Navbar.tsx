@@ -1,11 +1,15 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
+import { FaGithub, FaCog } from 'react-icons/fa';
 
 const NavContainer = styled.nav`
   background-color: ${({ theme }) => theme.colors.dark};
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  height: 64px; /* Hauteur fixe pour le calcul dans le MainContent */
 `;
 
 const NavList = styled.ul`
@@ -63,6 +67,30 @@ const Logo = styled(Link)`
   }
 `;
 
+const RightLinks = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const RightNavItem = styled.div<{ active?: boolean }>`
+  margin-left: 1.5rem;
+  display: flex;
+  align-items: center;
+  
+  a {
+    color: ${({ active, theme }) => active ? theme.colors.white : 'rgba(255, 255, 255, 0.7)'};
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: color 0.2s;
+    
+    &:hover {
+      color: ${({ theme }) => theme.colors.white};
+    }
+  }
+`;
+
 const Navbar: React.FC = () => {
   const location = useLocation();
   const path = location.pathname;
@@ -75,15 +103,29 @@ const Navbar: React.FC = () => {
           Gource Tools
         </Logo>
         <NavItem active={path === '/repositories' || path.startsWith('/repositories/')}>
-          <Link to="/repositories">Repositories</Link>
+          <Link to="/repositories">REPOS</Link>
         </NavItem>
         <NavItem active={path === '/projects' || path.startsWith('/projects/')}>
-          <Link to="/projects">Projects</Link>
+          <Link to="/projects">PROJECTS</Link>
         </NavItem>
-        <NavItem active={path === '/settings'}>
-          <Link to="/settings">Settings</Link>
+        <NavItem active={path === '/renders' || path.startsWith('/renders/')}>
+          <Link to="/renders">RENDERS</Link>
         </NavItem>
       </NavList>
+      <RightLinks>
+        <RightNavItem active={path === '/settings' || path.startsWith('/settings/')}>
+          <Link to="/settings">
+            <FaCog />
+            SETTINGS
+          </Link>
+        </RightNavItem>
+        <RightNavItem>
+          <a href="https://github.com/bitpaint/Gource-Tools" target="_blank" rel="noopener noreferrer">
+            <FaGithub />
+            GITHUB
+          </a>
+        </RightNavItem>
+      </RightLinks>
     </NavContainer>
   );
 };

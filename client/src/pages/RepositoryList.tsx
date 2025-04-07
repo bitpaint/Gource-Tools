@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy } from 'react-icons/fa';
+import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 
@@ -29,13 +29,22 @@ const Title = styled.h1`
   font-size: 1.8rem;
   color: ${({ theme }) => theme.colors.text};
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const TitleIcon = styled.span`
+  color: ${({ theme }) => theme.colors.primary};
+  display: flex;
+  align-items: center;
 `;
 
 const AddButton = styled(Link)`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: ${({ theme }) => theme.colors.primary};
+  background-color: #4CAF50; /* Vert */
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 4px;
@@ -44,35 +53,59 @@ const AddButton = styled(Link)`
   transition: background-color 0.3s;
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.primaryDark};
+    background-color: #388E3C; /* Vert foncé */
   }
 `;
 
-const Card = styled.div`
+const ListContainer = styled.div`
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  margin-bottom: 1rem;
 `;
 
-const CardGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-`;
-
-const CardHeader = styled.div`
+const ListHeader = styled.div`
   background-color: ${({ theme }) => theme.colors.dark};
-  padding: 1rem;
+  padding: 0.75rem 1.5rem;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  color: ${({ theme }) => theme.colors.white};
+  font-weight: bold;
+  align-items: center;
+`;
+
+const ListHeaderItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const ListItem = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
+  align-items: center;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.background};
+  }
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const RepoNameCell = styled.div`
   display: flex;
   align-items: center;
   gap: 0.75rem;
 `;
 
 const RepoIconWrapper = styled.div`
-  font-size: 1.5rem;
-  color: ${({ theme }) => theme.colors.white};
+  font-size: 1.25rem;
+  color: ${({ theme }) => theme.colors.dark};
   display: flex;
   align-items: center;
 `;
@@ -80,35 +113,14 @@ const RepoIconWrapper = styled.div`
 const RepoName = styled.h3`
   margin: 0;
   font-size: 1.1rem;
-  color: ${({ theme }) => theme.colors.white};
-  flex: 1;
-`;
-
-const CardBody = styled.div`
-  padding: 1rem;
-`;
-
-const RepoInfo = styled.div`
-  margin-bottom: 1rem;
-  color: ${({ theme }) => theme.colors.textLight};
-  font-size: 0.9rem;
-`;
-
-const InfoItem = styled.div`
-  display: flex;
-  margin-bottom: 0.5rem;
-  
-  strong {
-    min-width: 100px;
-    display: inline-block;
-  }
+  color: ${({ theme }) => theme.colors.text};
 `;
 
 const PathContainer = styled.div`
   display: flex;
   align-items: center;
   gap: 5px;
-  max-width: 200px;
+  max-width: 250px;
 `;
 
 const PathValue = styled.div`
@@ -137,14 +149,6 @@ const CopyButton = styled.button`
   }
 `;
 
-const CardActions = styled.div`
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
 const ActionButton = styled.button`
   display: flex;
   align-items: center;
@@ -154,11 +158,12 @@ const ActionButton = styled.button`
   padding: 0.5rem;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   color: ${({ theme }) => theme.colors.text};
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.background};
+    transform: scale(1.1);
   }
 
   &.edit {
@@ -166,12 +171,37 @@ const ActionButton = styled.button`
   }
 
   &.sync {
-    color: ${({ theme }) => theme.colors.success};
+    color: #4CAF50; /* Vert */
+    &:hover {
+      color: #388E3C; /* Vert foncé */
+    }
   }
 
   &.delete {
-    color: ${({ theme }) => theme.colors.danger};
+    color: #F44336; /* Rouge */
+    &:hover {
+      color: #D32F2F; /* Rouge foncé */
+    }
   }
+`;
+
+const Actions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+`;
+
+const DateCell = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: ${({ theme }) => theme.colors.textLight};
+`;
+
+const DateIcon = styled.span`
+  display: flex;
+  align-items: center;
+  color: ${({ theme }) => theme.colors.primary};
+  opacity: 0.6;
 `;
 
 const EmptyState = styled.div`
@@ -191,6 +221,25 @@ const EmptyTitle = styled.h3`
 const EmptyText = styled.p`
   color: ${({ theme }) => theme.colors.textLight};
   margin-bottom: 1.5rem;
+`;
+
+const EmptyIcon = styled.div`
+  font-size: 3rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  margin-bottom: 1.5rem;
+  opacity: 0.4;
+`;
+
+const LoadingIndicator = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: ${({ theme }) => theme.colors.textLight};
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: ${({ theme }) => theme.colors.danger};
 `;
 
 const RepositoryList: React.FC = () => {
@@ -318,18 +367,24 @@ const RepositoryList: React.FC = () => {
   return (
     <Container>
       <Header>
-        <Title>Git Repositories</Title>
+        <Title>
+          <TitleIcon><FaGithub size={24} /></TitleIcon>
+          Git Repositories
+        </Title>
         <AddButton to="/repositories/add">
           <FaPlus /> Add Repository
         </AddButton>
       </Header>
 
       {loading ? (
-        <p>Loading...</p>
+        <LoadingIndicator>Loading repositories...</LoadingIndicator>
       ) : error ? (
-        <p>Error: {error}</p>
+        <ErrorMessage>Error: {error}</ErrorMessage>
       ) : repositories.length === 0 ? (
         <EmptyState>
+          <EmptyIcon>
+            <FaGithub />
+          </EmptyIcon>
           <EmptyTitle>No Repositories</EmptyTitle>
           <EmptyText>
             Add a Git repository to start generating Gource visualizations.
@@ -339,74 +394,76 @@ const RepositoryList: React.FC = () => {
           </AddButton>
         </EmptyState>
       ) : (
-        <CardGrid>
+        <ListContainer>
+          <ListHeader>
+            <ListHeaderItem>
+              <FaGithub /> Repository
+            </ListHeaderItem>
+            <ListHeaderItem>
+              <FaFolder /> Path
+            </ListHeaderItem>
+            <ListHeaderItem>
+              <FaCalendarAlt /> Last Updated
+            </ListHeaderItem>
+            <div>Actions</div>
+          </ListHeader>
           {repositories.map((repo) => (
-            <Card key={repo.id}>
-              <CardHeader>
+            <ListItem key={repo.id}>
+              <RepoNameCell>
                 <RepoIconWrapper>
                   <FaGithub />
                 </RepoIconWrapper>
                 <RepoName>{repo.name}</RepoName>
-              </CardHeader>
-              <CardBody>
-                <RepoInfo>
-                  <InfoItem>
-                    <strong>URL:</strong> {repo.url || 'Local only'}
-                  </InfoItem>
-                  <InfoItem>
-                    <strong>Path:</strong> 
-                    {repo.local_path ? (
-                      <PathContainer>
-                        <PathValue title={repo.local_path}>
-                          {repo.local_path}
-                        </PathValue>
-                        <CopyButton 
-                          onClick={() => copyToClipboard(repo.local_path || '')}
-                          title="Copy path to clipboard"
-                        >
-                          <FaCopy size={14} />
-                        </CopyButton>
-                      </PathContainer>
-                    ) : (
-                      'Not available'
-                    )}
-                  </InfoItem>
-                  <InfoItem>
-                    <strong>Branch:</strong> {repo.branch_default || 'main'}
-                  </InfoItem>
-                  <InfoItem>
-                    <strong>Updated:</strong> {formatDate(repo.last_updated)}
-                  </InfoItem>
-                </RepoInfo>
-                <CardActions>
-                  <ActionButton 
-                    className="edit" 
-                    onClick={() => navigate(`/repositories/${repo.id}`)}
-                    title="Edit"
-                  >
-                    <FaEdit />
-                  </ActionButton>
-                  {repo.local_path && (
-                    <ActionButton 
-                      className="sync" 
-                      onClick={() => handleSyncRepository(repo.id)}
-                      title="Synchronize"
+              </RepoNameCell>
+              <PathContainer>
+                {repo.local_path ? (
+                  <>
+                    <PathValue title={repo.local_path}>
+                      {repo.local_path}
+                    </PathValue>
+                    <CopyButton 
+                      onClick={() => copyToClipboard(repo.local_path || '')}
+                      title="Copy path to clipboard"
                     >
-                      <FaSync />
-                    </ActionButton>
-                  )}
+                      <FaCopy size={14} />
+                    </CopyButton>
+                  </>
+                ) : (
+                  'Not available'
+                )}
+              </PathContainer>
+              <DateCell>
+                <DateIcon><FaCalendarAlt size={14} /></DateIcon>
+                {formatDate(repo.last_updated)}
+              </DateCell>
+              <Actions>
+                <ActionButton 
+                  className="edit" 
+                  onClick={() => navigate(`/repositories/${repo.id}`)}
+                  title="Edit"
+                >
+                  <FaEdit />
+                </ActionButton>
+                {repo.local_path && (
                   <ActionButton 
-                    className="delete" 
-                    onClick={() => handleDeleteRepository(repo.id)}
-                    title="Delete"
+                    className="sync" 
+                    onClick={() => handleSyncRepository(repo.id)}
+                    title="Synchronize"
                   >
-                    <FaTrash />
+                    <FaSync />
                   </ActionButton>
-                </CardActions>
-              </CardBody>
-            </Card>
+                )}
+                <ActionButton 
+                  className="delete" 
+                  onClick={() => handleDeleteRepository(repo.id)}
+                  title="Delete"
+                >
+                  <FaTrash />
+                </ActionButton>
+              </Actions>
+            </ListItem>
           ))}
-        </CardGrid>
+        </ListContainer>
       )}
     </Container>
   );

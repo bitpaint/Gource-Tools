@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaPlus, FaTrash, FaEdit, FaPlay, FaFolder } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaEdit, FaPlay, FaFolder, FaCalendarAlt, FaInfoCircle } from 'react-icons/fa';
 import api from '../services/api';
 
 interface Project {
@@ -27,13 +27,22 @@ const Title = styled.h1`
   font-size: 1.8rem;
   color: ${({ theme }) => theme.colors.text};
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const TitleIcon = styled.span`
+  color: ${({ theme }) => theme.colors.primary};
+  display: flex;
+  align-items: center;
 `;
 
 const AddButton = styled(Link)`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: ${({ theme }) => theme.colors.primary};
+  background-color: #4CAF50; /* Vert */
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 4px;
@@ -42,34 +51,58 @@ const AddButton = styled(Link)`
   transition: background-color 0.3s;
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.primary}dd;
+    background-color: #388E3C; /* Vert foncé */
   }
 `;
 
-const Card = styled.div`
+const ListContainer = styled.div`
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  margin-bottom: 1rem;
 `;
 
-const CardGrid = styled.div`
+const ListHeader = styled.div`
+  background-color: ${({ theme }) => theme.colors.dark};
+  padding: 0.75rem 1.5rem;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: 2fr 2fr 1fr auto;
+  color: ${({ theme }) => theme.colors.white};
+  font-weight: bold;
+  align-items: center;
 `;
 
-const CardHeader = styled.div`
-  background-color: ${({ theme }) => theme.colors.primary}20;
-  padding: 1rem;
+const ListHeaderItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const ListItem = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr auto;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
+  align-items: center;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.background};
+  }
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const ProjectNameCell = styled.div`
   display: flex;
   align-items: center;
   gap: 0.75rem;
 `;
 
 const ProjectIconWrapper = styled.div`
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   color: ${({ theme }) => theme.colors.primary};
   display: flex;
   align-items: center;
@@ -79,32 +112,38 @@ const ProjectName = styled.h3`
   margin: 0;
   font-size: 1.1rem;
   color: ${({ theme }) => theme.colors.text};
-  flex: 1;
 `;
 
-const CardBody = styled.div`
-  padding: 1rem;
-`;
-
-const ProjectDescription = styled.p`
-  color: ${({ theme }) => theme.colors.text}cc;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-  min-height: 40px;
-`;
-
-const ProjectInfo = styled.div`
-  margin-bottom: 1rem;
-  color: ${({ theme }) => theme.colors.text}99;
-  font-size: 0.9rem;
-`;
-
-const CardActions = styled.div`
+const ProjectDescription = styled.div`
+  color: ${({ theme }) => theme.colors.textLight};
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.background};
+`;
+
+const DescriptionIcon = styled.span`
+  display: flex;
+  align-items: center;
+  color: ${({ theme }) => theme.colors.primary};
+  opacity: 0.6;
+`;
+
+const DateCell = styled.div`
+  color: ${({ theme }) => theme.colors.textLight};
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const DateIcon = styled.span`
+  display: flex;
+  align-items: center;
+  color: ${({ theme }) => theme.colors.primary};
+  opacity: 0.6;
 `;
 
 const ActionButton = styled.button`
@@ -116,11 +155,12 @@ const ActionButton = styled.button`
   padding: 0.5rem;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   color: ${({ theme }) => theme.colors.text};
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.background};
+    transform: scale(1.1);
   }
 
   &.edit {
@@ -128,12 +168,23 @@ const ActionButton = styled.button`
   }
 
   &.play {
-    color: ${({ theme }) => theme.colors.success};
+    color: #4CAF50; /* Vert */
+    &:hover {
+      color: #388E3C; /* Vert foncé */
+    }
   }
 
   &.delete {
-    color: ${({ theme }) => theme.colors.danger};
+    color: #F44336; /* Rouge */
+    &:hover {
+      color: #D32F2F; /* Rouge foncé */
+    }
   }
+`;
+
+const Actions = styled.div`
+  display: flex;
+  gap: 0.5rem;
 `;
 
 const EmptyState = styled.div`
@@ -151,8 +202,27 @@ const EmptyTitle = styled.h3`
 `;
 
 const EmptyText = styled.p`
-  color: ${({ theme }) => theme.colors.text}99;
+  color: ${({ theme }) => theme.colors.textLight};
   margin-bottom: 1.5rem;
+`;
+
+const EmptyIcon = styled.div`
+  font-size: 3rem;
+  color: ${({ theme }) => theme.colors.textLight};
+  margin-bottom: 1.5rem;
+  opacity: 0.4;
+`;
+
+const LoadingIndicator = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: ${({ theme }) => theme.colors.textLight};
+`;
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: ${({ theme }) => theme.colors.danger};
 `;
 
 const ProjectList: React.FC = () => {
@@ -205,18 +275,24 @@ const ProjectList: React.FC = () => {
   return (
     <Container>
       <Header>
-        <Title>Gource Projects</Title>
+        <Title>
+          <TitleIcon><FaFolder size={24} /></TitleIcon>
+          Gource Projects
+        </Title>
         <AddButton to="/projects/create">
           <FaPlus /> Create Project
         </AddButton>
       </Header>
 
       {loading ? (
-        <p>Loading...</p>
+        <LoadingIndicator>Loading projects...</LoadingIndicator>
       ) : error ? (
-        <p>Error: {error}</p>
+        <ErrorMessage>Error: {error}</ErrorMessage>
       ) : projects.length === 0 ? (
         <EmptyState>
+          <EmptyIcon>
+            <FaFolder />
+          </EmptyIcon>
           <EmptyTitle>No Projects</EmptyTitle>
           <EmptyText>
             Start by creating a project to organize your Gource visualizations.
@@ -226,54 +302,61 @@ const ProjectList: React.FC = () => {
           </AddButton>
         </EmptyState>
       ) : (
-        <CardGrid>
+        <ListContainer>
+          <ListHeader>
+            <ListHeaderItem>
+              <FaFolder /> Project
+            </ListHeaderItem>
+            <ListHeaderItem>
+              <FaInfoCircle /> Description
+            </ListHeaderItem>
+            <ListHeaderItem>
+              <FaCalendarAlt /> Last Modified
+            </ListHeaderItem>
+            <div>Actions</div>
+          </ListHeader>
           {projects.map((project) => (
-            <Card key={project.id}>
-              <CardHeader>
+            <ListItem key={project.id}>
+              <ProjectNameCell>
                 <ProjectIconWrapper>
                   <FaFolder />
                 </ProjectIconWrapper>
                 <ProjectName>{project.name}</ProjectName>
-              </CardHeader>
-              <CardBody>
-                <ProjectDescription>
-                  {project.description || 'No description'}
-                </ProjectDescription>
-                <ProjectInfo>
-                  Modified on: {formatDate(project.last_modified)}
-                </ProjectInfo>
-                <ProjectInfo>
-                  {project.repository_count 
-                    ? `${project.repository_count} repositor${project.repository_count > 1 ? 'ies' : 'y'}` 
-                    : 'No repository'}
-                </ProjectInfo>
-                <CardActions>
-                  <ActionButton 
-                    className="edit" 
-                    onClick={() => navigate(`/projects/${project.id}`)}
-                    title="Details"
-                  >
-                    <FaEdit />
-                  </ActionButton>
-                  <ActionButton 
-                    className="play"
-                    onClick={() => navigate(`/gource/${project.id}`)}
-                    title="Configure Gource"
-                  >
-                    <FaPlay />
-                  </ActionButton>
-                  <ActionButton 
-                    className="delete" 
-                    onClick={() => handleDeleteProject(project.id)}
-                    title="Delete"
-                  >
-                    <FaTrash />
-                  </ActionButton>
-                </CardActions>
-              </CardBody>
-            </Card>
+              </ProjectNameCell>
+              <ProjectDescription>
+                <DescriptionIcon><FaInfoCircle size={14} /></DescriptionIcon>
+                {project.description || 'No description'}
+              </ProjectDescription>
+              <DateCell>
+                <DateIcon><FaCalendarAlt size={14} /></DateIcon>
+                {formatDate(project.last_modified)}
+              </DateCell>
+              <Actions>
+                <ActionButton 
+                  className="edit" 
+                  onClick={() => navigate(`/projects/${project.id}`)}
+                  title="Details"
+                >
+                  <FaEdit />
+                </ActionButton>
+                <ActionButton 
+                  className="play"
+                  onClick={() => navigate(`/gource/${project.id}`)}
+                  title="Configure Gource"
+                >
+                  <FaPlay />
+                </ActionButton>
+                <ActionButton 
+                  className="delete" 
+                  onClick={() => handleDeleteProject(project.id)}
+                  title="Delete"
+                >
+                  <FaTrash />
+                </ActionButton>
+              </Actions>
+            </ListItem>
           ))}
-        </CardGrid>
+        </ListContainer>
       )}
     </Container>
   );

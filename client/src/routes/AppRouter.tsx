@@ -92,6 +92,58 @@ const AppRouter: React.FC = () => {
         } 
       />
       
+      {/* Routes pour les rendus */}
+      <Route 
+        path="/renders" 
+        element={
+          <Layout>
+            <NotFound />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/renders/create" 
+        element={
+          <Layout>
+            <NotFound />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/renders/:renderId" 
+        element={
+          <Layout>
+            <NotFound />
+          </Layout>
+        } 
+      />
+      
+      {/* Routes pour les paramètres */}
+      <Route 
+        path="/settings" 
+        element={
+          <Layout>
+            <NotFound />
+          </Layout>
+        } 
+      />
+      <Route
+        path="/settings/gource"
+        element={
+          <Layout>
+            <NotFound />
+          </Layout>
+        }
+      />
+      <Route
+        path="/settings/app"
+        element={
+          <Layout>
+            <NotFound />
+          </Layout>
+        }
+      />
+      
       {/* Route 404 */}
       <Route 
         path="*" 

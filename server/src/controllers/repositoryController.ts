@@ -104,166 +104,168 @@ export const getRepositoryById = async (req: Request, res: Response) => {
   }
 };
 
-// Créer un nouveau dépôt dans le système et l'associer à un projet
+// Créer un nouveau dépôt dans le système et optionnellement l'associer à un projet
 export const createRepository = async (req: Request, res: Response) => {
   try {
     const { project_id, name, url, branch_default } = req.body;
     
-    if (!project_id || !name) {
-      return res.status(400).json({ error: 'Le projet ID et le nom du dépôt sont requis' });
+    if (!name) {
+      return res.status(400).json({ error: 'Le nom du dépôt est requis' });
     }
     
-    // Vérifier si le projet existe
-    db.get('SELECT * FROM projects WHERE id = ?', [project_id], async (err, row) => {
-      if (err) {
-        console.error('Erreur lors de la vérification du projet:', err.message);
-        return res.status(500).json({ error: 'Erreur lors de la création du dépôt' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Projet non trouvé' });
-      }
-      
+    // Si un project_id est fourni, vérifier si le projet existe
+    if (project_id) {
+      db.get('SELECT * FROM projects WHERE id = ?', [project_id], async (err, row) => {
+        if (err) {
+          console.error('Erreur lors de la vérification du projet:', err.message);
+          return res.status(500).json({ error: 'Erreur lors de la création du dépôt' });
+        }
+        
+        if (!row) {
+          return res.status(404).json({ error: 'Projet non trouvé' });
+        }
+        
+        // Continuer avec la création du dépôt
+        await createRepositoryAndLink();
+      });
+    } else {
+      // Créer le dépôt sans lien avec un projet
+      await createRepositoryAndLink();
+    }
+    
+    async function createRepositoryAndLink() {
       try {
         // Si une URL est fournie, chercher d'abord si ce dépôt existe déjà
+        let repoId: string;
+        let local_path: string | null = null;
+        
         if (url) {
-          const repoId = gitService.generateRepoId(url);
+          repoId = gitService.generateRepoId(url);
           
-          db.get('SELECT * FROM repositories WHERE id = ?', [repoId], async (err, existingRepo) => {
-            if (err) {
-              console.error('Erreur lors de la recherche du dépôt existant:', err.message);
-              return res.status(500).json({ error: 'Erreur lors de la création du dépôt' });
-            }
-            
-            let repoToUse: Repository;
-            
-            // Si le dépôt n'existe pas encore, le créer
-            if (!existingRepo) {
-              const now = new Date().toISOString();
-              let local_path;
-              
-              try {
-                // Cloner le dépôt
-                local_path = await gitService.cloneRepository(url);
-              } catch (error) {
-                console.error('Erreur lors du clonage du dépôt:', error);
-                return res.status(500).json({ 
-                  error: `Erreur lors du clonage du dépôt: ${(error as Error).message || 'Erreur inconnue'}` 
-                });
+          // Vérifier si le dépôt existe déjà
+          const existingRepo = await new Promise<Repository | null>((resolve) => {
+            db.get('SELECT * FROM repositories WHERE id = ?', [repoId], (err, row) => {
+              if (err || !row) {
+                resolve(null);
+              } else {
+                resolve(row as Repository);
               }
-              
-              // Créer l'entrée du dépôt
-              await new Promise<void>((resolve, reject) => {
-                db.run(
-                  'INSERT INTO repositories (id, name, url, local_path, branch_default, last_updated) VALUES (?, ?, ?, ?, ?, ?)',
-                  [repoId, name, url, local_path, branch_default || 'main', now],
-                  function(err) {
-                    if (err) {
-                      console.error('Erreur lors de la création du dépôt:', err.message);
-                      reject(err);
-                      return;
-                    }
-                    resolve();
-                  }
-                );
-              });
-              
-              repoToUse = {
-                id: repoId,
-                name,
-                url,
-                local_path,
-                branch_default: branch_default || 'main',
-                last_updated: now
-              };
-            } else {
-              // Utiliser le dépôt existant
-              repoToUse = existingRepo as Repository;
-            }
-            
-            // Créer le lien entre le projet et le dépôt
-            const linkId = uuidv4();
-            
-            db.run(
-              'INSERT INTO project_repositories (id, project_id, repository_id, branch_override, display_name) VALUES (?, ?, ?, ?, ?)',
-              [linkId, project_id, repoToUse.id, branch_default || undefined, name],
-              function(err) {
-                if (err) {
-                  console.error('Erreur lors de la liaison du dépôt au projet:', err.message);
-                  return res.status(500).json({ error: 'Erreur lors de la liaison du dépôt au projet' });
-                }
-                
-                const projectRepo: ProjectRepository = {
-                  id: linkId,
-                  project_id,
-                  repository_id: repoToUse.id,
-                  branch_override: branch_default,
-                  display_name: name
-                };
-                
-                return res.status(201).json({
-                  ...repoToUse,
-                  link_id: linkId,
-                  branch_override: branch_default,
-                  display_name: name
-                });
-              }
-            );
+            });
           });
-        } else {
-          // Dépôt local sans URL
-          const repoId = uuidv4();
-          const now = new Date().toISOString();
           
-          // Créer l'entrée du dépôt
+          if (existingRepo) {
+            // Le dépôt existe déjà, on peut juste l'associer au projet si nécessaire
+            if (project_id) {
+              await linkRepositoryToProject(existingRepo.id, project_id, name, branch_default);
+            }
+            
+            return res.status(200).json({
+              ...existingRepo,
+              message: 'Le dépôt existe déjà et a été récupéré avec succès',
+              existing: true
+            });
+          }
+          
+          // Le dépôt n'existe pas encore, le cloner
+          try {
+            local_path = await gitService.cloneRepository(url);
+          } catch (error) {
+            console.error('Erreur lors du clonage du dépôt:', error);
+            return res.status(500).json({ 
+              error: `Erreur lors du clonage du dépôt: ${(error as Error).message || 'Erreur inconnue'}` 
+            });
+          }
+        } else {
+          // Pas d'URL, c'est un dépôt local
+          repoId = uuidv4();
+        }
+        
+        // Créer l'entrée du dépôt
+        const now = new Date().toISOString();
+        
+        await new Promise<void>((resolve, reject) => {
           db.run(
             'INSERT INTO repositories (id, name, url, local_path, branch_default, last_updated) VALUES (?, ?, ?, ?, ?, ?)',
-            [repoId, name, null, null, branch_default || 'main', now],
+            [repoId, name, url || null, local_path || null, branch_default || 'main', now],
             function(err) {
               if (err) {
                 console.error('Erreur lors de la création du dépôt:', err.message);
-                return res.status(500).json({ error: 'Erreur lors de la création du dépôt' });
+                reject(err);
+                return;
               }
-              
-              // Créer le lien entre le projet et le dépôt
-              const linkId = uuidv4();
-              
-              db.run(
-                'INSERT INTO project_repositories (id, project_id, repository_id, branch_override, display_name) VALUES (?, ?, ?, ?, ?)',
-                [linkId, project_id, repoId, branch_default || undefined, name],
-                function(err) {
-                  if (err) {
-                    console.error('Erreur lors de la liaison du dépôt au projet:', err.message);
-                    return res.status(500).json({ error: 'Erreur lors de la liaison du dépôt au projet' });
-                  }
-                  
-                  const newRepository: Repository = {
-                    id: repoId,
-                    name,
-                    url: null,
-                    local_path: null,
-                    branch_default: branch_default || 'main',
-                    last_updated: now
-                  };
-                  
-                  return res.status(201).json({
-                    ...newRepository,
-                    link_id: linkId,
-                    branch_override: branch_default,
-                    display_name: name
-                  });
-                }
-              );
+              resolve();
             }
           );
+        });
+        
+        const newRepo = {
+          id: repoId,
+          name,
+          url: url || null,
+          local_path: local_path || null,
+          branch_default: branch_default || 'main',
+          last_updated: now
+        };
+        
+        // Si un project_id est fourni, créer le lien entre le projet et le dépôt
+        if (project_id) {
+          await linkRepositoryToProject(repoId, project_id, name, branch_default);
+          return res.status(201).json({
+            ...newRepo,
+            message: 'Dépôt créé et associé au projet avec succès'
+          });
         }
+        
+        return res.status(201).json({
+          ...newRepo,
+          message: 'Dépôt créé avec succès'
+        });
       } catch (error) {
         console.error('Erreur lors de la création du dépôt:', error);
         return res.status(500).json({ 
-          error: `Erreur lors de la création du dépôt: ${(error as Error).message || 'Erreur inconnue'}` 
+          error: `Erreur lors de la création du dépôt: ${(error as Error).message || 'Erreur inconnue'}`
         });
       }
-    });
+    }
+    
+    async function linkRepositoryToProject(repoId: string, projectId: string, displayName?: string, branchOverride?: string) {
+      // Vérifier si le lien existe déjà
+      const existingLink = await new Promise<boolean>((resolve) => {
+        db.get(
+          'SELECT * FROM project_repositories WHERE project_id = ? AND repository_id = ?',
+          [projectId, repoId],
+          (err, row) => {
+            if (err || !row) {
+              resolve(false);
+            } else {
+              resolve(true);
+            }
+          }
+        );
+      });
+      
+      if (existingLink) {
+        return; // Le lien existe déjà, ne rien faire
+      }
+      
+      // Créer le lien
+      const linkId = uuidv4();
+      
+      await new Promise<void>((resolve, reject) => {
+        db.run(
+          'INSERT INTO project_repositories (id, project_id, repository_id, branch_override, display_name) VALUES (?, ?, ?, ?, ?)',
+          [linkId, projectId, repoId, branchOverride || null, displayName || null],
+          function(err) {
+            if (err) {
+              console.error('Erreur lors de la liaison du dépôt au projet:', err.message);
+              reject(err);
+              return;
+            }
+            resolve();
+          }
+        );
+      });
+    }
   } catch (error) {
     console.error('Erreur inattendue lors de la création du dépôt:', error);
     return res.status(500).json({ error: 'Erreur lors de la création du dépôt' });
@@ -660,7 +662,7 @@ export const importRepositories = async (req: Request, res: Response) => {
           repoToUse = existingRepo;
         }
         
-        // Si un projet_id est fourni, créer la liaison
+        // Si un project_id est fourni, créer la liaison
         if (project_id) {
           // Vérifier si la liaison existe déjà
           const linkExists = await new Promise<boolean>((resolve) => {
