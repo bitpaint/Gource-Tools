@@ -11,6 +11,23 @@ yarn.lock
 /out
 *.tsbuildinfo
 
+# Client specific
+/client/build
+/client/dist
+/client/.env
+/client/.env.local
+
+# Server specific
+/server/dist
+/server/.env
+/server/.env.local
+
+# Electron specific
+/electron/dist
+/electron/build
+/electron/.env
+/electron/.env.local
+
 # Environment variables
 .env
 .env.local

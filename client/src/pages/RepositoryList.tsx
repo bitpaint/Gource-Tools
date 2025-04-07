@@ -92,7 +92,7 @@ const ListItem = styled.div`
   grid-template-columns: 2fr 1fr 1fr auto;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
-  align-items: center;
+  align-items: start;
   transition: background-color 0.2s;
   
   &:hover {
@@ -412,6 +412,44 @@ const TagFilterToggle = styled.button`
   }
 `;
 
+const AuthorBadge = styled.span`
+  background-color: ${({ theme }) => theme.colors.primary}20;
+  color: ${({ theme }) => theme.colors.primary};
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-right: 0.5rem;
+`;
+
+const TagBadge = styled.span`
+  background-color: ${({ theme }) => theme.colors.secondary}15;
+  color: ${({ theme }) => theme.colors.secondary};
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-right: 0.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.secondary}25;
+  }
+`;
+
+const BadgesContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+`;
+
 const RepositoryList: React.FC = () => {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [groupedRepositories, setGroupedRepositories] = useState<GroupedRepositories>({});
@@ -446,7 +484,7 @@ const RepositoryList: React.FC = () => {
       // Filtre par terme de recherche
       const matchesSearch = searchTerm === '' || 
         repo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (repo.username && repo.username.toLowerCase().includes(searchTerm.toLowerCase()));
+        (repo.url && extractRepoInfo(repo.url).username.toLowerCase().includes(searchTerm.toLowerCase()));
       
       // Filtre par tags
       const matchesTags = selectedTags.length === 0 || 
@@ -461,11 +499,16 @@ const RepositoryList: React.FC = () => {
     const grouped: GroupedRepositories = {};
     
     filteredRepos.forEach(repo => {
-      const username = repo.username || 'Autres';
-      if (!grouped[username]) {
-        grouped[username] = [];
+      const repoInfo = repo.url ? extractRepoInfo(repo.url) : { username: '', repoName: '' };
+      const username = repoInfo.username || repo.username || '';
+      
+      // Ne pas créer de groupe pour les dépôts sans utilisateur
+      if (username) {
+        if (!grouped[username]) {
+          grouped[username] = [];
+        }
+        grouped[username].push(repo);
       }
-      grouped[username].push(repo);
     });
     
     setGroupedRepositories(grouped);
@@ -585,14 +628,20 @@ const RepositoryList: React.FC = () => {
   // Fonction pour afficher les tags d'un dépôt
   const renderTags = (tags: string | null) => {
     if (!tags) return null;
-    const tagList = tags.split(',').map(tag => tag.trim()).filter(Boolean);
-    
+    const tagList = tags.split(',').map(tag => tag.trim());
     return (
-      <TagsContainer>
+      <BadgesContainer>
         {tagList.map((tag, index) => (
-          <Tag key={`${tag}-${index}`}>{tag}</Tag>
+          <TagBadge
+            key={index}
+            onClick={() => handleTagFilter(tag)}
+            title="Cliquer pour filtrer par ce tag"
+          >
+            <FaTags size={12} />
+            {tag}
+          </TagBadge>
         ))}
-      </TagsContainer>
+      </BadgesContainer>
     );
   };
 
@@ -611,6 +660,33 @@ const RepositoryList: React.FC = () => {
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedTags([]);
+  };
+
+  // Fonction pour extraire le nom d'utilisateur et le nom du dépôt à partir de l'URL Git
+  const extractRepoInfo = (url: string): { username: string; repoName: string } => {
+    if (!url) return { username: '', repoName: '' };
+    
+    // Nettoyer l'URL
+    let cleanUrl = url.trim().replace(/\.git$/, '');
+    
+    // Gérer les URLs SSH et HTTPS
+    const sshMatch = cleanUrl.match(/git@github\.com:([^/]+)\/([^/]+)/);
+    const httpsMatch = cleanUrl.match(/https:\/\/github\.com\/([^/]+)\/([^/]+)/);
+    
+    if (sshMatch) {
+      return {
+        username: sshMatch[1],
+        repoName: sshMatch[2]
+      };
+    } else if (httpsMatch) {
+      return {
+        username: httpsMatch[1],
+        repoName: httpsMatch[2]
+      };
+    }
+    
+    // Si on ne peut pas extraire, retourner des valeurs par défaut
+    return { username: '', repoName: '' };
   };
 
   return (
@@ -750,7 +826,15 @@ const RepositoryList: React.FC = () => {
                     </RepoIconWrapper>
                     <div>
                       <RepoName>{repo.name}</RepoName>
-                      {repo.tags && renderTags(repo.tags)}
+                      <BadgesContainer>
+                        {repo.url && (
+                          <AuthorBadge>
+                            <FaGithub size={12} />
+                            {extractRepoInfo(repo.url).username || repo.username || ''}
+                          </AuthorBadge>
+                        )}
+                        {renderTags(repo.tags)}
+                      </BadgesContainer>
                     </div>
                   </RepoNameCell>
                   <PathContainer>
