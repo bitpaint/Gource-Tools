@@ -1,0 +1,13 @@
+{
+  "github_api_key": "",
+  "default_render_settings": {
+    "resolution": "1920x1080",
+    "seconds_per_day": 8.57,
+    "hide": [
+      "progress",
+      "mouse",
+      "filenames",
+      "root"
+    ]
+  }
+}

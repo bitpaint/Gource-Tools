@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "C:\Users\paulr\Documents\GitHub\Gource-Tools\gource-web\backend\app.py", line 4, in <module>
+    from flask import Flask, request, jsonify
+  File "C:\Users\paulr\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\flask\__init__.py", line 7, in <module>
+    from .app import Flask as Flask
+  File "C:\Users\paulr\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\flask\app.py", line 28, in <module>
+    from . import cli
+  File "C:\Users\paulr\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\flask\cli.py", line 18, in <module>
+    from .helpers import get_debug_flag
+  File "C:\Users\paulr\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\flask\helpers.py", line 16, in <module>
+    from werkzeug.urls import url_quote
+ImportError: cannot import name 'url_quote' from 'werkzeug.urls' (C:\Users\paulr\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\werkzeug\urls.py)

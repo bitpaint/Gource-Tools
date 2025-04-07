@@ -1,12 +1,12 @@
-# Gource-Tools
+# Gource-Web
 
 Une interface web moderne pour Gource, un outil de visualisation de l'historique des dépôts Git.
 
-![Gource-Tools Screenshot](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)
+![Gource-Web Screenshot](https://raw.githubusercontent.com/bitpaint/bitcoin-gources/main/gource/art/screenshoot.jpg)
 
-## 🍩 Qu'est-ce que Gource-Tools?
+## 🍩 Qu'est-ce que Gource-Web?
 
-Gource-Tools est une boîte à outils complète conçue pour Gource. Sa fonction principale est de simplifier le processus de téléchargement de plusieurs dépôts, la génération de fichiers logs, et leur fusion en un seul fichier global nommé ACombinedLog.txt. De plus, Gource-Tools automatise le téléchargement des avatars depuis Gravatar. Cette boîte à outils est particulièrement utile pour gérer des projets à grande échelle avec de nombreux dépôts distincts.
+Gource-Web est une version modernisée de Gource-Tools, conçue pour simplifier la gestion de dépôts Git multiples et la création de visualisations Gource à travers une interface web intuitive. L'application conserve toutes les fonctionnalités de base de Gource-Tools tout en facilitant son utilisation grâce à une interface utilisateur moderne.
 
 ## ⚙️ Prérequis
 
@@ -19,31 +19,7 @@ Gource-Tools est une boîte à outils complète conçue pour Gource. Sa fonction
 
 ## 🚀 Installation
 
-### Installation rapide
-
-#### Sur Linux/macOS
-
-```bash
-# Installer les dépendances
-./install.sh
-
-# Démarrer l'application
-./run.sh
-```
-
-#### Sur Windows
-
-```
-# Installer les dépendances
-install.bat
-
-# Démarrer l'application
-run.bat
-```
-
-### Installation manuelle
-
-#### Backend (Flask)
+### Backend (Flask)
 
 ```bash
 cd gource-web/backend
@@ -51,7 +27,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-#### Frontend (React)
+### Frontend (React)
 
 ```bash
 cd gource-web/frontend
@@ -63,7 +39,7 @@ L'application sera accessible à l'adresse [http://localhost:3000](http://localh
 
 ## 🧰 Architecture
 
-Gource-Tools est divisé en deux parties principales :
+Gource-Web est divisé en deux parties principales :
 
 ### Backend (Python/Flask)
 
@@ -77,13 +53,13 @@ Le backend gère :
 
 Le frontend fournit :
 - Une interface utilisateur moderne et intuitive
-- Des formulaires faciles à utiliser pour configurer les visualisations
+- Des formulaires pour configurer facilement les visualisations
 - Une gestion visuelle des dépôts et des logs
-- Des paramètres de rendu personnalisables
+- Des paramètres personnalisables pour le rendu
 
 ## 📋 Fonctionnalités
 
-- **Gestion de dépôts**
+- **Gestion des dépôts**
   - Ajout de dépôts à partir d'URLs
   - Suppression de dépôts
   - Vue d'ensemble des dépôts disponibles
@@ -159,10 +135,10 @@ Pour tester l'application complète :
 2. Dans un autre terminal, lancez le frontend : `cd frontend && npm start`
 3. Accédez à [http://localhost:3000](http://localhost:3000)
 
-## 📄 Licence
+## 📄 License
 
 Ce projet est sous licence MIT. Voir le fichier LICENSE pour plus de détails.
 
 ## 🙋‍♂️ Aide et support
 
-Pour toute question ou assistance, veuillez ouvrir une issue sur GitHub.
+Pour toute question ou assistance, veuillez ouvrir une issue sur GitHub. 
