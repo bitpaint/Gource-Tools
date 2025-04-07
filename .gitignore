@@ -2,31 +2,32 @@
 node_modules/
 /.pnp
 .pnp.js
+package-lock.json
+yarn.lock
 
-# Testing
-/coverage
+# Build outputs
+/dist
+/build
+/out
+*.tsbuildinfo
 
-# Production
-/client/build
-/server/dist
-/electron/dist
-
-# Data
-/data
-
-# Misc
-.DS_Store
+# Environment variables
+.env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
 
 # Logs
-logs
+/logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 
 # Editor directories and files
 .idea
@@ -36,11 +37,37 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+*.sublime-workspace
+*.sublime-project
 
 # Temporary files
 .temp
 .tmp
 .cache
+.turbo
 
-# Repositories cloned for processing
-/repositories 
+# Data
+/data
+*.db
+*.sqlite
+*.sqlite3
+
+# Testing
+/coverage
+*.test.js
+*.test.ts
+*.test.tsx
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+/repositories
+.cursor/
+.github/workflows/*.local.yml 
