@@ -374,6 +374,7 @@ const TagsCell = styled.div`
   gap: 0.25rem;
   min-height: 30px;
   padding: 4px 0;
+  position: relative;
 `;
 
 const BadgesContainer = styled.div`
@@ -381,6 +382,80 @@ const BadgesContainer = styled.div`
   flex-wrap: wrap;
   gap: 0.25rem;
   margin-top: 0.25rem;
+`;
+
+const TagAddButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.primary};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  border-radius: 50%;
+  margin-left: 0.5rem;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.light};
+  }
+`;
+
+const TagInput = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: white;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  
+  input {
+    flex: 1;
+    border: 1px solid ${({ theme }) => theme.colors.borderColor};
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+    
+    &:focus {
+      outline: none;
+      border-color: ${({ theme }) => theme.colors.primary};
+    }
+  }
+  
+  button {
+    margin-left: 0.5rem;
+    background-color: ${({ theme }) => theme.colors.primary};
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    
+    &:hover {
+      background-color: ${({ theme }) => theme.colors.primary};
+      opacity: 0.8;
+    }
+  }
+`;
+
+const TagRemoveButton = styled.button`
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 0.25rem;
+  cursor: pointer;
+  color: ${({ theme }) => theme.colors.danger};
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  
+  &:hover {
+    color: ${({ theme }) => theme.colors.danger};
+    opacity: 0.8;
+  }
 `;
 
 const RepositoryList: React.FC = () => {
@@ -391,9 +466,11 @@ const RepositoryList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [editingTagRepo, setEditingTagRepo] = useState<string | null>(null);
+  const [newTag, setNewTag] = useState('');
   const navigate = useNavigate();
   const { addNotification } = useNotification();
-  const { hasToken, showTokenDialog } = useGitHubToken();
+  const { hasToken } = useGitHubToken();
 
   // Fonction pour extraire le nom d'utilisateur et le nom du dépôt à partir de l'URL Git
   const extractRepoInfo = (url: string): { username: string; repoName: string } => {
@@ -498,7 +575,7 @@ const RepositoryList: React.FC = () => {
         duration: 3000
       });
       
-      // Rafraîchir la liste pour obtenir les tags mis à jour
+      // Rafraîchir la liste
       fetchRepositories();
     } catch (err) {
       console.error('Error synchronizing repository:', err);
@@ -606,13 +683,143 @@ const RepositoryList: React.FC = () => {
     document.body.removeChild(textArea);
   };
 
+  const startEditingTags = (repoId: string) => {
+    setEditingTagRepo(repoId);
+    setNewTag('');
+  };
+
+  const cancelEditingTags = () => {
+    setEditingTagRepo(null);
+    setNewTag('');
+  };
+
+  const handleAddTag = async (repoId: string) => {
+    if (!newTag.trim()) {
+      cancelEditingTags();
+      return;
+    }
+
+    try {
+      const repo = repositories.find(r => r.id === repoId);
+      if (!repo) return;
+
+      const currentTags = repo.tags ? repo.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+      const tagToAdd = newTag.trim();
+      
+      if (currentTags.includes(tagToAdd)) {
+        addNotification({
+          type: 'warning',
+          message: 'Tag already exists',
+          duration: 3000
+        });
+        cancelEditingTags();
+        return;
+      }
+
+      const newTags = [...currentTags, tagToAdd].join(',');
+      
+      await api.repositories.update(repoId, { tags: newTags });
+      
+      // Update local state
+      setRepositories(repos => 
+        repos.map(r => 
+          r.id === repoId ? { ...r, tags: newTags } : r
+        )
+      );
+      
+      addNotification({
+        type: 'success',
+        message: 'Tag added successfully',
+        duration: 3000
+      });
+      
+      cancelEditingTags();
+    } catch (err) {
+      console.error('Error adding tag:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to add tag',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleRemoveTag = async (repoId: string, tagToRemove: string) => {
+    try {
+      const repo = repositories.find(r => r.id === repoId);
+      if (!repo || !repo.tags) return;
+
+      const currentTags = repo.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const newTags = currentTags.filter(tag => tag !== tagToRemove).join(',');
+      
+      await api.repositories.update(repoId, { tags: newTags });
+      
+      // Update local state
+      setRepositories(repos => 
+        repos.map(r => 
+          r.id === repoId ? { ...r, tags: newTags } : r
+        )
+      );
+      
+      addNotification({
+        type: 'success',
+        message: 'Tag removed successfully',
+        duration: 3000
+      });
+    } catch (err) {
+      console.error('Error removing tag:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to remove tag',
+        duration: 3000
+      });
+    }
+  };
+
   // Fonction pour afficher les tags d'un dépôt
-  const renderTags = (tags: string | null) => {
-    if (!tags) return <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>;
+  const renderTags = (repo: Repository) => {
+    const { id, tags } = repo;
+    
+    if (editingTagRepo === id) {
+      return (
+        <TagInput>
+          <input
+            type="text"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            placeholder="Enter new tag"
+            autoFocus
+            onKeyPress={(e) => e.key === 'Enter' && handleAddTag(id)}
+          />
+          <button onClick={() => handleAddTag(id)}>Add</button>
+          <button onClick={cancelEditingTags} style={{ backgroundColor: '#ccc' }}>Cancel</button>
+        </TagInput>
+      );
+    }
+    
+    if (!tags) {
+      return (
+        <>
+          <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>
+          <TagAddButton onClick={() => startEditingTags(id)}>
+            <FaPlus size={14} />
+          </TagAddButton>
+        </>
+      );
+    }
     
     const tagList = tags.split(',').map(tag => tag.trim()).filter(Boolean);
     
-    if (tagList.length === 0) return <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>;
+    if (tagList.length === 0) {
+      return (
+        <>
+          <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>
+          <TagAddButton onClick={() => startEditingTags(id)}>
+            <FaPlus size={14} />
+          </TagAddButton>
+        </>
+      );
+    }
     
     return (
       <>
@@ -624,8 +831,20 @@ const RepositoryList: React.FC = () => {
           >
             <FaTags size={12} />
             {tag}
+            <TagRemoveButton 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveTag(id, tag);
+              }}
+              title="Remove tag"
+            >
+              <FaTimes size={12} />
+            </TagRemoveButton>
           </TagBadge>
         ))}
+        <TagAddButton onClick={() => startEditingTags(id)}>
+          <FaPlus size={14} />
+        </TagAddButton>
       </>
     );
   };
@@ -647,80 +866,6 @@ const RepositoryList: React.FC = () => {
     setSelectedTags([]);
   };
 
-  // Dans le composant RepositoryList, j'ajoute une fonction de debug pour afficher les tags
-  const debugTags = () => {
-    console.log("=== DEBUG TAGS ===");
-    console.log("Available tags:", availableTags);
-    
-    repositories.forEach(repo => {
-      console.log(`Repo: ${repo.name}`);
-      console.log(`Has tags: ${!!repo.tags}`);
-      if (repo.tags) {
-        console.log(`Tags: ${repo.tags}`);
-        const tagList = repo.tags.split(',').map(tag => tag.trim()).filter(Boolean);
-        console.log(`Parsed tags (${tagList.length}):`, tagList);
-      }
-      console.log("---");
-    });
-    
-    addNotification({
-      type: 'info',
-      message: 'Tags info printed to console',
-      duration: 2000
-    });
-  };
-
-  // Function to force update GitHub tags
-  const handleForceUpdateTags = async () => {
-    try {
-      setLoading(true);
-      addNotification({
-        type: 'info',
-        message: 'Updating tags...',
-        duration: 2000
-      });
-      
-      const response = await api.repositories.forceUpdateTags();
-      
-      // Check if we hit the rate limit
-      if (response.status === 429) {
-        addNotification({
-          type: 'warning',
-          message: 'GitHub API rate limit reached. Some repositories were updated, but the process was stopped. Please try again later or check your authentication token.',
-          duration: 5000
-        });
-      } else {
-        addNotification({
-          type: 'success',
-          message: response.data.message,
-          duration: 3000
-        });
-      }
-      
-      // Reload repositories after update
-      await fetchRepositories();
-    } catch (error: any) {
-      console.error('Error updating tags:', error);
-      
-      // Check if it's a rate limit error
-      if (error.response && error.response.status === 429) {
-        addNotification({
-          type: 'error',
-          message: 'GitHub API rate limit reached. Please try again later or check your authentication token.',
-          duration: 5000
-        });
-      } else {
-        addNotification({
-          type: 'error',
-          message: 'Error updating tags. Please try again later.',
-          duration: 3000
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <Container>
       <Header>
@@ -729,40 +874,6 @@ const RepositoryList: React.FC = () => {
           Git Repositories
         </Title>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            onClick={debugTags}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: '#FF9800',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 500
-            }}
-          >
-            Debug Tags
-          </button>
-          <button 
-            onClick={handleForceUpdateTags}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              padding: '0.5rem 1rem',
-              borderRadius: '4px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 500
-            }}
-          >
-            Update GitHub Tags
-          </button>
           <AddButton to="/repositories/add">
             <FaPlus /> Add Repository
           </AddButton>
@@ -886,7 +997,7 @@ const RepositoryList: React.FC = () => {
                 )}
               </PathContainer>
               <TagsCell>
-                {repo.tags && renderTags(repo.tags)}
+                {renderTags(repo)}
               </TagsCell>
               <DateCell>
                 <DateIcon><FaCalendarAlt size={14} /></DateIcon>

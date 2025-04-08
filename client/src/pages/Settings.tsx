@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaGithub, FaSave, FaInfoCircle, FaCog, FaPaintBrush, FaTrash, FaKey, FaCheck, FaTimes, FaRegClock, FaStar, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaGithub, FaSave, FaInfoCircle, FaCog, FaPaintBrush, FaTrash, FaKey, FaCheck, FaTimes, FaRegClock, FaRocket, FaExternalLinkAlt } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 import { useGitHubToken } from '../components/ui/GitHubTokenContext';
+import Confetti from 'react-confetti';
 
 const SettingsContainer = styled.div`
   padding: 20px;
@@ -153,20 +154,25 @@ const TokenIcon = styled.div<{ $hasToken: boolean }>`
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: ${props => props.$hasToken ? '#38a169' : '#e53e3e'};
-  color: white;
+  background-color: ${props => props.$hasToken ? '#38a169' : '#fff'};
+  border: 2px solid ${props => props.$hasToken ? '#38a169' : '#e53e3e'};
+  color: ${props => props.$hasToken ? 'white' : '#e53e3e'};
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 16px;
   flex-shrink: 0;
-  
-  svg {
-    font-size: 20px;
-  }
+  font-size: 20px;
 `;
 
 const TokenInfo = styled.div`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const TokenTextInfo = styled.div`
   flex: 1;
 `;
 
@@ -180,6 +186,25 @@ const TokenDescription = styled.p`
   margin: 0;
   color: #666;
   font-size: 14px;
+`;
+
+const DeleteButton = styled.button`
+  background: none;
+  border: none;
+  color: #e53e3e;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #fff5f5;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 `;
 
 const ButtonGroup = styled.div`
@@ -301,12 +326,47 @@ const ScopeInfo = styled.div`
   }
 `;
 
+const SaveButton = styled(Button)<{ $loading?: boolean }>`
+  min-width: 140px;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  
+  ${props => props.$loading && `
+    &:before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 200%;
+      height: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+      );
+      animation: loading 1.5s infinite;
+    }
+  `}
+  
+  @keyframes loading {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+`;
+
 const Settings: React.FC = () => {
   const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   const { addNotification } = useNotification();
-  const { hasToken, tokenSource, showTokenDialog, removeToken } = useGitHubToken();
+  const { hasToken, tokenSource, removeToken } = useGitHubToken();
 
   const handleSaveToken = async () => {
     if (!githubToken.trim()) {
@@ -324,7 +384,6 @@ const Settings: React.FC = () => {
       const response = await api.settings.saveGithubToken(githubToken);
       
       if (response.data.success) {
-        // Tester le token
         const testResponse = await api.settings.testGithubToken();
         
         setTestResult({
@@ -333,16 +392,16 @@ const Settings: React.FC = () => {
         });
         
         if (testResponse.data.success) {
+          setShowConfetti(true);
           addNotification({
             type: 'success',
-            message: 'GitHub token saved successfully'
+            message: '🎉 GitHub token saved successfully!'
           });
-          // Vider le champ de saisie pour des raisons de sécurité
           setGithubToken('');
-          // Rafraîchir la page après un court délai
           setTimeout(() => {
+            setShowConfetti(false);
             window.location.reload();
-          }, 1500);
+          }, 2000);
         } else {
           addNotification({
             type: 'warning',
@@ -364,7 +423,7 @@ const Settings: React.FC = () => {
       setLoading(false);
     }
   };
-  
+
   const handleRemoveToken = async () => {
     if (!window.confirm('Are you sure you want to remove your GitHub token? This will limit your API usage.')) {
       return;
@@ -379,7 +438,6 @@ const Settings: React.FC = () => {
         message: 'GitHub token removed successfully'
       });
       
-      // Rafraîchir la page après un court délai
       setTimeout(() => {
         window.location.reload();
       }, 1500);
@@ -395,98 +453,115 @@ const Settings: React.FC = () => {
 
   return (
     <SettingsContainer>
+      {showConfetti && (
+        <Confetti
+          recycle={false}
+          numberOfPieces={800}
+          gravity={0.25}
+          initialVelocityY={30}
+          tweenDuration={50}
+          colors={['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff']}
+        />
+      )}
       <Title>Application Settings</Title>
       
       {/* GitHub Section */}
       <Section>
         <SectionTitle>
-          <FaGithub /> GitHub Configuration
+          🔑 GitHub Configuration
         </SectionTitle>
         
         <TokenStatusCard $hasToken={hasToken}>
           <TokenIcon $hasToken={hasToken}>
-            {hasToken ? <FaCheck /> : <FaTimes />}
+            {hasToken ? '✓' : '×'}
           </TokenIcon>
           <TokenInfo>
-            <TokenTitle>
-              {hasToken 
-                ? 'GitHub Token Configured' 
-                : 'No GitHub Token Found'}
-            </TokenTitle>
-            <TokenDescription>
-              {hasToken 
-                ? `Your GitHub token is currently ${tokenSource === 'env' 
-                    ? 'stored in your .env file' 
-                    : tokenSource === 'gitCredentialManager' 
-                      ? 'found in Git Credential Manager' 
-                      : 'configured via GitHub CLI'}.`
-                : 'Configure a GitHub token to increase your API rate limits.'}
-            </TokenDescription>
+            <TokenTextInfo>
+              <TokenTitle>
+                {hasToken 
+                  ? 'GitHub Token Configured' 
+                  : 'No GitHub Token Found'}
+              </TokenTitle>
+              <TokenDescription>
+                {hasToken 
+                  ? `Your GitHub token is currently ${tokenSource === 'env' 
+                      ? 'stored in your .env file' 
+                      : tokenSource === 'gitCredentialManager' 
+                        ? 'found in Git Credential Manager' 
+                        : 'configured via GitHub CLI'}.`
+                  : 'Configure a GitHub token to increase your API rate limits.'}
+              </TokenDescription>
+            </TokenTextInfo>
+            {hasToken && (
+              <DeleteButton onClick={handleRemoveToken} disabled={loading}>
+                🗑️
+              </DeleteButton>
+            )}
           </TokenInfo>
         </TokenStatusCard>
 
-        <ComparisonCard>
-          <PlanColumn>
-            <h3><FaRegClock /> Basic</h3>
-            <SetupTime>
-              <FaRegClock /> Setup: 0 min
-            </SetupTime>
-            <RateLimit>
-              60 <span>requests/hour</span>
-            </RateLimit>
-            <FeatureList>
-              <li><FaCheck /> Access to public repositories</li>
-              <li><FaCheck /> Basic GitHub API usage</li>
-              <li><FaTimes /> Limited rate for repository scanning</li>
-            </FeatureList>
-          </PlanColumn>
-          
-          <PlanColumn $isPro>
-            <h3><FaStar /> Enhanced Access</h3>
-            <SetupTime>
-              <FaRegClock /> Setup: ~1 min
-            </SetupTime>
-            <RateLimit>
-              5,000 <span>requests/hour</span>
-            </RateLimit>
-            <FeatureList>
-              <li><FaCheck /> Access to all repositories</li>
-              <li><FaCheck /> Increased API rate limits</li>
-              <li><FaCheck /> Faster repository scanning</li>
-            </FeatureList>
-            <ScopeInfo>
-              <strong>Required token scopes:</strong>
-              • For public repositories: <code>public_repo</code><br />
-              • For private repositories: <code>repo</code>
-            </ScopeInfo>
-            <LinkButton 
-              href="https://github.com/settings/tokens/new" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <FaExternalLinkAlt /> Create token on GitHub
-            </LinkButton>
-          </PlanColumn>
-        </ComparisonCard>
-        
-        {hasToken ? (
-          <ButtonGroup>
-            <DangerButton onClick={handleRemoveToken} disabled={loading}>
-              <FaTrash /> Remove Token
-            </DangerButton>
-          </ButtonGroup>
-        ) : (
-          <ButtonGroup>
-            <Input
-              type="password"
-              placeholder="Enter your GitHub token"
-              value={githubToken}
-              onChange={(e) => setGithubToken(e.target.value)}
-            />
-            <Button onClick={handleSaveToken} disabled={loading || !githubToken.trim()}>
-              <FaKey /> Save Token
-            </Button>
-          </ButtonGroup>
+        {!hasToken && (
+          <>
+            <ComparisonCard>
+              <PlanColumn>
+                <h3>🐢 Without Token</h3>
+                <SetupTime>
+                  Setup: 0 min
+                </SetupTime>
+                <RateLimit>
+                  60 <span>requests/hour</span>
+                </RateLimit>
+                <FeatureList>
+                  <li>✓ Access to public repositories</li>
+                  <li>✓ Basic GitHub API usage</li>
+                  <li>× Limited rate for repository scanning</li>
+                </FeatureList>
+              </PlanColumn>
+              
+              <PlanColumn $isPro>
+                <h3>🚀 With Free Token</h3>
+                <SetupTime>
+                  Quick Setup: ~1 min
+                </SetupTime>
+                <RateLimit>
+                  5,000 <span>requests/hour</span>
+                </RateLimit>
+                <FeatureList>
+                  <li>✓ Access to all repositories</li>
+                  <li>✓ Increased API rate limits</li>
+                  <li>✓ Faster repository scanning</li>
+                </FeatureList>
+                <ScopeInfo>
+                  <strong>Required token scopes (100% free):</strong>
+                  • For public repositories: <code>public_repo</code><br />
+                  • For private repositories: <code>repo</code>
+                </ScopeInfo>
+                <LinkButton 
+                  href="https://github.com/settings/tokens/new" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  Create your free token ✨
+                </LinkButton>
+              </PlanColumn>
+            </ComparisonCard>
+
+            <ButtonGroup>
+              <Input
+                type="password"
+                placeholder="Enter your free GitHub token"
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
+              />
+              <SaveButton 
+                onClick={handleSaveToken} 
+                disabled={loading || !githubToken.trim()}
+                $loading={loading}
+              >
+                {loading ? 'Saving...' : 'Save Token'}
+              </SaveButton>
+            </ButtonGroup>
+          </>
         )}
         
         {testResult && (
@@ -505,7 +580,7 @@ const Settings: React.FC = () => {
       {/* Gource Settings Section */}
       <Section>
         <SectionTitle>
-          <FaPaintBrush /> Gource Configuration
+          🎨 Gource Configuration
         </SectionTitle>
         <p>Gource settings are configured at the project level. Access a specific project to customize Gource rendering options.</p>
       </Section>
@@ -513,7 +588,7 @@ const Settings: React.FC = () => {
       {/* App Settings Section */}
       <Section>
         <SectionTitle>
-          <FaCog /> Application Configuration
+          ⚙️ Application Configuration
         </SectionTitle>
         <p>Additional options coming in a future update.</p>
       </Section>

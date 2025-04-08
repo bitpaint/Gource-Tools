@@ -92,34 +92,32 @@ const RightNavItem = styled.div<{ $active?: boolean }>`
   }
 `;
 
-const TokenAlertButton = styled.button`
+const TokenAlertButton = styled(Link)`
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #6c757d;
-  color: white;
-  border: none;
+  padding: 8px 12px;
+  background-color: #f5f5f5;
+  color: #333;
   border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  cursor: pointer;
-  margin-right: 16px;
+  text-decoration: none;
   transition: background-color 0.2s;
   
   &:hover {
-    background-color: #5a6268;
+    background-color: #e5e5e5;
   }
   
   svg {
-    font-size: 14px;
+    color: #0366d6;
   }
 `;
 
 const Navbar: React.FC = () => {
   const location = useLocation();
   const path = location.pathname;
-  const { hasToken, showTokenDialog } = useGitHubToken();
+  const { hasToken } = useGitHubToken();
   
   return (
     <NavContainer>
@@ -140,7 +138,7 @@ const Navbar: React.FC = () => {
       </NavList>
       <RightLinks>
         {!hasToken && (
-          <TokenAlertButton onClick={showTokenDialog}>
+          <TokenAlertButton to="/settings">
             <FaInfoCircle />
             GITHUB TOKEN
           </TokenAlertButton>
