@@ -15,6 +15,7 @@ interface Repository {
   branch_default: string;
   tags: string | null;
   last_updated: string;
+  slug?: string;
 }
 
 // Type pour les dépôts groupés par nom d'utilisateur
@@ -72,6 +73,36 @@ const AddButton = styled(Link)`
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   }
+`;
+
+const UpdateButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #2196F3;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+  font-size: 1rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  width: 100%;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #1976D2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  gap: 1rem;
 `;
 
 const ListContainer = styled.div`
@@ -676,8 +707,32 @@ const RepositoryList: React.FC = () => {
   const { hasToken } = useGitHubToken();
 
   // Ajout de la fonction pour gérer l'ajout au projet
-  const handleAddToProject = () => {
-    navigate('/projects/add', { state: { repositories: selectedRepos } });
+  const handleAddToProject = (repoId?: string) => {
+    // Si un repoId spécifique est fourni, on ne sélectionne que ce dépôt
+    // Sinon on utilise les dépôts déjà sélectionnés
+    const reposToAdd = repoId ? [repoId] : selectedRepos;
+    
+    // Vérifier qu'au moins un dépôt est sélectionné
+    if (reposToAdd.length === 0) {
+      addNotification({
+        type: 'warning',
+        message: 'Please select at least one repository',
+        duration: 3000
+      });
+      return;
+    }
+
+    try {
+      // Naviguer vers la page de sélection de projet avec les dépôts sélectionnés
+      navigate('/projects', { state: { repositories: reposToAdd } });
+    } catch (error) {
+      console.error('Error navigating to project selection:', error);
+      addNotification({
+        type: 'error',
+        message: 'Error navigating to project selection',
+        duration: 3000
+      });
+    }
   };
 
   // Fonction pour extraire le nom d'utilisateur et le nom du dépôt à partir de l'URL Git
@@ -763,7 +818,14 @@ const RepositoryList: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.repositories.getAll();
-      setRepositories(response.data);
+      
+      // Ajouter un slug à chaque dépôt basé sur son nom
+      const reposWithSlugs = response.data.map((repo: Repository) => ({
+        ...repo,
+        slug: repo.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      }));
+      
+      setRepositories(reposWithSlugs);
       setError(null);
     } catch (err) {
       console.error('Error loading repositories:', err);
@@ -1263,6 +1325,38 @@ const RepositoryList: React.FC = () => {
     }
   };
 
+  const handleUpdateAll = async () => {
+    try {
+      addNotification({
+        type: 'info',
+        message: `Synchronizing all repositories...`,
+        duration: 3000
+      });
+      
+      // Créer un tableau de promesses pour synchroniser tous les dépôts
+      const syncPromises = repositories.map(repo => api.repositories.sync(repo.id));
+      
+      // Attendre que toutes les synchronisations soient terminées
+      await Promise.all(syncPromises);
+      
+      addNotification({
+        type: 'success',
+        message: `Successfully synchronized all repositories`,
+        duration: 3000
+      });
+      
+      // Rafraîchir la liste
+      fetchRepositories();
+    } catch (err) {
+      console.error('Error synchronizing repositories:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to synchronize some repositories',
+        duration: 3000
+      });
+    }
+  };
+
   // Initialiser l'expansion des groupes
   useEffect(() => {
     // Par défaut, tous les groupes sont développés
@@ -1277,9 +1371,14 @@ const RepositoryList: React.FC = () => {
           <TitleIcon><FaGithub size={28} /></TitleIcon>
           Git Repositories
         </Title>
-        <AddButton to="/repositories/add">
-          <FaPlus /> Add Repository
-        </AddButton>
+        <ButtonContainer>
+          <AddButton to="/repositories/add">
+            <FaPlus /> Add Repository
+          </AddButton>
+          <UpdateButton onClick={handleUpdateAll}>
+            <FaSync /> Update All
+          </UpdateButton>
+        </ButtonContainer>
       </Header>
 
       <SearchContainer>
@@ -1425,7 +1524,7 @@ const RepositoryList: React.FC = () => {
                     />
                   </CheckboxContainer>
                   <RepoCell>
-                    <RepoName onClick={() => handleRepoSelect(repo.id)}>
+                    <RepoName onClick={() => navigate(`/repositories/${repo.slug || repo.id}`)}>
                       {repo.name}
                     </RepoName>
                   </RepoCell>
@@ -1438,7 +1537,7 @@ const RepositoryList: React.FC = () => {
                   <Actions>
                     <RepoActionButton 
                       className="project"
-                      onClick={() => handleAddToProject()}
+                      onClick={() => handleAddToProject(repo.id)}
                       title="Add to project"
                     >
                       <FaFolderPlus />
@@ -1452,7 +1551,7 @@ const RepositoryList: React.FC = () => {
                     </RepoActionButton>
                     <RepoActionButton 
                       className="edit" 
-                      onClick={() => navigate(`/repositories/${repo.id}`)}
+                      onClick={() => navigate(`/repositories/${repo.slug || repo.id}`)}
                       title="Edit"
                     >
                       <FaEdit />
@@ -1480,7 +1579,7 @@ const RepositoryList: React.FC = () => {
                 <span>{selectedRepos.length} repositories selected</span>
               </BatchActionsLeft>
               <BatchActionsRight>
-                <BatchActionButton onClick={handleAddToProject}>
+                <BatchActionButton onClick={() => handleAddToProject()}>
                   <FaFolderPlus />
                   Add to Project
                 </BatchActionButton>

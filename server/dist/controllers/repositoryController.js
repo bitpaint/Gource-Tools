@@ -45,40 +45,91 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.linkRepositoryToProject = exports.importRepositories = exports.getRepositoryBranches = exports.syncRepository = exports.deleteRepository = exports.updateRepository = exports.createRepository = exports.getRepositoryById = exports.getAllRepositories = void 0;
+exports.importRepository = exports.linkRepositoryToProject = exports.importRepositories = exports.getRepositoryBranches = exports.syncRepository = exports.deleteRepository = exports.updateRepository = exports.createRepository = exports.getRepositoryById = exports.getAllRepositories = void 0;
 const database_1 = __importDefault(require("../models/database"));
 const uuid_1 = require("uuid");
 const gitService = __importStar(require("../services/gitService"));
+const githubAuth_1 = require("../utils/githubAuth");
+// Get GitHub token (try all available sources)
+function getGitHubToken() {
+    return __awaiter(this, void 0, void 0, function* () {
+        return (0, githubAuth_1.getGitHubCredentials)();
+    });
+}
+// Function for creating GitHub API request headers
+function createGitHubHeaders() {
+    return __awaiter(this, void 0, void 0, function* () {
+        return (0, githubAuth_1.createGitHubHeaders)();
+    });
+}
+// Fonction pour créer des tags fallback pour les dépôts GitHub connus
+function getDefaultTagsForRepo(username, repoName) {
+    const lowerRepoName = repoName.toLowerCase();
+    // Détecter le langage de programmation à partir du nom
+    const languageTags = [];
+    if (lowerRepoName.includes('node') || lowerRepoName.includes('js') || lowerRepoName.includes('javascript')) {
+        languageTags.push('javascript', 'nodejs');
+    }
+    else if (lowerRepoName.includes('python') || lowerRepoName.includes('py')) {
+        languageTags.push('python');
+    }
+    else if (lowerRepoName.includes('rust') || lowerRepoName.includes('rs')) {
+        languageTags.push('rust');
+    }
+    else if (lowerRepoName.includes('go')) {
+        languageTags.push('golang');
+    }
+    else if (lowerRepoName.includes('java')) {
+        languageTags.push('java');
+    }
+    else if (lowerRepoName.includes('react')) {
+        languageTags.push('javascript', 'reactjs');
+    }
+    else if (lowerRepoName.includes('vue')) {
+        languageTags.push('javascript', 'vuejs');
+    }
+    // Ajouter des tags basés sur le dépôt NOSTR spécifique
+    if (username.toLowerCase() === 'nostr-protocol' || lowerRepoName.includes('nostr')) {
+        languageTags.push('nostr', 'protocol');
+        if (lowerRepoName === 'nips') {
+            return [...languageTags, 'nips', 'specifications', 'documentation'];
+        }
+        else if (lowerRepoName === 'nostr') {
+            return [...languageTags, 'core', 'reference-implementation'];
+        }
+        else if (lowerRepoName === 'data-vending-machines') {
+            return [...languageTags, 'dvm', 'data-processing'];
+        }
+    }
+    // Ajouter des tags génériques si aucun tag spécifique n'a été trouvé
+    if (languageTags.length === 0) {
+        languageTags.push('code', 'repository');
+    }
+    return languageTags;
+}
 // Récupérer tous les dépôts
 const getAllRepositories = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const projectId = req.query.project_id;
-        if (projectId) {
-            // Si project_id est fourni, récupérer les dépôts liés à ce projet
-            database_1.default.all(`
-        SELECT r.*, pr.branch_override, pr.display_name, pr.id as link_id 
-        FROM repositories r
-        JOIN project_repositories pr ON r.id = pr.repository_id
-        WHERE pr.project_id = ?
-        ORDER BY r.last_updated DESC
-      `, [projectId], (err, rows) => {
-                if (err) {
-                    console.error('Erreur lors de la récupération des dépôts du projet:', err.message);
-                    return res.status(500).json({ error: 'Erreur lors de la récupération des dépôts' });
-                }
-                return res.status(200).json(rows);
-            });
+        const { project_id } = req.query;
+        // Définir la requête SQL de base
+        let sql = 'SELECT * FROM repositories';
+        const params = [];
+        // Ajouter un filtre par projet si nécessaire
+        if (project_id) {
+            sql += ' WHERE id IN (SELECT repository_id FROM project_repositories WHERE project_id = ?)';
+            params.push(project_id);
         }
-        else {
-            // Sinon, récupérer tous les dépôts
-            database_1.default.all('SELECT * FROM repositories ORDER BY last_updated DESC', [], (err, rows) => {
-                if (err) {
-                    console.error('Erreur lors de la récupération des dépôts:', err.message);
-                    return res.status(500).json({ error: 'Erreur lors de la récupération des dépôts' });
-                }
-                return res.status(200).json(rows);
-            });
-        }
+        // Ajouter un ordre de tri
+        sql += ' ORDER BY name ASC';
+        // Exécuter la requête
+        database_1.default.all(sql, params, (err, rows) => __awaiter(void 0, void 0, void 0, function* () {
+            if (err) {
+                console.error('Erreur lors de la récupération des dépôts:', err.message);
+                return res.status(500).json({ error: 'Erreur lors de la récupération des dépôts' });
+            }
+            // Retourner directement les dépôts sans enrichissement des topics GitHub
+            return res.json(rows);
+        }));
     }
     catch (error) {
         console.error('Erreur inattendue lors de la récupération des dépôts:', error);
@@ -132,7 +183,7 @@ exports.getRepositoryById = getRepositoryById;
 // Créer un nouveau dépôt dans le système et optionnellement l'associer à un projet
 const createRepository = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { project_id, name, url, branch_default, download_avatars = true, username, topics } = req.body;
+        const { project_id, name, url, branch_default } = req.body;
         if (!name) {
             return res.status(400).json({ error: 'Le nom du dépôt est requis' });
         }
@@ -160,7 +211,6 @@ const createRepository = (req, res) => __awaiter(void 0, void 0, void 0, functio
                     // Si une URL est fournie, chercher d'abord si ce dépôt existe déjà
                     let repoId;
                     let local_path = null;
-                    let avatarsResult = null;
                     if (url) {
                         // Normaliser l'URL du dépôt avant de vérifier s'il existe
                         const normalizedUrl = gitService.normalizeGitUrl(url);
@@ -186,12 +236,6 @@ const createRepository = (req, res) => __awaiter(void 0, void 0, void 0, functio
                         // Le dépôt n'existe pas encore, le télécharger
                         try {
                             local_path = yield gitService.downloadRepository(normalizedUrl);
-                            // Télécharger les avatars si l'option est activée
-                            if (download_avatars && local_path) {
-                                const avatarService = require('../services/avatarService');
-                                avatarsResult = yield avatarService.downloadAvatarsForRepo(local_path);
-                                console.log(`Téléchargement des avatars: ${avatarsResult.success} sur ${avatarsResult.total} utilisateurs`);
-                            }
                         }
                         catch (error) {
                             // Préparer un message d'erreur convivial
@@ -213,61 +257,45 @@ const createRepository = (req, res) => __awaiter(void 0, void 0, void 0, functio
                         // Pas d'URL, c'est un dépôt local
                         repoId = (0, uuid_1.v4)();
                     }
-                    // Extraire le nom d'utilisateur à partir de l'URL si non fourni et que l'URL est de GitHub
-                    let extractedUsername = username;
-                    if (!extractedUsername && url && url.includes('github.com')) {
-                        const parts = url.split('/');
-                        if (parts.length >= 2) {
-                            // Pour une URL comme https://github.com/username/repo, prendre username
-                            extractedUsername = parts[parts.length - 2];
-                        }
-                    }
-                    // Convertir les topics en format texte pour le stockage
-                    const topicsText = topics ? (Array.isArray(topics) ? topics.join(',') : topics) : null;
                     // Créer l'entrée du dépôt
                     const now = new Date().toISOString();
+                    // Extraire le username de l'URL si disponible
+                    const username = url ? extractUsername(url) : null;
                     yield new Promise((resolve, reject) => {
-                        database_1.default.run('INSERT INTO repositories (id, name, url, local_path, branch_default, last_updated, username, topics) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [repoId, name, url || null, local_path || null, branch_default || 'main', now, extractedUsername || null, topicsText], (err) => {
+                        database_1.default.run('INSERT INTO repositories (id, name, username, url, local_path, branch_default, tags, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [repoId, name, username, url || null, local_path || null, branch_default || 'main', null, now], function (err) {
                             if (err) {
-                                console.error('Erreur lors de la création du dépôt:', err.message);
+                                console.error('Error creating repository:', err.message);
                                 reject(err);
+                                return;
                             }
-                            else {
-                                console.log(`Dépôt créé avec succès: ${name}`);
-                                resolve();
-                            }
+                            resolve();
                         });
                     });
-                    // Si c'est dans le contexte d'un projet, créer l'association
-                    let projectLinkId = null;
+                    const newRepo = {
+                        id: repoId,
+                        name,
+                        username,
+                        url: url || null,
+                        local_path: local_path || null,
+                        branch_default: branch_default || 'main',
+                        tags: null,
+                        last_updated: now
+                    };
+                    // Si un project_id est fourni, créer le lien entre le projet et le dépôt
                     if (project_id) {
-                        projectLinkId = yield linkRepositoryToProject(repoId, project_id, name, branch_default);
+                        yield linkRepositoryToProject(repoId, project_id, name, branch_default);
+                        return res.status(201).json(Object.assign(Object.assign({}, newRepo), { message: 'Repository created and linked to project successfully' }));
                     }
-                    // Récupérer le dépôt créé pour le renvoyer dans la réponse
-                    const repository = yield new Promise((resolve, reject) => {
-                        database_1.default.get('SELECT * FROM repositories WHERE id = ?', [repoId], (err, row) => {
-                            if (err) {
-                                console.error('Erreur lors de la récupération du dépôt créé:', err.message);
-                                reject(err);
-                            }
-                            else if (!row) {
-                                reject(new Error('Dépôt non trouvé après création'));
-                            }
-                            else {
-                                resolve(row);
-                            }
-                        });
-                    });
-                    return res.status(201).json({
-                        repository,
-                        project_link_id: projectLinkId,
-                        message: 'Dépôt créé avec succès',
-                        avatars_downloaded: avatarsResult
-                    });
+                    return res.status(201).json(Object.assign(Object.assign({}, newRepo), { message: 'Repository created successfully' }));
                 }
                 catch (error) {
                     console.error('Error creating repository:', error);
-                    return res.status(500).json({ error: 'Error creating repository' });
+                    // Préparer un message d'erreur convivial
+                    let errorMessage = 'Error creating repository';
+                    if (error.message.includes("UNIQUE constraint failed")) {
+                        errorMessage = `A repository with the same name already exists. Please choose a different name.`;
+                    }
+                    return res.status(500).json({ error: errorMessage });
                 }
             });
         }
@@ -312,7 +340,7 @@ exports.createRepository = createRepository;
 const updateRepository = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { name, url, branch_default, branch_override, display_name } = req.body;
+        const { name, url, branch_default, branch_override, display_name, tags } = req.body;
         const project_id = req.query.project_id;
         if (!name) {
             return res.status(400).json({ error: 'Le nom du dépôt est requis' });
@@ -336,12 +364,12 @@ const updateRepository = (req, res) => __awaiter(void 0, void 0, void 0, functio
                         return res.status(500).json({ error: 'Erreur lors de la mise à jour du dépôt' });
                     }
                     // Mettre à jour le dépôt
-                    database_1.default.run('UPDATE repositories SET name = ?, branch_default = ? WHERE id = ?', [name, branch_default || typedRow.branch_default, id], function (err) {
+                    database_1.default.run('UPDATE repositories SET name = ?, branch_default = ?, tags = ? WHERE id = ?', [name, branch_default || typedRow.branch_default, tags || typedRow.tags, id], function (err) {
                         if (err) {
                             console.error('Erreur lors de la mise à jour du dépôt:', err.message);
                             return res.status(500).json({ error: 'Erreur lors de la mise à jour du dépôt' });
                         }
-                        return res.status(200).json(Object.assign(Object.assign({}, typedRow), { name, branch_default: branch_default || typedRow.branch_default, branch_override: branch_override || undefined, display_name: display_name || name }));
+                        return res.status(200).json(Object.assign(Object.assign({}, typedRow), { name, branch_default: branch_default || typedRow.branch_default, branch_override: branch_override || undefined, display_name: display_name || name, tags: tags || typedRow.tags }));
                     });
                 });
             }));
@@ -358,12 +386,12 @@ const updateRepository = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 }
                 const repository = row;
                 // Mettre à jour le dépôt
-                database_1.default.run('UPDATE repositories SET name = ?, branch_default = ? WHERE id = ?', [name, branch_default || repository.branch_default, id], function (err) {
+                database_1.default.run('UPDATE repositories SET name = ?, branch_default = ?, tags = ? WHERE id = ?', [name, branch_default || repository.branch_default, tags || repository.tags, id], function (err) {
                     if (err) {
                         console.error('Erreur lors de la mise à jour du dépôt:', err.message);
                         return res.status(500).json({ error: 'Erreur lors de la mise à jour du dépôt' });
                     }
-                    return res.status(200).json(Object.assign(Object.assign({}, repository), { name, branch_default: branch_default || repository.branch_default }));
+                    return res.status(200).json(Object.assign(Object.assign({}, repository), { name, branch_default: branch_default || repository.branch_default, tags: tags || repository.tags }));
                 });
             });
         }
@@ -515,68 +543,27 @@ exports.getRepositoryBranches = getRepositoryBranches;
 // Importer les dépôts d'un utilisateur ou d'une organisation
 const importRepositories = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { username, platform, project_id } = req.body;
+        const { type, username, projectId } = req.body;
         if (!username) {
-            return res.status(400).json({ error: 'Username is required' });
+            return res.status(400).json({ error: 'Nom d\'utilisateur manquant' });
         }
-        if (platform !== 'github' && platform !== 'gitlab') {
-            return res.status(400).json({ error: 'Platform must be either "github" or "gitlab"' });
+        // Récupérer uniquement les dépôts GitHub
+        // Seule l'intégration GitHub est supportée
+        const githubApiUrl = `https://api.github.com/users/${username}/repos`;
+        const response = yield fetch(githubApiUrl, {
+            headers: yield createGitHubHeaders()
+        });
+        if (!response.ok) {
+            throw new Error(`GitHub API error: ${response.statusText}`);
         }
-        // Check if project exists (if project_id is provided)
-        if (project_id) {
-            const projectExists = yield new Promise((resolve) => {
-                database_1.default.get('SELECT * FROM projects WHERE id = ?', [project_id], (err, row) => {
-                    if (err || !row) {
-                        resolve(false);
-                    }
-                    else {
-                        resolve(true);
-                    }
-                });
-            });
-            if (!projectExists) {
-                return res.status(404).json({ error: 'Project not found' });
-            }
-        }
-        // Fetch repositories from the platform's API
-        let repositories = [];
-        try {
-            if (platform === 'github') {
-                // Fetch GitHub repositories
-                const githubApiUrl = `https://api.github.com/users/${username}/repos`;
-                const response = yield fetch(githubApiUrl);
-                if (!response.ok) {
-                    throw new Error(`GitHub API error: ${response.statusText}`);
-                }
-                const data = yield response.json();
-                repositories = data.map((repo) => ({
-                    name: repo.name,
-                    url: repo.clone_url
-                }));
-            }
-            else if (platform === 'gitlab') {
-                // Fetch GitLab repositories
-                const gitlabApiUrl = `https://gitlab.com/api/v4/users/${username}/projects`;
-                const response = yield fetch(gitlabApiUrl);
-                if (!response.ok) {
-                    throw new Error(`GitLab API error: ${response.statusText}`);
-                }
-                const data = yield response.json();
-                repositories = data.map((repo) => ({
-                    name: repo.name,
-                    url: repo.http_url_to_repo
-                }));
-            }
-        }
-        catch (error) {
-            console.error(`Error fetching repositories from ${platform}:`, error);
-            return res.status(500).json({
-                error: `Error fetching repositories from ${platform}: ${error.message}`
-            });
-        }
+        const data = yield response.json();
+        const repositories = data.map((repo) => ({
+            name: repo.name,
+            url: repo.clone_url
+        }));
         if (repositories.length === 0) {
             return res.status(404).json({
-                error: `No public repositories found for ${username} on ${platform}`
+                error: `No public repositories found for ${username} on GitHub`
             });
         }
         // Create/retrieve repositories and link them to the project
@@ -623,10 +610,10 @@ const importRepositories = (req, res) => __awaiter(void 0, void 0, void 0, funct
                     repoToUse = existingRepo;
                 }
                 // If a project_id is provided, create the link
-                if (project_id) {
+                if (projectId) {
                     // Check if link already exists
                     const linkExists = yield new Promise((resolve) => {
-                        database_1.default.get('SELECT * FROM project_repositories WHERE project_id = ? AND repository_id = ?', [project_id, repoToUse.id], (err, row) => {
+                        database_1.default.get('SELECT * FROM project_repositories WHERE project_id = ? AND repository_id = ?', [projectId, repoToUse.id], (err, row) => {
                             if (err || !row) {
                                 resolve(false);
                             }
@@ -638,7 +625,7 @@ const importRepositories = (req, res) => __awaiter(void 0, void 0, void 0, funct
                     if (!linkExists) {
                         const linkId = (0, uuid_1.v4)();
                         yield new Promise((resolve, reject) => {
-                            database_1.default.run('INSERT INTO project_repositories (id, project_id, repository_id, display_name) VALUES (?, ?, ?, ?)', [linkId, project_id, repoToUse.id, repo.name], function (err) {
+                            database_1.default.run('INSERT INTO project_repositories (id, project_id, repository_id, display_name) VALUES (?, ?, ?, ?)', [linkId, projectId, repoToUse.id, repo.name], function (err) {
                                 if (err) {
                                     reject(err);
                                     return;
@@ -757,3 +744,131 @@ const linkRepositoryToProject = (req, res) => __awaiter(void 0, void 0, void 0, 
     }
 });
 exports.linkRepositoryToProject = linkRepositoryToProject;
+// Fonction pour extraire le nom du dépôt à partir de l'URL Git
+const extractRepoName = (url) => {
+    if (!url)
+        return '';
+    // Retirer l'extension .git si présente
+    let repoName = url.trim().replace(/\.git$/, '');
+    // Extraire le nom du dépôt après le dernier '/' ou ':'
+    const parts = repoName.split(/[\/:]/).filter(Boolean);
+    return parts[parts.length - 1] || '';
+};
+// Fonction pour extraire le nom d'utilisateur à partir de l'URL Git
+const extractUsername = (url) => {
+    if (!url)
+        return '';
+    // Retirer l'extension .git si présente
+    let cleanUrl = url.trim().replace(/\.git$/, '');
+    // Pour les URL HTTP(S)
+    if (cleanUrl.includes('github.com') || cleanUrl.includes('gitlab.com')) {
+        // Format: https://github.com/username/repo
+        const parts = cleanUrl.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+            // L'index du nom d'utilisateur dépend de la structure de l'URL
+            const domainIndex = parts.findIndex(part => part === 'github.com' || part === 'gitlab.com');
+            if (domainIndex !== -1 && parts.length > domainIndex + 1) {
+                return parts[domainIndex + 1];
+            }
+        }
+    }
+    // Pour les URL SSH
+    else if (cleanUrl.includes('@github.com') || cleanUrl.includes('@gitlab.com')) {
+        // Format: git@github.com:username/repo
+        const match = cleanUrl.match(/@(?:github|gitlab)\.com[:|\/]([^\/]+)/);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    return '';
+};
+// Function to import a GitHub repository
+const importRepository = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { url } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+        // Extract owner and repo name from URL
+        let owner = '';
+        let repoName = '';
+        // HTTPS format: https://github.com/username/repo.git
+        const httpsMatch = url.match(/https:\/\/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?/);
+        // SSH format: git@github.com:username/repo.git
+        const sshMatch = url.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?/);
+        if (httpsMatch) {
+            owner = httpsMatch[1];
+            repoName = httpsMatch[2];
+        }
+        else if (sshMatch) {
+            owner = sshMatch[1];
+            repoName = sshMatch[2];
+        }
+        else {
+            return res.status(400).json({ error: 'Invalid GitHub URL format' });
+        }
+        // Get repository info from GitHub API
+        console.log(`Fetching repository data for ${owner}/${repoName}`);
+        const apiUrl = `https://api.github.com/repos/${owner}/${repoName}`;
+        const headers = yield createGitHubHeaders();
+        const response = yield fetch(apiUrl, { headers });
+        if (!response.ok) {
+            console.error(`GitHub API error: ${response.status} ${response.statusText}`);
+            if (response.status === 404) {
+                return res.status(404).json({
+                    error: 'Repository not found on GitHub. Make sure the URL is correct and the repository is public or you have access to it.'
+                });
+            }
+            if (response.status === 403) {
+                return res.status(403).json({
+                    error: 'GitHub API rate limit reached. Please try again later or add a GitHub token in the settings.'
+                });
+            }
+            return res.status(response.status).json({
+                error: `GitHub API error: ${response.statusText}`
+            });
+        }
+        const repoData = yield response.json();
+        // Generate default tags based on repository name
+        let topics = getDefaultTagsForRepo(owner, repoName);
+        // Create repository record in the database
+        database_1.default.run(`INSERT INTO repositories (name, description, url, clone_url, default_branch, stars, forks, last_commit, tags, last_tags_update)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+            repoData.name,
+            repoData.description || '',
+            url,
+            repoData.clone_url,
+            repoData.default_branch,
+            repoData.stargazers_count,
+            repoData.forks_count,
+            repoData.updated_at,
+            topics.join(','),
+            new Date().toISOString()
+        ], function (err) {
+            if (err) {
+                console.error('Error saving repository:', err.message);
+                return res.status(500).json({ error: 'Error saving repository' });
+            }
+            return res.status(201).json({
+                id: this.lastID,
+                name: repoData.name,
+                description: repoData.description || '',
+                url: url,
+                clone_url: repoData.clone_url,
+                default_branch: repoData.default_branch,
+                stars: repoData.stargazers_count,
+                forks: repoData.forks_count,
+                last_commit: repoData.updated_at,
+                tags: topics.join(',')
+            });
+        });
+    }
+    catch (error) {
+        console.error('Error importing repository:', error);
+        return res.status(500).json({
+            error: 'Error importing repository',
+            message: error.message || 'Unknown error'
+        });
+    }
+});
+exports.importRepository = importRepository;

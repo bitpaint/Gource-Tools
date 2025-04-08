@@ -43,7 +43,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route 
-        path="/projects/:projectId" 
+        path="/projects/:projectIdOrSlug" 
         element={
           <Layout>
             <ProjectDetail />
@@ -51,7 +51,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route 
-        path="/projects/:projectId/edit" 
+        path="/projects/:projectIdOrSlug/edit" 
         element={
           <Layout>
             <EditProject />
@@ -59,7 +59,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route 
-        path="/projects/:projectId/gource" 
+        path="/projects/:projectIdOrSlug/gource" 
         element={
           <Layout>
             <NotFound />
@@ -67,7 +67,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route 
-        path="/projects/:projectId/link-repositories" 
+        path="/projects/:projectIdOrSlug/link-repositories" 
         element={
           <Layout>
             <LinkRepositoriesToProject />
@@ -93,7 +93,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route 
-        path="/repositories/:repoId" 
+        path="/repositories/:repoIdOrSlug" 
         element={
           <Layout>
             <EditRepository />

@@ -188,10 +188,11 @@ const AddNewButton = styled(Button)`
  * NOT for downloading new repositories (use AddRepository for that)
  */
 const LinkRepositoriesToProject: React.FC = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectIdOrSlug } = useParams<{ projectIdOrSlug: string }>();
   const navigate = useNavigate();
   
   const [project, setProject] = useState<Project | null>(null);
+  const [projectId, setProjectId] = useState<string>('');
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [filteredRepositories, setFilteredRepositories] = useState<Repository[]>([]);
   const [selectedRepositories, setSelectedRepositories] = useState<string[]>([]);
@@ -203,16 +204,23 @@ const LinkRepositoriesToProject: React.FC = () => {
   
   useEffect(() => {
     // Fetch project details
-    if (projectId) {
+    if (projectIdOrSlug) {
       fetchProject();
+    }
+  }, [projectIdOrSlug]);
+  
+  useEffect(() => {
+    // Fetch repositories once we have the project ID
+    if (projectId) {
       fetchRepositories();
     }
   }, [projectId]);
   
   const fetchProject = async () => {
     try {
-      const response = await api.get(`/projects/${projectId}`);
+      const response = await api.get(`/projects/${projectIdOrSlug}`);
       setProject(response.data);
+      setProjectId(response.data.id);
     } catch (err) {
       console.error('Error loading project:', err);
       setError('Error loading project. Please try again.');
@@ -223,14 +231,16 @@ const LinkRepositoriesToProject: React.FC = () => {
     try {
       setLoading(true);
       
-      // Fetch all repositories
+      // Get all repositories in the system
       const allReposResponse = await api.get('/repositories');
       
-      // Fetch repositories already linked to project
+      // Get repositories already linked to the project
       const projectReposResponse = await api.get(`/repositories?project_id=${projectId}`);
       
-      // Filter out repositories already linked to the project
+      // Extract IDs of repositories already linked to the project
       const linkedRepoIds = projectReposResponse.data.map((repo: Repository) => repo.id);
+      
+      // Filter out repositories that are already linked to the project
       const availableRepos = allReposResponse.data.filter(
         (repo: Repository) => !linkedRepoIds.includes(repo.id)
       );
@@ -317,9 +327,7 @@ const LinkRepositoriesToProject: React.FC = () => {
     <Container>
       <Header>
         <Title>Link Repositories to Project</Title>
-        <Subtitle>
-          {project ? `Select repositories to link to ${project.name}` : 'Loading project...'}
-        </Subtitle>
+        {project && <Subtitle>Project: {project.name}</Subtitle>}
       </Header>
       
       <Form onSubmit={handleSubmit}>

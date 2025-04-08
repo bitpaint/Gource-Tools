@@ -10,6 +10,7 @@ interface Project {
   name: string;
   description: string;
   last_modified: string;
+  slug?: string;
 }
 
 interface Repository {
@@ -173,16 +174,24 @@ const AddRepoButton = styled(Button)`
 `;
 
 const ProjectDetail = () => {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectIdOrSlug } = useParams<{ projectIdOrSlug: string }>();
   const navigate = useNavigate();
   const { addNotification } = useNotification();
   
-  // S'assurer que projectId n'est pas undefined
-  const safeProjectId = projectId || '';
+  // S'assurer que projectIdOrSlug n'est pas undefined
+  const safeProjectParam = projectIdOrSlug || '';
+  const [projectId, setProjectId] = useState<string>('');
   
   // Définir les fonctions d'API de manière stable
-  const getProject = useCallback(() => api.projects.getById(safeProjectId), [safeProjectId]);
-  const getRepositories = useCallback(() => api.repositories.getAll(safeProjectId), [safeProjectId]);
+  const getProject = useCallback(() => {
+    // Fonction qui récupère le projet soit par ID, soit qui recherche par slug
+    return api.projects.getById(safeProjectParam);
+  }, [safeProjectParam]);
+  
+  const getRepositories = useCallback(() => {
+    if (!projectId) return Promise.resolve({ data: [] }); // Résoudre avec un tableau vide au lieu de rejeter
+    return api.repositories.getAll(projectId);
+  }, [projectId]);
   
   // Charger les détails du projet
   const [projectState, fetchProject] = useApi(
@@ -190,19 +199,27 @@ const ProjectDetail = () => {
     true
   );
   
-  // Charger les dépôts du projet
+  // Extraire l'ID réel du projet une fois qu'il est chargé
+  useEffect(() => {
+    if (projectState.data) {
+      const project = projectState.data as Project;
+      setProjectId(project.id);
+    }
+  }, [projectState.data]);
+  
+  // Charger les dépôts du projet une fois que l'ID est disponible
   const [repositoriesState, fetchRepositories] = useApi(
     getRepositories,
-    true
+    !!projectId // Ne pas charger tant que l'ID n'est pas disponible
   );
   
   const handleDeleteProject = async () => {
-    if (!window.confirm('Are you sure you want to delete this project and all its repositories?')) {
+    if (!projectId || !window.confirm('Are you sure you want to delete this project and all its repositories?')) {
       return;
     }
     
     try {
-      await api.projects.delete(safeProjectId);
+      await api.projects.delete(projectId);
       addNotification({
         type: 'success',
         message: 'Project successfully deleted'
@@ -218,11 +235,11 @@ const ProjectDetail = () => {
   };
   
   const handleEditProject = () => {
-    navigate(`/projects/${safeProjectId}/edit`);
+    navigate(`/projects/${safeProjectParam}/edit`);
   };
   
   const handleAddRepository = () => {
-    navigate(`/projects/${safeProjectId}/link-repositories`);
+    navigate(`/projects/${safeProjectParam}/link-repositories`);
   };
   
   const handleEditRepository = (repoId: string) => {
@@ -288,6 +305,10 @@ const ProjectDetail = () => {
     );
   }
   
+  if (!projectState.data) {
+    return <LoadingState>No project data available...</LoadingState>;
+  }
+  
   const project = projectState.data as Project;
   
   return (
@@ -320,11 +341,13 @@ const ProjectDetail = () => {
           <LoadingState>Loading repositories...</LoadingState>
         ) : repositoriesState.error ? (
           <div>Error loading repositories: {repositoriesState.error}</div>
-        ) : (repositoriesState.data as Repository[])?.length === 0 ? (
+        ) : !repositoriesState.data ? (
+          <p>No repository data available.</p>
+        ) : (Array.isArray(repositoriesState.data) && repositoriesState.data.length === 0) ? (
           <p>No repositories associated with this project. Add one to get started.</p>
         ) : (
           <RepositoriesList>
-            {(repositoriesState.data as Repository[]).map(repo => (
+            {Array.isArray(repositoriesState.data) && repositoriesState.data.map((repo: Repository) => (
               <RepositoryCard key={repo.id}>
                 <RepoName>{repo.name}</RepoName>
                 {repo.url && <RepoInfo>URL: {repo.url}</RepoInfo>}

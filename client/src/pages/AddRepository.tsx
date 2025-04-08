@@ -13,7 +13,6 @@ interface FormData {
 
 interface ImportData {
   username: string;
-  platform: 'github' | 'gitlab';
 }
 
 interface ImportResult {
@@ -26,10 +25,12 @@ interface ImportResult {
 
 const Container = styled.div`
   padding: 2rem;
+  width: 100%;
 `;
 
 const Header = styled.div`
   margin-bottom: 2rem;
+  width: 100%;
 `;
 
 const Title = styled.h1`
@@ -48,11 +49,12 @@ const Form = styled.form`
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
+  width: 100%;
 `;
 
 const FormGroup = styled.div`
   margin-bottom: 1.5rem;
+  width: 100%;
 `;
 
 const Label = styled.label`
@@ -95,9 +97,15 @@ const Button = styled.button`
 const CancelButton = styled(Button)`
   background-color: ${({ theme }) => theme.colors.background};
   color: ${({ theme }) => theme.colors.text};
+  padding: 0.75rem 1.5rem;
+  min-width: 150px;
   
   &:hover {
     background-color: ${({ theme }) => theme.colors.background}dd;
+  }
+  
+  @media (max-width: 600px) {
+    width: 100%;
   }
 `;
 
@@ -117,9 +125,10 @@ const ErrorMessage = styled.div`
 `;
 
 const InfoText = styled.div`
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.colors.text}99;
+  margin-top: 0.8rem;
+  font-size: 1rem;
+  color: ${({ theme }) => theme.colors.text}cc;
+  text-align: center;
 `;
 
 const SuccessMessage = styled.div`
@@ -133,6 +142,7 @@ const Tabs = styled.div`
   display: flex;
   margin-bottom: 2rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.background};
+  width: 100%;
 `;
 
 const Tab = styled.button<{ $active: boolean }>`
@@ -166,18 +176,34 @@ const Select = styled.select`
 
 const UrlForm = styled.div`
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1rem;
+  width: 100%;
 `;
 
 const UrlInput = styled(Input)`
-  flex: 1;
+  width: 100%;
 `;
 
-const AddButton = styled(Button)`
+const DownloadButton = styled(Button)`
   background-color: ${({ theme }) => theme.colors.primary};
   color: white;
   padding: 0.75rem 1rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  font-weight: 500;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  
+  &:disabled {
+    background-color: #e0e0e0;
+    color: #757575;
+    cursor: not-allowed;
+  }
 `;
 
 const RepositoryList = styled.div`
@@ -228,7 +254,7 @@ const SuccessCardBase = styled.div`
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   padding: 2rem;
-  max-width: 600px;
+  width: 100%;
   text-align: center;
   margin-top: 2rem;
   position: relative;
@@ -240,14 +266,14 @@ const SuccessCard = animated(SuccessCardBase);
 const SuccessIcon = styled.div`
   background-color: ${({ theme }) => theme.colors.success || '#28a745'};
   color: white;
-  width: 80px;
-  height: 80px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   display: flex;
   justify-content: center;
   align-items: center;
   margin: 0 auto 1.5rem auto;
-  font-size: 2.5rem;
+  font-size: 2rem;
 `;
 
 const SuccessTitle = styled.h2`
@@ -263,12 +289,13 @@ const SuccessDescription = styled.p`
 `;
 
 const ResultsList = styled.div`
-  max-height: 200px;
+  max-height: 250px;
   overflow-y: auto;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   text-align: left;
   border: 1px solid ${({ theme }) => theme.colors.background};
   border-radius: 4px;
+  width: 100%;
 `;
 
 const ResultItem = styled.div<{ $success: boolean }>`
@@ -294,9 +321,14 @@ const ActionButton = styled(Button)`
   color: white;
   font-weight: 600;
   padding: 0.875rem 1.75rem;
+  min-width: 150px;
   
   &:hover {
     background-color: ${({ theme }) => theme.colors.primary}cc;
+  }
+  
+  @media (max-width: 600px) {
+    width: 100%;
   }
 `;
 
@@ -306,22 +338,24 @@ const LoadingOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(255, 255, 255, 0.92);
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  backdrop-filter: blur(3px);
+  padding: 2rem;
 `;
 
 const LoadingSpinner = styled.div`
-  border: 4px solid rgba(0, 0, 0, 0.1);
+  border: 4px solid rgba(0, 0, 0, 0.05);
   border-radius: 50%;
   border-top: 4px solid ${({ theme }) => theme.colors.primary};
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   
   @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -332,13 +366,45 @@ const LoadingSpinner = styled.div`
 const LoadingText = styled.p`
   font-size: 1.25rem;
   color: ${({ theme }) => theme.colors.text};
-  margin-top: 1rem;
+  margin: 0 0 1.5rem;
+  text-align: center;
+  font-weight: 500;
+`;
+
+const LoadingProgressContainer = styled.div`
+  width: 90%;
+  background-color: #f0f0f0;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+`;
+
+const LoadingProgressBar = styled.div<{ $progress: number }>`
+  height: 100%;
+  width: ${props => `${props.$progress}%`};
+  background-color: ${({ theme }) => theme.colors.primary};
+  border-radius: 4px;
+  transition: width 0.3s ease;
+`;
+
+const LoadingDetails = styled.div`
+  font-size: 0.9rem;
+  color: ${({ theme }) => theme.colors.text}aa;
+  margin-top: 0.5rem;
+  text-align: center;
 `;
 
 const ActionButtonsContainer = styled.div`
   display: flex;
   justify-content: center;
   gap: 1rem;
+  margin-top: 1rem;
+  
+  @media (max-width: 600px) {
+    flex-direction: column;
+    width: 100%;
+  }
 `;
 
 /**
@@ -349,10 +415,8 @@ const ActionButtonsContainer = styled.div`
 const AddRepository: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'quick' | 'bulk'>('quick');
   const [quickUrl, setQuickUrl] = useState('');
-  const [repositories, setRepositories] = useState<Array<{ url: string, name: string }>>([]);
   const [importData, setImportData] = useState<ImportData>({
     username: '',
-    platform: 'github'
   });
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -366,6 +430,8 @@ const AddRepository: React.FC = () => {
   const [importResults, setImportResults] = useState<ImportResult[]>([]);
   const [showSuccessCard, setShowSuccessCard] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState('');
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressDetails, setProgressDetails] = useState('');
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -392,6 +458,17 @@ const AddRepository: React.FC = () => {
     setSuccess(null);
     setShowSuccessCard(false);
     setShowConfetti(false);
+    
+    // Focus the appropriate input field when switching tabs
+    setTimeout(() => {
+      if (activeTab === 'quick') {
+        const quickInput = document.querySelector('input[value="' + quickUrl + '"]') as HTMLInputElement;
+        if (quickInput) quickInput.focus();
+      } else if (activeTab === 'bulk') {
+        const usernameInput = document.getElementById('username') as HTMLInputElement;
+        if (usernameInput) usernameInput.focus();
+      }
+    }, 100);
   }, [activeTab]);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -408,7 +485,26 @@ const AddRepository: React.FC = () => {
   const handleUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      addRepository();
+      
+      // Check if it might be a username/organization
+      if (quickUrl.trim() && quickUrl.indexOf('/') === -1 && quickUrl.indexOf('.') === -1) {
+        // Suggest bulk import
+        setActiveTab('bulk');
+        setImportData(prev => ({ ...prev, username: quickUrl }));
+        setQuickUrl('');
+        
+        // Focus the username input in the bulk tab
+        setTimeout(() => {
+          const usernameInput = document.getElementById('username');
+          if (usernameInput) {
+            usernameInput.focus();
+          }
+        }, 100);
+        
+        return;
+      }
+      
+      handleQuickDownload();
     }
   };
 
@@ -434,10 +530,7 @@ const AddRepository: React.FC = () => {
     
     // If it might be a username or organization
     if (url.indexOf('/') === -1 && url.indexOf('.') === -1) {
-      // Suggest bulk import
-      setActiveTab('bulk');
-      setImportData(prev => ({ ...prev, username: url }));
-      setError('This appears to be a username. Please use the bulk import tab instead.');
+      // We'll handle this in the keydown handler instead
       return '';
     }
     
@@ -450,7 +543,8 @@ const AddRepository: React.FC = () => {
     return url;
   };
 
-  const addRepository = () => {
+  // New function to directly download a repository
+  const handleQuickDownload = async () => {
     if (!quickUrl.trim()) return;
     
     // Normalize the URL
@@ -471,16 +565,70 @@ const AddRepository: React.FC = () => {
     const pathParts = urlObj.pathname.split('/').filter(Boolean);
     let name = pathParts[pathParts.length - 1].replace(/\.git$/, '');
     
-    const newRepo = { url: normalizedUrl, name };
-    setRepositories(prev => [...prev, newRepo]);
-    setQuickUrl('');
-    setError(null);
-    setSuccess(null);
-  };
-
-  const removeRepository = (index: number) => {
-    setRepositories(prev => prev.filter((_, i) => i !== index));
-    setSuccess(null);
+    try {
+      setSubmitting(true);
+      setError(null);
+      setSuccess(null);
+      setLoadingProgress(`Downloading repository ${name}`);
+      setProgressPercent(10);
+      setProgressDetails('Initializing download...');
+      
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setProgressPercent(prev => {
+          const newProgress = prev + Math.random() * 10;
+          if (newProgress >= 90) {
+            clearInterval(progressInterval);
+            setProgressDetails('Finalizing repository setup...');
+            return 90;
+          }
+          
+          if (newProgress > 30 && newProgress < 60) {
+            setProgressDetails('Cloning Git repository...');
+          } else if (newProgress >= 60 && newProgress < 90) {
+            setProgressDetails('Processing repository data...');
+          }
+          
+          return newProgress;
+        });
+      }, 800);
+      
+      const response = await api.post('/repositories', {
+        name: name,
+        url: normalizedUrl
+      });
+      
+      // Complete the progress
+      clearInterval(progressInterval);
+      setProgressPercent(100);
+      setProgressDetails('Download complete!');
+      
+      // Show success UI
+      setTimeout(() => {
+        setImportResults([{
+          id: response.data.id,
+          name: name,
+          url: normalizedUrl,
+          success: true
+        }]);
+        
+        setShowSuccessCard(true);
+        setShowConfetti(true);
+        setQuickUrl('');
+      }, 500);
+      
+      setTimeout(() => {
+        setShowConfetti(false);
+      }, 5000);
+    } catch (err: any) {
+      console.error('Error downloading repository:', err);
+      setError(err.response?.data?.error || 'An error occurred while downloading the repository. Please try again.');
+    } finally {
+      setSubmitting(false);
+      setLoadingProgress('');
+      setProgressPercent(0);
+      setProgressDetails('');
+    }
   };
 
   const handleImport = async () => {
@@ -492,18 +640,84 @@ const AddRepository: React.FC = () => {
     setSubmitting(true);
     setError(null);
     setSuccess(null);
-    setLoadingProgress(`Discovering repositories for ${importData.username}...`);
+    setLoadingProgress(`Discovering repositories for ${importData.username}`);
+    setProgressPercent(10);
+    setProgressDetails('Searching for repositories...');
 
     try {
+      // Simulate progress updates for the search phase
+      const searchProgressInterval = setInterval(() => {
+        setProgressPercent(prev => {
+          const newProgress = prev + Math.random() * 3;
+          if (newProgress >= 40) {
+            clearInterval(searchProgressInterval);
+            setProgressDetails(`Found repositories for ${importData.username}, preparing download...`);
+            return 40;
+          }
+          
+          if (newProgress > 20 && newProgress < 40) {
+            setProgressDetails(`Scanning ${importData.username}'s repositories...`);
+          }
+          
+          return newProgress;
+        });
+      }, 1000);
+      
       const response = await api.post('/repositories/import', {
         username: importData.username,
-        platform: importData.platform
+        platform: 'github'
       });
       
-      // Show success UI
-      setShowSuccessCard(true);
-      setShowConfetti(true);
-      setImportResults(response.data.results || []);
+      clearInterval(searchProgressInterval);
+      
+      // If we have results, show progress for each repository download
+      if (response.data.results && response.data.results.length > 0) {
+        const totalRepos = response.data.results.length;
+        setProgressDetails(`Found ${totalRepos} repositories, starting download...`);
+        
+        // Calculate progress increment per repo
+        const progressPerRepo = 50 / totalRepos;
+        let currentProgress = 40; // Start at 40% after search phase
+        
+        // Simulate downloading each repository
+        const downloadProgressInterval = setInterval(() => {
+          setProgressPercent(prev => {
+            const newProgress = prev + (progressPerRepo / 10); // Increment gradually
+            if (newProgress >= 95) {
+              clearInterval(downloadProgressInterval);
+              setProgressDetails('Finalizing repository imports...');
+              return 95;
+            }
+            
+            // Update message occasionally with count
+            const completedCount = Math.floor((newProgress - 40) / progressPerRepo);
+            if (completedCount > 0 && completedCount % Math.max(1, Math.floor(totalRepos / 10)) === 0) {
+              setProgressDetails(`Downloaded ${completedCount} of ${totalRepos} repositories...`);
+            }
+            
+            return newProgress;
+          });
+        }, Math.min(500, 5000 / totalRepos)); // Faster updates for many repos
+        
+        // Complete the progress after a delay proportional to repo count
+        setTimeout(() => {
+          clearInterval(downloadProgressInterval);
+          setProgressPercent(100);
+          setProgressDetails('Import complete!');
+          
+          // Show success UI
+          setTimeout(() => {
+            setShowSuccessCard(true);
+            setShowConfetti(true);
+            setImportResults(response.data.results || []);
+          }, 500);
+        }, Math.min(3000, 500 + (totalRepos * 100))); // Faster for many repos
+      } else {
+        // No repos found
+        setProgressPercent(100);
+        setProgressDetails('No repositories found');
+        setError('No repositories were found for this username or organization');
+      }
       
       setTimeout(() => {
         setShowConfetti(false);
@@ -512,79 +726,14 @@ const AddRepository: React.FC = () => {
       // Reset form
       setImportData({
         username: '',
-        platform: 'github'
       });
     } catch (err: any) {
       console.error('Error importing repositories:', err);
       setError(err.response?.data?.error || 'An error occurred while importing repositories. Please try again.');
     } finally {
       setSubmitting(false);
-      setLoadingProgress('');
-    }
-  };
-
-  const handleQuickSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (repositories.length === 0 && quickUrl.trim()) {
-      addRepository();
-      if (error) return;
-    }
-    
-    if (repositories.length === 0) {
-      setError('You must specify at least one repository URL');
-      return;
-    }
-    
-    try {
-      setSubmitting(true);
-      setError(null);
-      setSuccess(null);
-      setLoadingProgress(`Downloading repositories...`);
-      
-      const results: ImportResult[] = [];
-      
-      for (let i = 0; i < repositories.length; i++) {
-        const repo = repositories[i];
-        setLoadingProgress(`Downloading ${repo.name} (${i+1}/${repositories.length})...`);
-        
-        try {
-          const response = await api.post('/repositories', {
-            name: repo.name,
-            url: repo.url
-          });
-          
-          results.push({
-            id: response.data.id,
-            name: repo.name,
-            url: repo.url,
-            success: true
-          });
-        } catch (err: any) {
-          results.push({
-            id: '',
-            name: repo.name,
-            url: repo.url,
-            success: false,
-            error: err.response?.data?.error || 'Unknown error'
-          });
-        }
-      }
-      
-      // Show success UI
-      setImportResults(results);
-      setShowSuccessCard(true);
-      setShowConfetti(true);
-      setRepositories([]);
-      
-      setTimeout(() => {
-        setShowConfetti(false);
-      }, 5000);
-    } catch (err: any) {
-      console.error('Error creating repositories:', err);
-      setError(err.response?.data?.error || 'An error occurred while creating repositories. Please try again.');
-    } finally {
-      setSubmitting(false);
+      setProgressPercent(0);
+      setProgressDetails('');
       setLoadingProgress('');
     }
   };
@@ -664,6 +813,14 @@ const AddRepository: React.FC = () => {
     setError(null);
   };
 
+  // Add a new function to handle keydown in the username input
+  const handleEnterKeyForUsername = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleImport();
+    }
+  };
+
   return (
     <Container>
       {/* Confetti effect on success */}
@@ -681,7 +838,11 @@ const AddRepository: React.FC = () => {
       {submitting && (
         <LoadingOverlay>
           <LoadingSpinner />
-          <LoadingText>{loadingProgress || 'Processing...'}</LoadingText>
+          <LoadingText>{loadingProgress}</LoadingText>
+          <LoadingProgressContainer>
+            <LoadingProgressBar $progress={progressPercent} />
+          </LoadingProgressContainer>
+          <LoadingDetails>{progressDetails}</LoadingDetails>
         </LoadingOverlay>
       )}
       
@@ -736,7 +897,7 @@ const AddRepository: React.FC = () => {
           </Tabs>
           
           {activeTab === 'quick' && (
-            <Form onSubmit={handleQuickSubmit}>
+            <Form onSubmit={(e) => { e.preventDefault(); handleQuickDownload(); }}>
               <FormGroup>
                 <Label>Repository URL or "username/repo"</Label>
                 <UrlForm>
@@ -747,96 +908,48 @@ const AddRepository: React.FC = () => {
                     onKeyDown={handleUrlKeyDown}
                     placeholder="e.g., https://github.com/username/repo.git or username/repo"
                   />
-                  <AddButton 
-                    type="button" 
-                    onClick={addRepository}
-                    disabled={!quickUrl.trim()}
+                  <DownloadButton 
+                    type="submit" 
+                    disabled={submitting || !quickUrl.trim()}
                   >
-                    Add
-                  </AddButton>
+                    {submitting ? 'Downloading...' : 'Download Repository'}
+                  </DownloadButton>
                 </UrlForm>
                 {error && <ErrorMessage>{error}</ErrorMessage>}
                 {success && <SuccessMessage>{success}</SuccessMessage>}
                 <InfoText>
-                  Enter the full URL of a Git repository or use the "username/repo" format for GitHub repositories.
-                  To import all repositories from a user, use the Bulk Import tab.
+                  Enter a Git URL or "username/repo" format for GitHub repositories.
                 </InfoText>
               </FormGroup>
-
-              {repositories.length > 0 && (
-                <FormGroup>
-                  <Label>Repositories to download</Label>
-                  <RepositoryList>
-                    {repositories.map((repo, index) => (
-                      <RepositoryItem key={index}>
-                        <div>{repo.name} ({repo.url})</div>
-                        <RemoveButton 
-                          type="button" 
-                          onClick={() => removeRepository(index)}
-                        >
-                          Remove
-                        </RemoveButton>
-                      </RepositoryItem>
-                    ))}
-                  </RepositoryList>
-                </FormGroup>
-              )}
-              
-              <ButtonContainer>
-                <CancelButton type="button" onClick={() => navigate(-1)}>
-                  Cancel
-                </CancelButton>
-                <SubmitButton 
-                  type="submit" 
-                  disabled={submitting || repositories.length === 0}
-                >
-                  {submitting ? 'Downloading...' : 'Download Repositories'}
-                </SubmitButton>
-              </ButtonContainer>
             </Form>
           )}
           
           {activeTab === 'bulk' && (
             <Form onSubmit={(e) => { e.preventDefault(); handleImport(); }}>
               <FormGroup>
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">Username or Organization</Label>
                 <Input
                   type="text"
                   id="username"
                   name="username"
                   value={importData.username}
                   onChange={handleImportDataChange}
+                  onKeyDown={handleEnterKeyForUsername}
                   placeholder="e.g., octocat"
                   required
                 />
+                <DownloadButton 
+                  type="submit" 
+                  disabled={submitting || !importData.username}
+                >
+                  {submitting ? 'Importing...' : 'Import Repositories'}
+                </DownloadButton>
+                {error && <ErrorMessage>{error}</ErrorMessage>}
+                {success && <SuccessMessage>{success}</SuccessMessage>}
                 <InfoText>
-                  Enter the username or organization whose public repositories you want to import.
+                  Enter GitHub username/organization to import their public repositories.
                 </InfoText>
               </FormGroup>
-              
-              <FormGroup>
-                <Label htmlFor="platform">Platform</Label>
-                <Select
-                  id="platform"
-                  name="platform"
-                  value="github"
-                  disabled={true}
-                >
-                  <option value="github">GitHub</option>
-                </Select>
-              </FormGroup>
-              
-              {error && <ErrorMessage>{error}</ErrorMessage>}
-              {success && <SuccessMessage>{success}</SuccessMessage>}
-              
-              <ButtonContainer>
-                <CancelButton type="button" onClick={() => navigate(-1)}>
-                  Cancel
-                </CancelButton>
-                <SubmitButton type="submit" disabled={submitting || !importData.username}>
-                  {submitting ? 'Importing...' : 'Import Repositories'}
-                </SubmitButton>
-              </ButtonContainer>
             </Form>
           )}
         </>

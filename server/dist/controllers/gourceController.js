@@ -53,7 +53,6 @@ const fs_1 = __importDefault(require("fs"));
 const child_process_1 = require("child_process");
 const util_1 = __importDefault(require("util"));
 const gitService = __importStar(require("../services/gitService"));
-const avatarService = __importStar(require("../services/avatarService"));
 const execAsync = util_1.default.promisify(child_process_1.exec);
 // Répertoire pour stocker les logs Gource et les rendus
 const GOURCE_DIR = path_1.default.join(__dirname, '../../../data/gource');
@@ -113,7 +112,7 @@ exports.getConfigById = getConfigById;
 // Créer une nouvelle configuration Gource
 const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { project_id, speed, resolution, background_color, avatars_enabled, avatar_size, start_date, end_date, custom_options, download_avatars } = req.body;
+        const { project_id, speed, resolution, background_color, avatars_enabled, avatar_size, start_date, end_date, custom_options } = req.body;
         if (!project_id) {
             return res.status(400).json({ error: 'L\'ID du projet est requis' });
         }
@@ -131,8 +130,8 @@ const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
             database_1.default.run(`INSERT INTO gource_configs (
           id, project_id, speed, resolution, background_color, 
           avatars_enabled, avatar_size, start_date, end_date, 
-          custom_options, created_at, updated_at, download_avatars
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+          custom_options, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
                 id, project_id,
                 speed || 1.0,
                 resolution || '1280x720',
@@ -142,8 +141,7 @@ const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                 start_date || null,
                 end_date || null,
                 custom_options || '',
-                now, now,
-                download_avatars !== undefined ? download_avatars : true
+                now, now
             ], function (err) {
                 if (err) {
                     console.error('Erreur lors de la création de la configuration Gource:', err.message);
@@ -161,8 +159,7 @@ const createConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* (
                     end_date: end_date || null,
                     custom_options: custom_options || '',
                     created_at: now,
-                    updated_at: now,
-                    download_avatars: download_avatars !== undefined ? download_avatars : true
+                    updated_at: now
                 };
                 return res.status(201).json(newConfig);
             });
@@ -178,60 +175,39 @@ exports.createConfig = createConfig;
 const updateConfig = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { speed, resolution, background_color, avatars_enabled, avatar_size, start_date, end_date, custom_options, download_avatars } = req.body;
+        const { speed, resolution, background_color, avatars_enabled, avatar_size, start_date, end_date, custom_options } = req.body;
         // Vérifier si la configuration existe
         database_1.default.get('SELECT * FROM gource_configs WHERE id = ?', [id], (err, row) => {
             if (err) {
-                console.error('Erreur lors de la vérification de la configuration Gource:', err.message);
+                console.error('Erreur lors de la recherche de la configuration Gource:', err.message);
                 return res.status(500).json({ error: 'Erreur lors de la mise à jour de la configuration Gource' });
             }
             if (!row) {
                 return res.status(404).json({ error: 'Configuration Gource non trouvée' });
             }
-            const now = new Date().toISOString();
             const config = row;
-            // Mettre à jour seulement les champs fournis
-            const updatedFields = {
-                speed: speed !== undefined ? speed : config.speed,
-                resolution: resolution !== undefined ? resolution : config.resolution,
-                background_color: background_color !== undefined ? background_color : config.background_color,
-                avatars_enabled: avatars_enabled !== undefined ? avatars_enabled : config.avatars_enabled,
-                avatar_size: avatar_size !== undefined ? avatar_size : config.avatar_size,
-                start_date: start_date !== undefined ? start_date : config.start_date,
-                end_date: end_date !== undefined ? end_date : config.end_date,
-                custom_options: custom_options !== undefined ? custom_options : config.custom_options,
-                updated_at: now,
-                download_avatars: download_avatars !== undefined ? download_avatars : config.download_avatars
-            };
+            const now = new Date().toISOString();
             database_1.default.run(`UPDATE gource_configs SET 
-          speed = ?, 
-          resolution = ?, 
-          background_color = ?, 
-          avatars_enabled = ?, 
-          avatar_size = ?,
-          start_date = ?,
-          end_date = ?,
-          custom_options = ?,
-          updated_at = ?,
-          download_avatars = ?
+          speed = ?, resolution = ?, background_color = ?, 
+          avatars_enabled = ?, avatar_size = ?, start_date = ?, 
+          end_date = ?, custom_options = ?, updated_at = ? 
         WHERE id = ?`, [
-                updatedFields.speed,
-                updatedFields.resolution,
-                updatedFields.background_color,
-                updatedFields.avatars_enabled ? 1 : 0,
-                updatedFields.avatar_size,
-                updatedFields.start_date,
-                updatedFields.end_date,
-                updatedFields.custom_options,
-                updatedFields.updated_at,
-                updatedFields.download_avatars ? 1 : 0,
+                speed !== undefined ? speed : config.speed,
+                resolution || config.resolution,
+                background_color || config.background_color,
+                avatars_enabled !== undefined ? avatars_enabled : config.avatars_enabled,
+                avatar_size !== undefined ? avatar_size : config.avatar_size,
+                start_date !== undefined ? start_date : config.start_date,
+                end_date !== undefined ? end_date : config.end_date,
+                custom_options !== undefined ? custom_options : config.custom_options,
+                now,
                 id
             ], function (err) {
                 if (err) {
                     console.error('Erreur lors de la mise à jour de la configuration Gource:', err.message);
                     return res.status(500).json({ error: 'Erreur lors de la mise à jour de la configuration Gource' });
                 }
-                const updatedConfig = Object.assign(Object.assign({}, config), updatedFields);
+                const updatedConfig = Object.assign(Object.assign({}, config), { speed: speed !== undefined ? speed : config.speed, resolution: resolution || config.resolution, background_color: background_color || config.background_color, avatars_enabled: avatars_enabled !== undefined ? avatars_enabled : config.avatars_enabled, avatar_size: avatar_size !== undefined ? avatar_size : config.avatar_size, start_date: start_date !== undefined ? start_date : config.start_date, end_date: end_date !== undefined ? end_date : config.end_date, custom_options: custom_options !== undefined ? custom_options : config.custom_options, updated_at: now });
                 return res.status(200).json(updatedConfig);
             });
         });
@@ -342,35 +318,12 @@ function startRenderProcess(render, config, repositories) {
         try {
             // Mettre à jour le statut à "processing"
             yield updateRenderStatus(render.id, 'processing');
-            // Créer le fichier de mapping des avatars si les avatars sont activés
-            let avatarMappingFile = '';
-            if (config.avatars_enabled) {
-                const avatarMappingPath = path_1.default.join(GOURCE_DIR, `avatar-mapping-${render.id}.txt`);
-                try {
-                    avatarMappingFile = yield avatarService.createGourceAvatarMapping(avatarMappingPath);
-                    console.log(`Fichier de mapping des avatars créé: ${avatarMappingFile}`);
-                }
-                catch (error) {
-                    console.warn('Erreur lors de la création du fichier de mapping des avatars:', error);
-                }
-            }
             // Générer les logs Gource pour chaque dépôt
             const logFiles = yield Promise.all(repositories.map((repo) => __awaiter(this, void 0, void 0, function* () {
                 if (!repo.local_path)
                     return null;
-                // Si les avatars sont activés et le téléchargement est activé, télécharger les avatars du dépôt
-                if (config.avatars_enabled && config.download_avatars) {
-                    try {
-                        console.log(`Téléchargement des avatars pour le dépôt: ${repo.name}`);
-                        const result = yield avatarService.downloadAvatarsForRepo(repo.local_path);
-                        console.log(`Téléchargement des avatars terminé: ${result.success}/${result.total} avatars téléchargés`);
-                    }
-                    catch (error) {
-                        console.warn(`Erreur lors du téléchargement des avatars pour ${repo.name}:`, error);
-                    }
-                }
                 const logFile = path_1.default.join(LOGS_DIR, `${repo.id}_gource.log`);
-                yield gitService.getGourceLogs(repo.local_path, logFile, repo.branch_override || repo.branch_default);
+                yield gitService.getGourceLogs(repo.local_path, logFile);
                 return logFile;
             })));
             // Filtrer les logs null (dépôts sans chemin local)
@@ -391,9 +344,8 @@ function startRenderProcess(render, config, repositories) {
             gourceCmd += `--viewport ${width}x${height} `;
             gourceCmd += `--background-colour ${config.background_color} `;
             if (config.avatars_enabled) {
-                if (avatarMappingFile) {
-                    gourceCmd += `--user-image-file "${avatarMappingFile}" `;
-                }
+                gourceCmd += `--user-image-dir "${path_1.default.join(GOURCE_DIR, 'avatars')}" `;
+                gourceCmd += `--default-user-image "${path_1.default.join(GOURCE_DIR, 'avatars', 'default.png')}" `;
                 gourceCmd += `--user-scale ${config.avatar_size / 100} `;
             }
             else {

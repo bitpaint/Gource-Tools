@@ -3,9 +3,9 @@ import { useParams } from 'react-router-dom';
 import ProjectForm from '../components/projects/ProjectForm';
 
 const EditProject: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { projectIdOrSlug } = useParams<{ projectIdOrSlug: string }>();
   
-  if (!id) {
+  if (!projectIdOrSlug) {
     return <div>Missing project ID</div>;
   }
   
@@ -13,7 +13,7 @@ const EditProject: React.FC = () => {
     <div>
       <h1>Edit Project</h1>
       <p>Modify your project details.</p>
-      <ProjectForm projectId={id} />
+      <ProjectForm projectId={projectIdOrSlug} />
     </div>
   );
 };

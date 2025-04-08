@@ -39,12 +39,13 @@ function initializeTables() {
       CREATE TABLE IF NOT EXISTS repositories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        username TEXT,
         url TEXT,
         local_path TEXT,
         branch_default TEXT DEFAULT 'main',
-        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
-        username TEXT,
-        topics TEXT
+        tags TEXT,
+        last_tags_update DATETIME,
+        last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
         // Project-Repositories linking table
@@ -75,7 +76,6 @@ function initializeTables() {
         custom_options TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        download_avatars INTEGER DEFAULT 1,
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
       )
     `);
@@ -100,12 +100,69 @@ function initializeTables() {
       CREATE TABLE IF NOT EXISTS avatars (
         id TEXT PRIMARY KEY,
         email TEXT,
-        username TEXT NOT NULL,
-        image_path TEXT NOT NULL,
-        provider TEXT DEFAULT 'github',
+        username TEXT,
+        image_path TEXT NOT NULL
+      )
+    `);
+        // Gource profiles table
+        db.run(`
+      CREATE TABLE IF NOT EXISTS gource_profiles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_default INTEGER DEFAULT 0,
+        is_global INTEGER DEFAULT 0,
+        
+        secondsPerDay REAL DEFAULT 10,
+        autoSkipSeconds REAL DEFAULT 0.5,
+        elasticity REAL DEFAULT 0.5,
+        fileIdle INTEGER DEFAULT 0,
+        
+        backgroundColor TEXT DEFAULT '#000000',
+        cameraMode TEXT DEFAULT 'overview',
+        hideItems TEXT DEFAULT '',
+        disableBloom INTEGER DEFAULT 0,
+        
+        startDate TEXT DEFAULT '',
+        stopDate TEXT DEFAULT '',
+        maxUserFiles INTEGER DEFAULT 100,
+        maxFileLag INTEGER DEFAULT 3,
+        
+        userScale REAL DEFAULT 1.0,
+        userImageDir TEXT DEFAULT '',
+        highlightUsers TEXT DEFAULT '',
+        
+        fileScale REAL DEFAULT 1.0,
+        maxFiles INTEGER DEFAULT 1000,
+        fileExtensions TEXT DEFAULT '',
+        
+        showKey INTEGER DEFAULT 1,
+        dateFormat TEXT DEFAULT '%Y-%m-%d',
+        fontName TEXT DEFAULT 'Arial',
+        fontSize INTEGER DEFAULT 14,
+        
+        customLogo TEXT DEFAULT '',
+        logoPosition TEXT DEFAULT 'top-left',
+        logoScale REAL DEFAULT 1.0,
+        titleText TEXT DEFAULT '',
+        
+        outputResolution TEXT DEFAULT '1920x1080',
+        framerate INTEGER DEFAULT 60,
+        
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        last_used DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(username)
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+        // Créer la table de liaison profiles-projets si elle n'existe pas
+        db.run(`
+      CREATE TABLE IF NOT EXISTS project_profiles (
+        project_id TEXT NOT NULL,
+        profile_id TEXT NOT NULL,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (project_id, profile_id),
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+        FOREIGN KEY (profile_id) REFERENCES gource_profiles (id) ON DELETE CASCADE
       )
     `);
         // Migration de branch à branch_default si la table existe déjà
@@ -170,6 +227,31 @@ function initializeTables() {
                                 });
                             });
                         }
+                    });
+                }
+            });
+        });
+        // Après la création de toutes les tables, ajouter un bloc pour vérifier si last_tags_update existe
+        // et l'ajouter si ce n'est pas le cas
+        db.get("PRAGMA table_info(repositories)", (err, rows) => {
+            if (err) {
+                console.error('Erreur lors de la vérification du schéma de la table repositories:', err.message);
+                return;
+            }
+            // Vérifier si la colonne 'last_tags_update' existe
+            db.get("SELECT 1 FROM pragma_table_info('repositories') WHERE name = 'last_tags_update'", (err, exists) => {
+                if (err) {
+                    console.error('Erreur lors de la vérification de la colonne last_tags_update:', err.message);
+                    return;
+                }
+                if (!exists) {
+                    console.log('Ajout de la colonne last_tags_update à la table repositories...');
+                    db.run(`ALTER TABLE repositories ADD COLUMN last_tags_update DATETIME`, (err) => {
+                        if (err) {
+                            console.error('Erreur lors de l\'ajout de la colonne last_tags_update:', err.message);
+                            return;
+                        }
+                        console.log('Colonne last_tags_update ajoutée avec succès');
                     });
                 }
             });

@@ -77,36 +77,6 @@ function getDefaultTagsForRepo(username: string, repoName: string): string[] {
   return languageTags;
 }
 
-// Function to get repository tags from GitHub API
-async function fetchRepositoryTags(username: string, repoName: string): Promise<string[]> {
-  try {
-    // Use GitHub API
-    const githubApiUrl = `https://api.github.com/repos/${username}/${repoName}/topics`;
-    console.log(`Fetching topics for ${username}/${repoName}`);
-    
-    const headers = await createGitHubHeaders();
-    const response = await fetch(githubApiUrl, { headers });
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data.topics && Array.isArray(data.topics)) {
-        return data.topics;
-      }
-      return []; // Return empty array if no topics found
-    } else {
-      console.log(`GitHub API responded with status: ${response.status}`);
-      if (response.status === 403) {
-        console.log('Rate limit reached or authentication required');
-        throw new Error('GitHub API rate limit reached. Please try again later or check your authentication token.');
-      }
-      return []; // Return empty array for other errors
-    }
-  } catch (error) {
-    console.error(`Error fetching topics for ${username}/${repoName}:`, error);
-    throw error; // Propagate the error to be handled by the caller
-  }
-}
-
 // Récupérer tous les dépôts
 export const getAllRepositories = async (req: Request, res: Response) => {
   try {
@@ -132,80 +102,8 @@ export const getAllRepositories = async (req: Request, res: Response) => {
         return res.status(500).json({ error: 'Erreur lors de la récupération des dépôts' });
       }
       
-      // Traiter les dépôts pour enrichir avec les topics GitHub si nécessaire
-      const repositories = rows as Repository[];
-      
-      // Filtrer les dépôts GitHub qui n'ont pas de tags ou qui nécessitent une mise à jour
-      const reposToUpdate = repositories.filter(repo => 
-        repo.url && 
-        (repo.url.includes('github.com') || repo.url.includes('git@github.com')) && 
-        (!repo.tags || isTagsUpdateNeeded(repo))
-      );
-      
-      if (reposToUpdate.length > 0) {
-        console.log(`Enrichissement des topics GitHub pour ${reposToUpdate.length} dépôts`);
-        
-        // Traiter les dépôts par lots pour éviter de surcharger l'API GitHub
-        const batchSize = 3;
-        for (let i = 0; i < reposToUpdate.length; i += batchSize) {
-          const batch = reposToUpdate.slice(i, i + batchSize);
-          
-          // Traiter chaque dépôt en parallèle
-          await Promise.all(batch.map(async (repo) => {
-            try {
-              // Extraire username et repoName
-              let username = '';
-              let repoName = '';
-              
-              // Format HTTPS: https://github.com/username/repo.git
-              const httpsMatch = repo.url!.match(/https:\/\/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?/);
-              
-              // Format SSH: git@github.com:username/repo.git
-              const sshMatch = repo.url!.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?/);
-              
-              if (httpsMatch) {
-                username = httpsMatch[1];
-                repoName = httpsMatch[2];
-              } else if (sshMatch) {
-                username = sshMatch[1];
-                repoName = sshMatch[2];
-              } else {
-                return;
-              }
-              
-              // Utiliser notre nouvelle fonction
-              const githubTopics = await fetchRepositoryTags(username, repoName);
-              
-              // Fusionner avec les tags existants
-              const existingTags = repo.tags ? repo.tags.split(',').map(tag => tag.trim()) : [];
-              
-              // Combiner les tags tout en évitant les doublons
-              const allTags = [...new Set([...existingTags, ...githubTopics])].join(',');
-              
-              // Mise à jour du dépôt dans l'array
-              const index = repositories.findIndex(r => r.id === repo.id);
-              if (index !== -1) {
-                repositories[index].tags = allTags;
-              }
-              
-              // Mise à jour de la base de données
-              db.run(
-                'UPDATE repositories SET tags = ?, last_tags_update = ? WHERE id = ?',
-                [allTags, new Date().toISOString(), repo.id]
-              );
-            } catch (error) {
-              console.error(`Erreur lors de la récupération des topics pour ${repo.name}:`, error);
-            }
-          }));
-          
-          // Attendre un peu entre les lots pour éviter de dépasser les limites de l'API GitHub
-          if (i + batchSize < reposToUpdate.length) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        }
-      }
-      
-      return res.json(repositories);
+      // Retourner directement les dépôts sans enrichissement des topics GitHub
+      return res.json(rows);
     });
   } catch (error) {
     console.error('Erreur inattendue lors de la récupération des dépôts:', error);
@@ -213,39 +111,39 @@ export const getAllRepositories = async (req: Request, res: Response) => {
   }
 };
 
-// Vérifier si les tags d'un dépôt nécessitent une mise à jour
-// Cette fonction détermine si on doit rafraîchir les tags d'un dépôt basé sur la date de dernière mise à jour
-function isTagsUpdateNeeded(repo: Repository): boolean {
-  // Toujours mettre à jour (temporaire pour résoudre le problème de tags)
-  return true;
-  
-  // Si jamais mis à jour ou pas de last_tags_update, mettre à jour
-  /*if (!repo.last_tags_update) return true;
-  
-  // Mise à jour maximum une fois par jour
-  const lastUpdate = new Date(repo.last_tags_update);
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-  
-  return lastUpdate < oneDayAgo;*/
-}
-
-// Récupérer un dépôt par son ID
+// Récupérer un dépôt par son ID ou son slug
 export const getRepositoryById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const projectId = req.query.project_id as string;
     
+    // Vérifie d'abord si c'est un UUID (format standard UUID v4)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+    
     if (projectId) {
       // Si project_id est fourni, récupérer le dépôt dans le contexte du projet
-      db.get(`
+      let query = `
         SELECT r.*, pr.branch_override, pr.display_name, pr.id as link_id 
         FROM repositories r
         JOIN project_repositories pr ON r.id = pr.repository_id
-        WHERE r.id = ? AND pr.project_id = ?
-      `, [id, projectId], (err, row) => {
+        WHERE pr.project_id = ? AND 
+      `;
+      
+      let params = [projectId];
+      
+      if (isUuid) {
+        // Recherche par ID
+        query += 'r.id = ?';
+        params.push(id);
+      } else {
+        // Recherche par slug (nom formaté)
+        query += 'LOWER(REPLACE(REPLACE(REPLACE(r.name, " ", "-"), ".", ""), "_", "-")) = LOWER(?)';
+        params.push(id);
+      }
+      
+      db.get(query, params, (err, row) => {
         if (err) {
-          console.error('Erreur lors de la récupération du dépôt:', err.message);
+          console.error('Erreur lors de la récupération du dépôt dans un projet:', err.message);
           return res.status(500).json({ error: 'Erreur lors de la récupération du dépôt' });
         }
         
@@ -257,7 +155,20 @@ export const getRepositoryById = async (req: Request, res: Response) => {
       });
     } else {
       // Sinon, récupérer le dépôt général
-      db.get('SELECT * FROM repositories WHERE id = ?', [id], (err, row) => {
+      let query = 'SELECT * FROM repositories WHERE ';
+      let params = [];
+      
+      if (isUuid) {
+        // Recherche par ID
+        query += 'id = ?';
+        params.push(id);
+      } else {
+        // Recherche par slug (nom formaté)
+        query += 'LOWER(REPLACE(REPLACE(REPLACE(name, " ", "-"), ".", ""), "_", "-")) = LOWER(?)';
+        params.push(id);
+      }
+      
+      db.get(query, params, (err, row) => {
         if (err) {
           console.error('Erreur lors de la récupération du dépôt:', err.message);
           return res.status(500).json({ error: 'Erreur lors de la récupération du dépôt' });
@@ -1018,229 +929,6 @@ const extractUsername = (url: string): string => {
   return '';
 };
 
-// Get GitHub topics for a repository
-export const getRepositoryTopics = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    
-    // Check if the repository exists
-    db.get('SELECT * FROM repositories WHERE id = ?', [id], async (err, row) => {
-      if (err) {
-        console.error('Error finding repository:', err.message);
-        return res.status(500).json({ error: 'Error retrieving GitHub topics' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Repository not found' });
-      }
-      
-      const repository = row as Repository;
-      
-      if (!repository.url) {
-        return res.status(400).json({ error: 'This repository does not have a GitHub URL' });
-      }
-      
-      try {
-        // Extract username/organization and repository name from the URL
-        let username = '';
-        let repoName = '';
-        
-        // HTTPS format: https://github.com/username/repo.git
-        const httpsMatch = repository.url.match(/https:\/\/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?/);
-        
-        // SSH format: git@github.com:username/repo.git
-        const sshMatch = repository.url.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?/);
-        
-        if (httpsMatch) {
-          username = httpsMatch[1];
-          repoName = httpsMatch[2];
-        } else if (sshMatch) {
-          username = sshMatch[1];
-          repoName = sshMatch[2];
-        } else {
-          return res.status(400).json({ error: 'Unrecognized GitHub URL format' });
-        }
-        
-        // Use our function to fetch topics
-        const githubTopics = await fetchRepositoryTags(username, repoName);
-        
-        // Update the database with the new topics
-        db.run(
-          'UPDATE repositories SET tags = ?, last_tags_update = ? WHERE id = ?',
-          [githubTopics.join(','), new Date().toISOString(), id],
-          function(err) {
-            if (err) {
-              console.error('Error updating tags:', err.message);
-              // Continue despite the error, as we already have the data
-            }
-            
-            return res.status(200).json({ 
-              topics: githubTopics,
-              tags: githubTopics.join(',')
-            });
-          }
-        );
-      } catch (error) {
-        console.error('Error retrieving GitHub topics:', error);
-        
-        // Check if it's a rate limit error
-        if (error instanceof Error && error.message.includes('rate limit')) {
-          return res.status(429).json({ 
-            error: 'GitHub API rate limit reached. Please try again later or check your authentication token.'
-          });
-        }
-        
-        return res.status(500).json({ 
-          error: `Error retrieving GitHub topics: ${(error as Error).message || 'Unknown error'}` 
-        });
-      }
-    });
-  } catch (error) {
-    console.error('Unexpected error retrieving GitHub topics:', error);
-    return res.status(500).json({ error: 'Error retrieving GitHub topics' });
-  }
-};
-
-// Force update tags for all repositories
-export const forceUpdateAllTags = async (req: Request, res: Response) => {
-  try {
-    // Get all GitHub repositories
-    db.all('SELECT * FROM repositories WHERE url LIKE "%github.com%" ORDER BY name ASC', async (err, rows) => {
-      if (err) {
-        console.error('Error retrieving repositories:', err.message);
-        return res.status(500).json({ error: 'Error retrieving repositories' });
-      }
-      
-      const repositories = rows as Repository[];
-      
-      if (repositories.length === 0) {
-        return res.status(200).json({ message: 'No GitHub repositories to update' });
-      }
-      
-      console.log(`Forcing update of GitHub topics for ${repositories.length} repositories`);
-      
-      // Process repositories in batches to avoid overloading the GitHub API
-      const batchSize = 3;
-      const results = [];
-      let rateLimitReached = false;
-      
-      for (let i = 0; i < repositories.length; i += batchSize) {
-        // If rate limit was reached, stop processing
-        if (rateLimitReached) {
-          break;
-        }
-        
-        const batch = repositories.slice(i, i + batchSize);
-        
-        // Process each repository in parallel
-        const batchResults = await Promise.all(batch.map(async (repo) => {
-          try {
-            if (!repo.url) {
-              return { id: repo.id, name: repo.name, success: false, error: 'Missing URL' };
-            }
-            
-            // Extract username and repoName
-            let username = '';
-            let repoName = '';
-            
-            // HTTPS format: https://github.com/username/repo.git
-            const httpsMatch = repo.url.match(/https:\/\/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?/);
-            
-            // SSH format: git@github.com:username/repo.git
-            const sshMatch = repo.url.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?/);
-            
-            if (httpsMatch) {
-              username = httpsMatch[1];
-              repoName = httpsMatch[2];
-            } else if (sshMatch) {
-              username = sshMatch[1];
-              repoName = sshMatch[2];
-            } else {
-              return { id: repo.id, name: repo.name, success: false, error: 'Unrecognized GitHub URL format' };
-            }
-            
-            // Use our function to fetch topics
-            const githubTopics = await fetchRepositoryTags(username, repoName);
-            
-            // Update the database
-            await new Promise<void>((resolve, reject) => {
-              db.run(
-                'UPDATE repositories SET tags = ?, last_tags_update = ? WHERE id = ?',
-                [githubTopics.join(','), new Date().toISOString(), repo.id],
-                function(err) {
-                  if (err) {
-                    console.error(`Error updating tags for ${repo.name}:`, err.message);
-                    reject(err);
-                  } else {
-                    resolve();
-                  }
-                }
-              );
-            });
-            
-            return { 
-              id: repo.id, 
-              name: repo.name, 
-              success: true, 
-              topics: githubTopics,
-              tags: githubTopics.join(',')
-            };
-          } catch (error) {
-            console.error(`Error updating topics for ${repo.name}:`, error);
-            
-            // Check if it's a rate limit error
-            if (error instanceof Error && error.message.includes('rate limit')) {
-              rateLimitReached = true;
-              return { 
-                id: repo.id, 
-                name: repo.name, 
-                success: false, 
-                error: 'GitHub API rate limit reached'
-              };
-            }
-            
-            return { 
-              id: repo.id, 
-              name: repo.name, 
-              success: false, 
-              error: (error as Error).message || 'Unknown error'
-            };
-          }
-        }));
-        
-        results.push(...batchResults);
-        
-        // If rate limit was reached, stop processing
-        if (rateLimitReached) {
-          break;
-        }
-        
-        // Add a small delay between batches to avoid hitting rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
-      // Check if rate limit was reached
-      if (rateLimitReached) {
-        return res.status(429).json({ 
-          message: 'GitHub API rate limit reached. Some repositories were updated, but the process was stopped.',
-          results: results
-        });
-      }
-      
-      return res.status(200).json({ 
-        message: `Successfully updated topics for ${results.filter(r => r.success).length} repositories`,
-        results: results
-      });
-    });
-  } catch (error) {
-    console.error('Error updating repository topics:', error);
-    return res.status(500).json({ 
-      error: 'Error updating repository topics',
-      message: (error as Error).message || 'Unknown error'
-    });
-  }
-};
-
 // Function to import a GitHub repository
 export const importRepository = async (req: Request, res: Response) => {
   try {
@@ -1300,14 +988,8 @@ export const importRepository = async (req: Request, res: Response) => {
     
     const repoData = await response.json();
     
-    // Get topics for the repository
-    let topics: string[] = [];
-    try {
-      topics = await fetchRepositoryTags(owner, repoName);
-    } catch (error) {
-      console.log('Error fetching topics:', error);
-      // Continue without topics if there's an error
-    }
+    // Generate default tags based on repository name
+    let topics: string[] = getDefaultTagsForRepo(owner, repoName);
     
     // Create repository record in the database
     db.run(

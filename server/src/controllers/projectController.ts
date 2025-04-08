@@ -13,6 +13,11 @@ interface ProfileRow {
   id: string;
 }
 
+// Helper pour générer un slug à partir d'un nom
+const generateSlug = (name: string): string => {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+};
+
 // Récupérer tous les projets
 export const getAllProjects = async (req: Request, res: Response) => {
   try {
@@ -30,23 +35,45 @@ export const getAllProjects = async (req: Request, res: Response) => {
   }
 };
 
-// Récupérer un projet par son ID
+// Récupérer un projet par son ID ou son slug
 export const getProjectById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
-    db.get('SELECT * FROM projects WHERE id = ?', [id], (err, row) => {
-      if (err) {
-        console.error('Erreur lors de la récupération du projet:', err.message);
-        return res.status(500).json({ error: 'Erreur lors de la récupération du projet' });
-      }
-      
-      if (!row) {
-        return res.status(404).json({ error: 'Projet non trouvé' });
-      }
-      
-      return res.status(200).json(row);
-    });
+    // Vérifie d'abord si c'est un UUID (format standard UUID v4)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+    
+    if (isUuid) {
+      // Recherche par ID
+      db.get('SELECT * FROM projects WHERE id = ?', [id], (err, row) => {
+        if (err) {
+          console.error('Erreur lors de la récupération du projet par ID:', err.message);
+          return res.status(500).json({ error: 'Erreur lors de la récupération du projet' });
+        }
+        
+        if (!row) {
+          return res.status(404).json({ error: 'Projet non trouvé' });
+        }
+        
+        return res.status(200).json(row);
+      });
+    } else {
+      // Recherche par slug (considérant le slug comme le nom formaté)
+      // Note: Cette approche est simple mais peut poser des problèmes si deux projets ont le même slug
+      // Une meilleure solution serait d'ajouter un champ slug dans la table projets
+      db.get('SELECT * FROM projects WHERE LOWER(REPLACE(REPLACE(REPLACE(name, " ", "-"), ".", ""), "_", "-")) = LOWER(?)', [id], (err, row) => {
+        if (err) {
+          console.error('Erreur lors de la récupération du projet par slug:', err.message);
+          return res.status(500).json({ error: 'Erreur lors de la récupération du projet' });
+        }
+        
+        if (!row) {
+          return res.status(404).json({ error: 'Projet non trouvé' });
+        }
+        
+        return res.status(200).json(row);
+      });
+    }
   } catch (error) {
     console.error('Erreur inattendue lors de la récupération du projet:', error);
     return res.status(500).json({ error: 'Erreur lors de la récupération du projet' });

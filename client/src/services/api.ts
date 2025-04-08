@@ -31,37 +31,53 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+// Fonction helper pour normaliser les ID/slugs
+// Si l'ID ressemble à un UUID, on le renvoie tel quel
+// Sinon on considère que c'est un slug et on le transmet tel quel
+// Le backend devra être adapté pour rechercher par ID ou par slug
+const normalizeIdOrSlug = (idOrSlug: string): string => {
+  return idOrSlug;
+};
+
 // Service API pour les projets
 export const projectsApi = {
   getAll: () => axiosInstance.get('/api/projects'),
-  getById: (id: string) => axiosInstance.get(`/api/projects/${id}`),
+  getById: (idOrSlug: string) => axiosInstance.get(`/api/projects/${normalizeIdOrSlug(idOrSlug)}`),
   create: (data: any) => axiosInstance.post('/api/projects', data),
-  update: (id: string, data: any) => axiosInstance.put(`/api/projects/${id}`, data),
-  delete: (id: string) => axiosInstance.delete(`/api/projects/${id}`),
+  update: (idOrSlug: string, data: any) => axiosInstance.put(`/api/projects/${normalizeIdOrSlug(idOrSlug)}`, data),
+  delete: (idOrSlug: string) => axiosInstance.delete(`/api/projects/${normalizeIdOrSlug(idOrSlug)}`),
 };
 
 // Service API pour les dépôts
 export const repositoriesApi = {
   getAll: (projectId?: string) => {
-    const url = projectId ? `/api/repositories?project_id=${projectId}` : '/api/repositories';
+    const url = projectId 
+      ? `/api/repositories?project_id=${normalizeIdOrSlug(projectId)}` 
+      : '/api/repositories';
     return axiosInstance.get(url);
   },
-  getById: (id: string, projectId?: string) => {
-    const url = projectId ? `/api/repositories/${id}?project_id=${projectId}` : `/api/repositories/${id}`;
+  getById: (idOrSlug: string, projectId?: string) => {
+    const url = projectId 
+      ? `/api/repositories/${normalizeIdOrSlug(idOrSlug)}?project_id=${normalizeIdOrSlug(projectId)}` 
+      : `/api/repositories/${normalizeIdOrSlug(idOrSlug)}`;
     return axiosInstance.get(url);
   },
   create: (data: any) => axiosInstance.post('/api/repositories', data),
-  update: (id: string, data: any, projectId?: string) => {
-    const url = projectId ? `/api/repositories/${id}?project_id=${projectId}` : `/api/repositories/${id}`;
+  update: (idOrSlug: string, data: any, projectId?: string) => {
+    const url = projectId 
+      ? `/api/repositories/${normalizeIdOrSlug(idOrSlug)}?project_id=${normalizeIdOrSlug(projectId)}` 
+      : `/api/repositories/${normalizeIdOrSlug(idOrSlug)}`;
     return axiosInstance.put(url, data);
   },
-  delete: (id: string, projectId?: string) => {
-    const url = projectId ? `/api/repositories/${id}?project_id=${projectId}` : `/api/repositories/${id}`;
+  delete: (idOrSlug: string, projectId?: string) => {
+    const url = projectId 
+      ? `/api/repositories/${normalizeIdOrSlug(idOrSlug)}?project_id=${normalizeIdOrSlug(projectId)}` 
+      : `/api/repositories/${normalizeIdOrSlug(idOrSlug)}`;
     return axiosInstance.delete(url);
   },
-  sync: (id: string) => axiosInstance.post(`/api/repositories/${id}/sync`),
-  getBranches: (id: string) => axiosInstance.get(`/api/repositories/${id}/branches`),
-  getTopics: (id: string) => axiosInstance.get(`/api/repositories/${id}/topics`),
+  sync: (idOrSlug: string) => axiosInstance.post(`/api/repositories/${normalizeIdOrSlug(idOrSlug)}/sync`),
+  getBranches: (idOrSlug: string) => axiosInstance.get(`/api/repositories/${normalizeIdOrSlug(idOrSlug)}/branches`),
+  getTopics: (idOrSlug: string) => axiosInstance.get(`/api/repositories/${normalizeIdOrSlug(idOrSlug)}/topics`),
   forceUpdateTags: () => axiosInstance.post('/api/repositories/force-update-tags'),
   import: (data: any) => axiosInstance.post('/api/repositories/import', data)
 };

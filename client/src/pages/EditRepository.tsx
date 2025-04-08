@@ -289,94 +289,97 @@ interface Repository {
   branch_default: string;
   tags: string | null;
   last_updated: string;
+  slug?: string;
 }
 
 const EditRepository: React.FC = () => {
-  const { repoId } = useParams<{ repoId: string }>();
+  const { repoIdOrSlug } = useParams<{ repoIdOrSlug: string }>();
   const navigate = useNavigate();
   const { addNotification } = useNotification();
   
   const [repository, setRepository] = useState<Repository | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  
-  // Form state
-  const [name, setName] = useState('');
-  const [url, setUrl] = useState('');
-  const [username, setUsername] = useState('');
-  const [localPath, setLocalPath] = useState('');
-  const [branch, setBranch] = useState('');
-  
-  // Tags handling
+  const [error, setError] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState({
+    name: '',
+    username: '',
+    url: '',
+    local_path: '',
+    branch_default: 'main',
+  });
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   
   useEffect(() => {
-    const fetchRepository = async () => {
-      if (!repoId) return;
+    if (repoIdOrSlug) {
+      fetchRepository();
+    }
+  }, [repoIdOrSlug]);
+  
+  const fetchRepository = async () => {
+    try {
+      setLoading(true);
+      const response = await api.repositories.getById(repoIdOrSlug || '');
       
-      try {
-        setLoading(true);
-        const response = await api.repositories.getById(repoId);
-        const repositoryData = response.data;
-        
-        setRepository(repositoryData);
-        setName(repositoryData.name || '');
-        setUrl(repositoryData.url || '');
-        setUsername(repositoryData.username || '');
-        setLocalPath(repositoryData.local_path || '');
-        setBranch(repositoryData.branch_default || '');
-        
-        // Parse tags
-        if (repositoryData.tags) {
-          setTags(repositoryData.tags.split(',').map((tag: string) => tag.trim()).filter(Boolean));
-        }
-        
-        // Fetch all repositories to extract available tags
-        const allReposResponse = await api.repositories.getAll();
-        const allRepos = allReposResponse.data;
-        
-        // Extract unique tags from all repositories
-        const tagsSet = new Set<string>();
-        allRepos.forEach((repo: Repository) => {
-          if (repo.tags) {
-            const repoTags = repo.tags.split(',').map(tag => tag.trim()).filter(Boolean);
-            repoTags.forEach(tag => tagsSet.add(tag));
-          }
-        });
-        
-        setAvailableTags(Array.from(tagsSet).sort());
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching repository:', err);
-        setError('Failed to load repository. Please try again.');
-      } finally {
-        setLoading(false);
+      // Mettre à jour les données du dépôt
+      setRepository(response.data);
+      
+      // Initialiser les valeurs du formulaire
+      setFormValues({
+        name: response.data.name || '',
+        username: response.data.username || '',
+        url: response.data.url || '',
+        local_path: response.data.local_path || '',
+        branch_default: response.data.branch_default || 'main',
+      });
+      
+      // Initialiser les tags (s'ils existent)
+      if (response.data.tags) {
+        setTags(response.data.tags.split(',').map((tag: string) => tag.trim()));
       }
-    };
-    
-    fetchRepository();
-  }, [repoId]);
+      
+      // Fetch all repositories to extract available tags
+      const allReposResponse = await api.repositories.getAll();
+      const allRepos = allReposResponse.data;
+      
+      // Extract unique tags from all repositories
+      const tagsSet = new Set<string>();
+      allRepos.forEach((repo: Repository) => {
+        if (repo.tags) {
+          const repoTags = repo.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+          repoTags.forEach(tag => tagsSet.add(tag));
+        }
+      });
+      
+      setAvailableTags(Array.from(tagsSet).sort());
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching repository:', err);
+      setError('Failed to load repository');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleSave = async () => {
-    if (!repoId || !repository) return;
+    if (!repoIdOrSlug || !repository) return;
     
     try {
       setSaving(true);
       
       // Prepare data for update
       const updatedData = {
-        name,
-        username,
-        url,
-        local_path: localPath,
-        branch_default: branch,
+        name: formValues.name,
+        username: formValues.username,
+        url: formValues.url,
+        local_path: formValues.local_path,
+        branch_default: formValues.branch_default,
         tags: tags.join(',')
       };
       
-      await api.repositories.update(repoId, updatedData);
+      await api.repositories.update(repoIdOrSlug, updatedData);
       
       addNotification({
         type: 'success',
@@ -480,8 +483,8 @@ const EditRepository: React.FC = () => {
             <Input
               id="name"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={formValues.name}
+              onChange={(e) => setFormValues({ ...formValues, name: e.target.value })}
               required
             />
           </FormGroup>
@@ -491,8 +494,8 @@ const EditRepository: React.FC = () => {
             <Input
               id="url"
               type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              value={formValues.url}
+              onChange={(e) => setFormValues({ ...formValues, url: e.target.value })}
               placeholder="https://github.com/username/repository.git"
             />
             <HelpText>The URL to the Git repository. Used for syncing with GitHub.</HelpText>
@@ -503,8 +506,8 @@ const EditRepository: React.FC = () => {
             <Input
               id="username"
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              value={formValues.username}
+              onChange={(e) => setFormValues({ ...formValues, username: e.target.value })}
               placeholder="github-username"
             />
           </FormGroup>
@@ -514,8 +517,8 @@ const EditRepository: React.FC = () => {
             <Input
               id="local_path"
               type="text"
-              value={localPath}
-              onChange={(e) => setLocalPath(e.target.value)}
+              value={formValues.local_path}
+              onChange={(e) => setFormValues({ ...formValues, local_path: e.target.value })}
               placeholder="C:/path/to/repository"
             />
             <HelpText>Local path on your machine where the repository is located.</HelpText>
@@ -526,8 +529,8 @@ const EditRepository: React.FC = () => {
             <Input
               id="branch"
               type="text"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
+              value={formValues.branch_default}
+              onChange={(e) => setFormValues({ ...formValues, branch_default: e.target.value })}
               placeholder="main"
             />
             <HelpText>The default branch used for Gource visualizations.</HelpText>

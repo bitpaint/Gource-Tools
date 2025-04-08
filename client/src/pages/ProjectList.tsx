@@ -1,17 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaPlus, FaTrash, FaEdit, FaPlay, FaFolder, FaCalendarAlt, FaInfoCircle, FaSearch, FaTags, FaTimes, FaCheckSquare, FaSync } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaFolder, FaCalendarAlt, FaInfoCircle, FaSearch, FaTags, FaTimes, FaCheckSquare, FaSync } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
+import axios from 'axios';
 
 interface Project {
   id: string;
   name: string;
-  description: string;
   last_modified: string;
   repository_count?: number;
   tags?: string;
+  slug?: string;
+}
+
+interface Repository {
+  id: string;
+  name: string;
+}
+
+interface ProjectRepository {
+  id: string;
+  project_id: string;
+  repository_id: string;
 }
 
 const Container = styled.div`
@@ -64,6 +76,36 @@ const AddButton = styled(Link)`
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   }
+`;
+
+const UpdateButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #2196F3;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+  font-size: 1rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  width: 100%;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #1976D2;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+`;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  gap: 1rem;
 `;
 
 const SearchContainer = styled.div`
@@ -119,7 +161,7 @@ const ListHeader = styled.div`
   background-color: ${({ theme }) => theme.colors.dark};
   padding: 0.4rem 0.8rem;
   display: grid;
-  grid-template-columns: 32px minmax(200px, 1.2fr) minmax(300px, 2fr) 80px 160px;
+  grid-template-columns: 32px minmax(300px, 2fr) 160px 120px;
   color: ${({ theme }) => theme.colors.white};
   font-weight: bold;
   align-items: center;
@@ -135,7 +177,7 @@ const ListHeaderItem = styled.div`
 
 const ListItem = styled.div`
   display: grid;
-  grid-template-columns: 32px minmax(200px, 1.2fr) minmax(300px, 2fr) 80px 160px;
+  grid-template-columns: 32px minmax(300px, 2fr) 160px 120px;
   padding: 0.4rem 0.8rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
   align-items: center;
@@ -184,14 +226,6 @@ const ProjectName = styled.h3`
   }
 `;
 
-const Description = styled.div`
-  color: ${({ theme }) => theme.colors.textLight};
-  font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
 const DateCell = styled.div`
   display: flex;
   align-items: center;
@@ -237,16 +271,6 @@ const ActionButton = styled.button`
     background-color: ${({ theme }) => theme.colors.background};
     transform: translateY(-1px);
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  }
-
-  &.edit {
-    color: ${({ theme }) => theme.colors.primary};
-    border-color: ${({ theme }) => theme.colors.primary}40;
-  }
-
-  &.play {
-    color: #4CAF50;
-    border-color: #4CAF5040;
   }
 
   &.delete {
@@ -440,7 +464,11 @@ const ProjectList: React.FC = () => {
     try {
       setLoading(true);
       const response = await api.projects.getAll();
-      setProjects(response.data);
+      const projectsWithSlugs = response.data.map((project: Project) => ({
+        ...project,
+        slug: project.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      }));
+      setProjects(projectsWithSlugs);
       setError(null);
     } catch (err) {
       console.error('Error loading projects:', err);
@@ -518,9 +546,62 @@ const ProjectList: React.FC = () => {
     }
   };
 
+  const handleUpdateAllProjects = async () => {
+    try {
+      addNotification({
+        type: 'info',
+        message: `Updating repositories for all projects...`,
+        duration: 3000
+      });
+      
+      // Récupérer tous les projets
+      const projectsResponse = await api.projects.getAll();
+      const projects = projectsResponse.data;
+      
+      let totalSyncedCount = 0;
+      
+      // Pour chaque projet
+      for (const project of projects) {
+        try {
+          // Récupérer les associations projet-dépôts
+          // Cette méthode doit être implémentée côté serveur si elle ne l'est pas déjà
+          const response = await axios.get(`/api/projects/${project.id}/repositories`);
+          const projectRepos = response.data;
+          
+          // Synchroniser chaque dépôt associé à ce projet
+          for (const projectRepo of projectRepos) {
+            try {
+              await api.repositories.sync(projectRepo.repository_id);
+              totalSyncedCount++;
+            } catch (error) {
+              console.error(`Error syncing repository for project ${project.name}:`, error);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching repositories for project ${project.name}:`, error);
+        }
+      }
+      
+      addNotification({
+        type: 'success',
+        message: `Successfully synchronized ${totalSyncedCount} repositories across all projects`,
+        duration: 3000
+      });
+      
+      // Rafraîchir la liste des projets
+      fetchProjects();
+    } catch (err) {
+      console.error('Error updating projects:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to update repositories for some projects',
+        duration: 3000
+      });
+    }
+  };
+
   const filteredProjects = projects.filter(project =>
-    project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.description.toLowerCase().includes(searchTerm.toLowerCase())
+    project.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -530,9 +611,14 @@ const ProjectList: React.FC = () => {
           <TitleIcon><FaFolder size={28} /></TitleIcon>
           Gource Projects
         </Title>
-        <AddButton to="/projects/create">
-          <FaPlus /> Create Project
-        </AddButton>
+        <ButtonContainer>
+          <AddButton to="/projects/create">
+            <FaPlus /> Create Project
+          </AddButton>
+          <UpdateButton onClick={handleUpdateAllProjects}>
+            <FaSync /> Update All
+          </UpdateButton>
+        </ButtonContainer>
       </Header>
 
       <SearchContainer>
@@ -603,7 +689,6 @@ const ProjectList: React.FC = () => {
               />
             </CheckboxContainer>
             <ListHeaderItem>Project</ListHeaderItem>
-            <ListHeaderItem>Description</ListHeaderItem>
             <ListHeaderItem>Last Modified</ListHeaderItem>
             <div>Actions</div>
           </ListHeader>
@@ -617,18 +702,15 @@ const ProjectList: React.FC = () => {
                 />
               </CheckboxContainer>
               <ProjectCell>
-                <ProjectName onClick={() => handleProjectSelect(project.id)}>
+                <ProjectName onClick={() => navigate(`/projects/${project.slug || project.id}`)}>
                   {project.name}
                 </ProjectName>
                 {project.repository_count !== undefined && (
-                  <Description>
+                  <span style={{ fontSize: '0.8rem', color: '#666' }}>
                     {project.repository_count} repositories
-                  </Description>
+                  </span>
                 )}
               </ProjectCell>
-              <Description>
-                {project.description || 'No description'}
-              </Description>
               <DateCell>
                 <DateIcon>
                   <FaCalendarAlt size={12} />
@@ -636,9 +718,6 @@ const ProjectList: React.FC = () => {
                 {getRelativeTimeString(project.last_modified)}
               </DateCell>
               <Actions>
-                <ActionButton className="edit" onClick={() => navigate(`/projects/${project.id}/edit`)} title="Edit project">
-                  <FaEdit /> Edit
-                </ActionButton>
                 <ActionButton className="delete" onClick={() => handleDeleteProject(project.id)} title="Delete project">
                   <FaTrash /> Delete
                 </ActionButton>

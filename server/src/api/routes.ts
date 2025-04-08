@@ -27,8 +27,6 @@ router.put('/repositories/:id', repositoryController.updateRepository);
 router.delete('/repositories/:id', repositoryController.deleteRepository);
 router.post('/repositories/:id/sync', repositoryController.syncRepository);
 router.get('/repositories/:id/branches', repositoryController.getRepositoryBranches);
-router.get('/repositories/:id/topics', repositoryController.getRepositoryTopics);
-router.post('/repositories/force-update-tags', repositoryController.forceUpdateAllTags);
 
 // Route spécifique pour la liaison entre projets et dépôts
 router.post('/project-repositories', repositoryController.linkRepositoryToProject);

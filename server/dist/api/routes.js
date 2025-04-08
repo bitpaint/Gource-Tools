@@ -41,7 +41,7 @@ const express_1 = __importDefault(require("express"));
 const projectController = __importStar(require("../controllers/projectController"));
 const repositoryController = __importStar(require("../controllers/repositoryController"));
 const gourceController = __importStar(require("../controllers/gourceController"));
-const avatarController = __importStar(require("../controllers/avatarController"));
+const settingsController = __importStar(require("../controllers/settingsController"));
 const router = express_1.default.Router();
 exports.apiRouter = router;
 // Health check endpoint
@@ -72,14 +72,15 @@ router.post('/gource/configs', gourceController.createConfig);
 router.put('/gource/configs/:id', gourceController.updateConfig);
 router.post('/gource/renders', gourceController.createRender);
 router.get('/gource/renders/:id/status', gourceController.getRenderStatus);
-// Routes pour les avatars
-router.get('/avatars', avatarController.getAllAvatars);
-router.get('/avatars/:username', avatarController.getAvatarByUsername);
-router.post('/avatars/github', avatarController.fetchGithubAvatar);
-router.post('/avatars/repository', avatarController.downloadAvatarsForRepo);
-router.get('/avatars/image/:id', avatarController.getAvatarImage);
-router.post('/avatars/mapping', avatarController.createAvatarMapping);
+// Routes pour les réglages
+router.get('/settings/github/token', settingsController.checkGithubToken);
+router.post('/settings/github/token', settingsController.saveGithubToken);
+router.get('/settings/github/token/test', settingsController.testGithubToken);
+router.delete('/settings/github/token', settingsController.removeGithubToken);
 // Placeholder pour les routes futures
 router.get('/renders', (req, res) => {
     res.status(200).json({ message: 'Renders API - Coming soon' });
+});
+router.get('/avatars', (req, res) => {
+    res.status(200).json({ message: 'Avatars API - Coming soon' });
 });

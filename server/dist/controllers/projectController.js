@@ -66,13 +66,30 @@ const createProject = (req, res) => __awaiter(void 0, void 0, void 0, function* 
                 console.error('Erreur lors de la création du projet:', err.message);
                 return res.status(500).json({ error: 'Erreur lors de la création du projet' });
             }
-            const newProject = {
-                id,
-                name,
-                description,
-                last_modified: new Date().toISOString()
-            };
-            return res.status(201).json(newProject);
+            // Chercher le profil Gource par défaut pour l'associer au projet
+            database_1.default.get('SELECT id FROM gource_profiles WHERE is_default = 1 AND is_global = 1 LIMIT 1', [], (err, profileRow) => {
+                if (err) {
+                    console.error('Erreur lors de la recherche du profil par défaut:', err.message);
+                    // Continuer même si on ne peut pas associer le profil par défaut
+                }
+                // Si un profil par défaut a été trouvé, l'associer au projet
+                if (profileRow && profileRow.id) {
+                    database_1.default.run('INSERT INTO project_profiles (project_id, profile_id, is_default) VALUES (?, ?, 1)', [id, profileRow.id], function (err) {
+                        if (err) {
+                            console.error('Erreur lors de l\'association du profil par défaut au projet:', err.message);
+                            // Continuer même si on ne peut pas associer le profil par défaut
+                        }
+                        console.log(`Profil par défaut ${profileRow.id} associé au projet ${id}`);
+                    });
+                }
+                const newProject = {
+                    id,
+                    name,
+                    description,
+                    last_modified: new Date().toISOString()
+                };
+                return res.status(201).json(newProject);
+            });
         });
     }
     catch (error) {
