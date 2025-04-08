@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder, FaSearch, FaTags, FaTimes } from 'react-icons/fa';
+import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder, FaSearch, FaTags, FaTimes, FaTag } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 import { useGitHubToken } from '../components/ui/GitHubTokenContext';
@@ -458,6 +458,133 @@ const TagRemoveButton = styled.button`
   }
 `;
 
+// Ajout des nouveaux composants styled pour le groupement et la sélection
+const GroupHeader = styled.div`
+  background-color: ${({ theme }) => theme.colors.light};
+  padding: 0.75rem 1.5rem;
+  font-weight: bold;
+  color: ${({ theme }) => theme.colors.text};
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.background};
+  }
+`;
+
+const GroupIcon = styled.span`
+  color: ${({ theme }) => theme.colors.primary};
+  display: flex;
+  align-items: center;
+`;
+
+const CheckboxContainer = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+`;
+
+const Checkbox = styled.input`
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+`;
+
+const BatchActionsBar = styled.div`
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: ${({ theme }) => theme.colors.primary};
+  color: white;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  border-radius: 0 0 8px 8px;
+  animation: slideUp 0.3s ease;
+  
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+`;
+
+const ActionButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: ${({ theme }) => theme.colors.text};
+
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.background};
+    transform: scale(1.1);
+  }
+
+  &.edit {
+    color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &.sync {
+    color: #4CAF50; /* Vert */
+    &:hover {
+      color: #388E3C; /* Vert foncé */
+    }
+  }
+
+  &.delete {
+    color: #F44336; /* Rouge */
+    &:hover {
+      color: #D32F2F; /* Rouge foncé */
+    }
+  }
+`;
+
+const BatchAction = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+  }
+`;
+
+const SelectAllButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.textLight};
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  margin-left: 0.5rem;
+  
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
+    text-decoration: underline;
+  }
+`;
+
 const RepositoryList: React.FC = () => {
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [groupedRepositories, setGroupedRepositories] = useState<GroupedRepositories>({});
@@ -468,6 +595,8 @@ const RepositoryList: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [editingTagRepo, setEditingTagRepo] = useState<string | null>(null);
   const [newTag, setNewTag] = useState('');
+  const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
   const navigate = useNavigate();
   const { addNotification } = useNotification();
   const { hasToken } = useGitHubToken();
@@ -718,7 +847,15 @@ const RepositoryList: React.FC = () => {
 
       const newTags = [...currentTags, tagToAdd].join(',');
       
-      await api.repositories.update(repoId, { tags: newTags });
+      // Send all required fields to the API
+      await api.repositories.update(repoId, { 
+        name: repo.name,
+        username: repo.username,
+        url: repo.url,
+        local_path: repo.local_path,
+        branch_default: repo.branch_default,
+        tags: newTags
+      });
       
       // Update local state
       setRepositories(repos => 
@@ -752,7 +889,15 @@ const RepositoryList: React.FC = () => {
       const currentTags = repo.tags.split(',').map(t => t.trim()).filter(Boolean);
       const newTags = currentTags.filter(tag => tag !== tagToRemove).join(',');
       
-      await api.repositories.update(repoId, { tags: newTags });
+      // Send all required fields to the API
+      await api.repositories.update(repoId, { 
+        name: repo.name,
+        username: repo.username,
+        url: repo.url,
+        local_path: repo.local_path,
+        branch_default: repo.branch_default,
+        tags: newTags
+      });
       
       // Update local state
       setRepositories(repos => 
@@ -866,6 +1011,196 @@ const RepositoryList: React.FC = () => {
     setSelectedTags([]);
   };
 
+  // Fonction pour gérer la sélection/désélection d'un dépôt
+  const handleSelectRepository = (repoId: string) => {
+    setSelectedRepos(prev => 
+      prev.includes(repoId)
+        ? prev.filter(id => id !== repoId)
+        : [...prev, repoId]
+    );
+  };
+  
+  // Fonction pour gérer la sélection/désélection d'un groupe entier
+  const handleSelectGroup = (username: string) => {
+    const reposInGroup = Object.values(groupedRepositories)
+      .filter((repos, key) => username === key)
+      .flat()
+      .map(repo => repo.id);
+    
+    // Vérifier si tous les dépôts du groupe sont déjà sélectionnés
+    const allSelected = reposInGroup.every(id => selectedRepos.includes(id));
+    
+    if (allSelected) {
+      // Désélectionner tous les dépôts du groupe
+      setSelectedRepos(prev => prev.filter(id => !reposInGroup.includes(id)));
+    } else {
+      // Sélectionner tous les dépôts du groupe
+      const newSelected = [...selectedRepos];
+      reposInGroup.forEach(id => {
+        if (!newSelected.includes(id)) {
+          newSelected.push(id);
+        }
+      });
+      setSelectedRepos(newSelected);
+    }
+  };
+  
+  // Fonction pour vérifier si tous les dépôts d'un groupe sont sélectionnés
+  const isGroupSelected = (username: string): boolean => {
+    const reposInGroup = groupedRepositories[username] || [];
+    return reposInGroup.length > 0 && reposInGroup.every(repo => selectedRepos.includes(repo.id));
+  };
+  
+  // Fonction pour vérifier si certains dépôts d'un groupe sont sélectionnés
+  const isGroupPartiallySelected = (username: string): boolean => {
+    const reposInGroup = groupedRepositories[username] || [];
+    return reposInGroup.some(repo => selectedRepos.includes(repo.id)) && 
+           !reposInGroup.every(repo => selectedRepos.includes(repo.id));
+  };
+  
+  // Fonction pour gérer l'expansion/réduction d'un groupe
+  const toggleGroupExpansion = (username: string) => {
+    setExpandedGroups(prev => 
+      prev.includes(username)
+        ? prev.filter(u => u !== username)
+        : [...prev, username]
+    );
+  };
+  
+  // Sélectionner/désélectionner tous les dépôts
+  const handleSelectAll = () => {
+    if (selectedRepos.length === repositories.length) {
+      setSelectedRepos([]);
+    } else {
+      setSelectedRepos(repositories.map(repo => repo.id));
+    }
+  };
+  
+  // Gérer les actions par lot
+  const handleBatchDelete = async () => {
+    if (selectedRepos.length === 0) return;
+    
+    if (!window.confirm(`Are you sure you want to delete ${selectedRepos.length} repositories? This action is irreversible.`)) {
+      return;
+    }
+    
+    try {
+      // Créer un tableau de promesses pour supprimer tous les dépôts sélectionnés
+      const deletePromises = selectedRepos.map(id => api.repositories.delete(id));
+      
+      // Attendre que toutes les suppressions soient terminées
+      await Promise.all(deletePromises);
+      
+      addNotification({
+        type: 'success',
+        message: `Successfully deleted ${selectedRepos.length} repositories`,
+        duration: 3000
+      });
+      
+      // Rafraîchir la liste et réinitialiser la sélection
+      fetchRepositories();
+      setSelectedRepos([]);
+    } catch (err) {
+      console.error('Error deleting repositories:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to delete some repositories',
+        duration: 3000
+      });
+    }
+  };
+  
+  const handleBatchSync = async () => {
+    if (selectedRepos.length === 0) return;
+    
+    try {
+      addNotification({
+        type: 'info',
+        message: `Synchronizing ${selectedRepos.length} repositories...`,
+        duration: 3000
+      });
+      
+      // Créer un tableau de promesses pour synchroniser tous les dépôts sélectionnés
+      const syncPromises = selectedRepos.map(id => api.repositories.sync(id));
+      
+      // Attendre que toutes les synchronisations soient terminées
+      await Promise.all(syncPromises);
+      
+      addNotification({
+        type: 'success',
+        message: `Successfully synchronized ${selectedRepos.length} repositories`,
+        duration: 3000
+      });
+      
+      // Rafraîchir la liste
+      fetchRepositories();
+    } catch (err) {
+      console.error('Error synchronizing repositories:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to synchronize some repositories',
+        duration: 3000
+      });
+    }
+  };
+  
+  // Gérer les tags par lot
+  const handleBatchAddTag = async () => {
+    if (selectedRepos.length === 0) return;
+    
+    const tagToAdd = prompt('Enter a tag to add to selected repositories:');
+    if (!tagToAdd?.trim()) return;
+    
+    try {
+      // Récupérer les dépôts sélectionnés
+      const selectedRepositories = repositories.filter(repo => selectedRepos.includes(repo.id));
+      
+      // Mettre à jour chaque dépôt
+      const updatePromises = selectedRepositories.map(repo => {
+        const currentTags = repo.tags ? repo.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+        // Éviter les doublons
+        if (!currentTags.includes(tagToAdd.trim())) {
+          currentTags.push(tagToAdd.trim());
+        }
+        const newTags = currentTags.join(',');
+        
+        return api.repositories.update(repo.id, { 
+          name: repo.name,
+          username: repo.username,
+          url: repo.url,
+          local_path: repo.local_path,
+          branch_default: repo.branch_default,
+          tags: newTags
+        });
+      });
+      
+      await Promise.all(updatePromises);
+      
+      addNotification({
+        type: 'success',
+        message: `Tag "${tagToAdd}" added to ${selectedRepos.length} repositories`,
+        duration: 3000
+      });
+      
+      // Rafraîchir la liste
+      fetchRepositories();
+    } catch (err) {
+      console.error('Error adding tag to repositories:', err);
+      addNotification({
+        type: 'error',
+        message: 'Failed to add tag to some repositories',
+        duration: 3000
+      });
+    }
+  };
+
+  // Initialiser l'expansion des groupes
+  useEffect(() => {
+    // Par défaut, tous les groupes sont développés
+    const allUsernames = Object.keys(groupedRepositories);
+    setExpandedGroups(allUsernames);
+  }, [groupedRepositories]);
+
   return (
     <Container>
       <Header>
@@ -890,7 +1225,7 @@ const RepositoryList: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher un dépôt ou un utilisateur..."
+              placeholder="Search repositories or users..."
             />
           </SearchInput>
         </SearchRow>
@@ -898,7 +1233,7 @@ const RepositoryList: React.FC = () => {
         <ActiveFiltersContainer>
           {searchTerm && (
             <FilterTag>
-              Recherche: {searchTerm}
+              Search: {searchTerm}
               <button onClick={() => setSearchTerm('')}>
                 <FaTimes />
               </button>
@@ -917,7 +1252,7 @@ const RepositoryList: React.FC = () => {
           {(selectedTags.length > 0 || searchTerm) && (
             <FilterTag>
               <button onClick={clearFilters}>
-                Effacer tous les filtres
+                Clear all filters
               </button>
             </FilterTag>
           )}
@@ -960,74 +1295,138 @@ const RepositoryList: React.FC = () => {
           <EmptyIcon>
             <FaSearch />
           </EmptyIcon>
-          <EmptyTitle>Aucun résultat</EmptyTitle>
+          <EmptyTitle>No results</EmptyTitle>
           <EmptyText>
-            Aucun dépôt ne correspond aux critères de recherche.
+            No repositories match your search criteria.
           </EmptyText>
-          <button onClick={clearFilters}>Effacer les filtres</button>
+          <button onClick={clearFilters}>Clear filters</button>
         </EmptyState>
       ) : (
         <ListContainer>
           <ListHeader>
-            <ListHeaderItem>Auteur / Dépôt</ListHeaderItem>
+            <CheckboxContainer>
+              <Checkbox 
+                type="checkbox" 
+                checked={selectedRepos.length === repositories.length && repositories.length > 0}
+                onChange={handleSelectAll}
+              />
+              <SelectAllButton onClick={handleSelectAll}>
+                {selectedRepos.length === repositories.length && repositories.length > 0 
+                  ? 'Deselect All' 
+                  : 'Select All'}
+              </SelectAllButton>
+            </CheckboxContainer>
+            <ListHeaderItem>Repository</ListHeaderItem>
             <ListHeaderItem>Path</ListHeaderItem>
             <ListHeaderItem>Tags</ListHeaderItem>
             <ListHeaderItem>Last Updated</ListHeaderItem>
             <div>Actions</div>
           </ListHeader>
-          {Object.values(groupedRepositories).flat().map((repo) => (
-            <ListItem key={repo.id}>
-              <RepoCell>
-                <AuthorBadge>
-                  <FaGithub size={12} />
-                  {repo.url ? extractRepoInfo(repo.url).username : repo.username || ''}
-                </AuthorBadge>
-                <RepoName>{repo.name}</RepoName>
-              </RepoCell>
-              <PathContainer>
-                {repo.local_path ? (
-                  <CopyButton 
-                    onClick={() => copyToClipboard(repo.local_path || '')}
-                    title={`Copy path: ${repo.local_path}`}
-                  >
-                    <FaCopy size={16} />
-                  </CopyButton>
-                ) : (
-                  'N/A'
-                )}
-              </PathContainer>
-              <TagsCell>
-                {renderTags(repo)}
-              </TagsCell>
-              <DateCell>
-                <DateIcon><FaCalendarAlt size={14} /></DateIcon>
-                {formatDate(repo.last_updated)}
-              </DateCell>
-              <Actions>
-                <ActionButton 
-                  className="sync" 
-                  onClick={() => handleSyncRepository(repo.id)}
-                  title="Synchronize"
-                >
-                  <FaSync />
-                </ActionButton>
-                <ActionButton 
-                  className="edit" 
-                  onClick={() => navigate(`/repositories/${repo.id}`)}
-                  title="Edit"
-                >
-                  <FaEdit />
-                </ActionButton>
-                <ActionButton 
-                  className="delete" 
-                  onClick={() => handleDeleteRepository(repo.id)}
-                  title="Delete"
-                >
-                  <FaTrash />
-                </ActionButton>
-              </Actions>
-            </ListItem>
+          
+          {Object.entries(groupedRepositories).map(([username, repos]) => (
+            <div key={username}>
+              <GroupHeader onClick={() => toggleGroupExpansion(username)}>
+                <CheckboxContainer onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelectGroup(username);
+                }}>
+                  <Checkbox 
+                    type="checkbox" 
+                    checked={isGroupSelected(username)}
+                    onChange={() => {}}
+                    ref={el => {
+                      if (el) {
+                        el.indeterminate = isGroupPartiallySelected(username);
+                      }
+                    }}
+                  />
+                </CheckboxContainer>
+                <GroupIcon>
+                  <FaGithub size={18} />
+                </GroupIcon>
+                {username} ({repos.length})
+                <div style={{ marginLeft: 'auto', fontSize: '0.9rem' }}>
+                  {expandedGroups.includes(username) ? 'Click to collapse' : 'Click to expand'}
+                </div>
+              </GroupHeader>
+              
+              {expandedGroups.includes(username) && repos.map((repo) => (
+                <ListItem key={repo.id}>
+                  <CheckboxContainer>
+                    <Checkbox 
+                      type="checkbox" 
+                      checked={selectedRepos.includes(repo.id)}
+                      onChange={() => handleSelectRepository(repo.id)}
+                    />
+                  </CheckboxContainer>
+                  <RepoCell>
+                    <RepoName>{repo.name}</RepoName>
+                  </RepoCell>
+                  <PathContainer>
+                    {repo.local_path ? (
+                      <CopyButton 
+                        onClick={() => copyToClipboard(repo.local_path || '')}
+                        title={`Copy path: ${repo.local_path}`}
+                      >
+                        <FaCopy size={16} />
+                      </CopyButton>
+                    ) : (
+                      'N/A'
+                    )}
+                  </PathContainer>
+                  <TagsCell>
+                    {renderTags(repo)}
+                  </TagsCell>
+                  <DateCell>
+                    <DateIcon><FaCalendarAlt size={14} /></DateIcon>
+                    {formatDate(repo.last_updated)}
+                  </DateCell>
+                  <Actions>
+                    <ActionButton 
+                      className="sync" 
+                      onClick={() => handleSyncRepository(repo.id)}
+                      title="Synchronize"
+                    >
+                      <FaSync />
+                    </ActionButton>
+                    <ActionButton 
+                      className="edit" 
+                      onClick={() => navigate(`/repositories/${repo.id}/edit`)}
+                      title="Edit"
+                    >
+                      <FaEdit />
+                    </ActionButton>
+                    <ActionButton 
+                      className="delete" 
+                      onClick={() => handleDeleteRepository(repo.id)}
+                      title="Delete"
+                    >
+                      <FaTrash />
+                    </ActionButton>
+                  </Actions>
+                </ListItem>
+              ))}
+            </div>
           ))}
+          
+          {selectedRepos.length > 0 && (
+            <BatchActionsBar>
+              <div>
+                <strong>{selectedRepos.length}</strong> repositories selected
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <BatchAction onClick={handleBatchAddTag}>
+                  <FaTag /> Add Tag
+                </BatchAction>
+                <BatchAction onClick={handleBatchSync}>
+                  <FaSync /> Sync All
+                </BatchAction>
+                <BatchAction onClick={handleBatchDelete} style={{ backgroundColor: 'rgba(244, 67, 54, 0.7)' }}>
+                  <FaTrash /> Delete All
+                </BatchAction>
+              </div>
+            </BatchActionsBar>
+          )}
         </ListContainer>
       )}
     </Container>
