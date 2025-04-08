@@ -30,22 +30,26 @@ Cette roadmap détaille les étapes de développement du projet Gource-Tools.
 ### Semaine 7-8: Intégration Gource
 - [x] Développer l'intégration avec Gource (génération de logs)
 - [x] Créer l'interface de configuration des paramètres Gource
+- [ ] Ajouter la fonctionnalité de filtrage et d'organisation des profiles - crer un profile par défaut qui existe déja et qui est modifiable. Et un manager de profiles gource.
 - [ ] Implémenter la gestion des avatars (GitHub, Gravatar)
-- [ ] Développer les options avancées de personnalisation
+
+
 
 ## Phase 3: Système de Rendu et Prévisualisation
 
-### Semaine 9-10: Prévisualisation
-- [ ] Intégrer un système de prévisualisation WebGL
-- [ ] Développer l'affichage en temps réel des modifications
-- [ ] Créer l'interface de prévisualisation interactive
-- [ ] Optimiser pour différentes tailles de dépôts
 
-### Semaine 11-12: Export et Rendu
+
+### Semaine 9-10: Export et Rendu
 - [ ] Intégrer FFmpeg pour l'export vidéo
 - [ ] Développer la file d'attente des rendus
 - [ ] Implémenter les différentes options d'export (MP4, WebM, GIF)
 - [ ] Créer l'interface de personnalisation des rendus
+
+### Semaine 11-12: Prévisualisation
+- [ ] Intégrer un système de prévisualisation WebGL
+- [ ] Développer l'affichage en temps réel des modifications
+- [ ] Créer l'interface de prévisualisation interactive
+- [ ] Optimiser pour différentes tailles de dépôts
 
 ## Phase 4: UI/UX Avancée et Intégrations
 
@@ -81,4 +85,4 @@ Cette roadmap détaille les étapes de développement du projet Gource-Tools.
 - Phase: 2
 - Tâches complétées: 13/28
 - État: Correction du problème de structure de base de données pour la récupération des dépôts GitHub
-- Prochaine étape: Implémentation de la gestion des avatars et finalisation des options avancées de personnalisation pour Gource 
+- Prochaine étape: Implémentation de le telechargement des avatars.

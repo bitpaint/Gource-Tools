@@ -9,6 +9,10 @@ interface Project {
   last_modified: string;
 }
 
+interface ProfileRow {
+  id: string;
+}
+
 // Récupérer tous les projets
 export const getAllProjects = async (req: Request, res: Response) => {
   try {
@@ -69,14 +73,38 @@ export const createProject = async (req: Request, res: Response) => {
           return res.status(500).json({ error: 'Erreur lors de la création du projet' });
         }
         
-        const newProject: Project = {
-          id,
-          name,
-          description,
-          last_modified: new Date().toISOString()
-        };
-        
-        return res.status(201).json(newProject);
+        // Chercher le profil Gource par défaut pour l'associer au projet
+        db.get('SELECT id FROM gource_profiles WHERE is_default = 1 AND is_global = 1 LIMIT 1', [], (err, profileRow: ProfileRow | undefined) => {
+          if (err) {
+            console.error('Erreur lors de la recherche du profil par défaut:', err.message);
+            // Continuer même si on ne peut pas associer le profil par défaut
+          }
+          
+          // Si un profil par défaut a été trouvé, l'associer au projet
+          if (profileRow && profileRow.id) {
+            db.run(
+              'INSERT INTO project_profiles (project_id, profile_id, is_default) VALUES (?, ?, 1)',
+              [id, profileRow.id],
+              function(err) {
+                if (err) {
+                  console.error('Erreur lors de l\'association du profil par défaut au projet:', err.message);
+                  // Continuer même si on ne peut pas associer le profil par défaut
+                }
+                
+                console.log(`Profil par défaut ${profileRow.id} associé au projet ${id}`);
+              }
+            );
+          }
+          
+          const newProject: Project = {
+            id,
+            name,
+            description,
+            last_modified: new Date().toISOString()
+          };
+          
+          return res.status(201).json(newProject);
+        });
       }
     );
   } catch (error) {

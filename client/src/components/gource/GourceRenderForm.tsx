@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import styled from 'styled-components';
 
 interface GourceRenderFormProps {
-  configId: string;
+  profile_id: string;
   onSubmit: (renderOptions: RenderOptions) => void;
   onCancel?: () => void;
   loading?: boolean;
@@ -144,13 +144,13 @@ const InfoBox = styled.div`
 `;
 
 const GourceRenderForm: React.FC<GourceRenderFormProps> = ({
-  configId,
+  profile_id,
   onSubmit,
   onCancel,
   loading = false,
 }) => {
   const [renderOptions, setRenderOptions] = useState<RenderOptions>({
-    config_id: configId,
+    config_id: profile_id,
     output_format: 'mp4',
     quality: 'medium',
   });

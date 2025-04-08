@@ -652,11 +652,11 @@ const ProfilesList: React.FC = () => {
       
       // Charger les projets liés à ce profil
       const linksResponse = await api.gource.getProfileProjects(profileId);
-      setProjectLinks(linksResponse.data);
+      setProjectLinks(linksResponse.data || []);
       
       // Charger tous les projets disponibles
       const projectsResponse = await api.projects.getAll();
-      setAvailableProjects(projectsResponse.data);
+      setAvailableProjects(projectsResponse.data || []);
       
       setShowLinkModal(true);
     } catch (err) {
@@ -955,11 +955,11 @@ const ProfilesList: React.FC = () => {
               )}
               
               <h3>Available projects</h3>
-              {availableProjects.filter(project => !projectLinks.some(link => link.project_id === project.id)).length === 0 ? (
+              {(availableProjects || []).filter(project => !(projectLinks || []).some(link => link.project_id === project.id)).length === 0 ? (
                 <p>No more projects available.</p>
               ) : (
-                availableProjects
-                  .filter(project => !projectLinks.some(link => link.project_id === project.id))
+                (availableProjects || [])
+                  .filter(project => !(projectLinks || []).some(link => link.project_id === project.id))
                   .map(project => (
                     <ProjectItem key={project.id}>
                       <ProjectName>{project.name}</ProjectName>

@@ -107,6 +107,69 @@ function initializeTables() {
       )
     `);
 
+    // Gource profiles table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS gource_profiles (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        is_default INTEGER DEFAULT 0,
+        is_global INTEGER DEFAULT 0,
+        
+        secondsPerDay REAL DEFAULT 10,
+        autoSkipSeconds REAL DEFAULT 0.5,
+        elasticity REAL DEFAULT 0.5,
+        fileIdle INTEGER DEFAULT 0,
+        
+        backgroundColor TEXT DEFAULT '#000000',
+        cameraMode TEXT DEFAULT 'overview',
+        hideItems TEXT DEFAULT '',
+        disableBloom INTEGER DEFAULT 0,
+        
+        startDate TEXT DEFAULT '',
+        stopDate TEXT DEFAULT '',
+        maxUserFiles INTEGER DEFAULT 100,
+        maxFileLag INTEGER DEFAULT 3,
+        
+        userScale REAL DEFAULT 1.0,
+        userImageDir TEXT DEFAULT '',
+        highlightUsers TEXT DEFAULT '',
+        
+        fileScale REAL DEFAULT 1.0,
+        maxFiles INTEGER DEFAULT 1000,
+        fileExtensions TEXT DEFAULT '',
+        
+        showKey INTEGER DEFAULT 1,
+        dateFormat TEXT DEFAULT '%Y-%m-%d',
+        fontName TEXT DEFAULT 'Arial',
+        fontSize INTEGER DEFAULT 14,
+        
+        customLogo TEXT DEFAULT '',
+        logoPosition TEXT DEFAULT 'top-left',
+        logoScale REAL DEFAULT 1.0,
+        titleText TEXT DEFAULT '',
+        
+        outputResolution TEXT DEFAULT '1920x1080',
+        framerate INTEGER DEFAULT 60,
+        
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Créer la table de liaison profiles-projets si elle n'existe pas
+    db.run(`
+      CREATE TABLE IF NOT EXISTS project_profiles (
+        project_id TEXT NOT NULL,
+        profile_id TEXT NOT NULL,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (project_id, profile_id),
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+        FOREIGN KEY (profile_id) REFERENCES gource_profiles (id) ON DELETE CASCADE
+      )
+    `);
+
     // Migration de branch à branch_default si la table existe déjà
     db.get("PRAGMA table_info(repositories)", (err, row) => {
       if (err) {
@@ -211,6 +274,13 @@ function initializeTables() {
     });
 
     console.log('Database tables created or already exist');
+    
+    // Initialiser le profil Gource par défaut
+    import('./initDefaultGourceProfile').then(module => {
+      module.initDefaultGourceProfile();
+    }).catch(err => {
+      console.error('Erreur lors du chargement du module d\'initialisation du profil Gource par défaut:', err);
+    });
   });
 }
 
