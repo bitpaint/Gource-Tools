@@ -137,7 +137,7 @@ const CopyButton = styled.button`
   }
 `;
 
-const ActionButton = styled.button`
+const RepoActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -514,42 +514,6 @@ const BatchActionsBar = styled.div`
   @keyframes slideUp {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
-  }
-`;
-
-const ActionButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: ${({ theme }) => theme.colors.text};
-
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.background};
-    transform: scale(1.1);
-  }
-
-  &.edit {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-
-  &.sync {
-    color: #4CAF50; /* Vert */
-    &:hover {
-      color: #388E3C; /* Vert foncé */
-    }
-  }
-
-  &.delete {
-    color: #F44336; /* Rouge */
-    &:hover {
-      color: #D32F2F; /* Rouge foncé */
-    }
   }
 `;
 
@@ -1022,10 +986,9 @@ const RepositoryList: React.FC = () => {
   
   // Fonction pour gérer la sélection/désélection d'un groupe entier
   const handleSelectGroup = (username: string) => {
-    const reposInGroup = Object.values(groupedRepositories)
-      .filter((repos, key) => username === key)
-      .flat()
-      .map(repo => repo.id);
+    if (!groupedRepositories[username]) return;
+    
+    const reposInGroup = groupedRepositories[username].map(repo => repo.id);
     
     // Vérifier si tous les dépôts du groupe sont déjà sélectionnés
     const allSelected = reposInGroup.every(id => selectedRepos.includes(id));
@@ -1382,27 +1345,27 @@ const RepositoryList: React.FC = () => {
                     {formatDate(repo.last_updated)}
                   </DateCell>
                   <Actions>
-                    <ActionButton 
+                    <RepoActionButton 
                       className="sync" 
                       onClick={() => handleSyncRepository(repo.id)}
                       title="Synchronize"
                     >
                       <FaSync />
-                    </ActionButton>
-                    <ActionButton 
+                    </RepoActionButton>
+                    <RepoActionButton 
                       className="edit" 
-                      onClick={() => navigate(`/repositories/${repo.id}/edit`)}
+                      onClick={() => navigate(`/repositories/${repo.id}`)}
                       title="Edit"
                     >
                       <FaEdit />
-                    </ActionButton>
-                    <ActionButton 
+                    </RepoActionButton>
+                    <RepoActionButton 
                       className="delete" 
                       onClick={() => handleDeleteRepository(repo.id)}
                       title="Delete"
                     >
                       <FaTrash />
-                    </ActionButton>
+                    </RepoActionButton>
                   </Actions>
                 </ListItem>
               ))}
