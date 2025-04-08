@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder, FaSearch, FaTags, FaTimes, FaTag } from 'react-icons/fa';
+import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder, FaSearch, FaTags, FaTimes, FaTag, FaCheckSquare, FaFolderPlus } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 import { useGitHubToken } from '../components/ui/GitHubTokenContext';
@@ -24,17 +24,20 @@ interface GroupedRepositories {
 
 const Container = styled.div`
   padding: 2rem;
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
 `;
 
 const Header = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 `;
 
 const Title = styled.h1`
-  font-size: 1.8rem;
+  font-size: 2rem;
   color: ${({ theme }) => theme.colors.text};
   margin: 0;
   display: flex;
@@ -51,35 +54,44 @@ const TitleIcon = styled.span`
 const AddButton = styled(Link)`
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  background-color: #4CAF50; /* Vert */
+  background-color: #4CAF50;
   color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
   text-decoration: none;
-  font-weight: 500;
-  transition: background-color 0.3s;
+  font-weight: 600;
+  transition: all 0.3s;
+  font-size: 1rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  width: 100%;
 
   &:hover {
-    background-color: #388E3C; /* Vert foncé */
+    background-color: #388E3C;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   }
 `;
 
 const ListContainer = styled.div`
-  background-color: white;
+  background: ${({ theme }) => theme.colors.white};
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 0 0 5rem 0;
   overflow: hidden;
 `;
 
 const ListHeader = styled.div`
   background-color: ${({ theme }) => theme.colors.dark};
-  padding: 0.75rem 1.5rem;
+  padding: 0.4rem 0.8rem;
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) 90px 1fr auto auto;
+  grid-template-columns: 32px minmax(200px, 1.2fr) minmax(300px, 2fr) 80px 160px;
   color: ${({ theme }) => theme.colors.white};
   font-weight: bold;
   align-items: center;
+  font-size: 0.85rem;
+  letter-spacing: 0.3px;
 `;
 
 const ListHeaderItem = styled.div`
@@ -90,14 +102,17 @@ const ListHeaderItem = styled.div`
 
 const ListItem = styled.div`
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) 90px 1fr auto auto;
-  padding: 1rem 1.5rem;
+  grid-template-columns: 32px minmax(200px, 1.2fr) minmax(300px, 2fr) 80px 160px;
+  padding: 0.4rem 0.8rem;
+  padding-left: 2rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
   align-items: center;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  min-height: 36px;
   
   &:hover {
     background-color: ${({ theme }) => theme.colors.background};
+    transform: translateX(2px);
   }
   
   &:last-child {
@@ -108,32 +123,55 @@ const ListItem = styled.div`
 const RepoCell = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  padding-left: 0.8rem;
 `;
 
 const RepoName = styled.h3`
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   color: ${({ theme }) => theme.colors.text};
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  
+  &:before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #4CAF50;
+  }
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 const PathContainer = styled.div`
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 `;
 
 const CopyButton = styled.button`
   background: none;
   border: none;
-  padding: 8px;
+  padding: 8px 12px;
   cursor: pointer;
-  color: ${({ theme }) => theme.colors.textLight};
+  color: ${({ theme }) => theme.colors.primary};
   display: flex;
   align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  border-radius: 4px;
   
   &:hover {
-    color: ${({ theme }) => theme.colors.text};
+    background-color: ${({ theme }) => theme.colors.background};
   }
 `;
 
@@ -141,67 +179,85 @@ const RepoActionButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: none;
-  border: none;
-  padding: 0.5rem;
-  border-radius: 4px;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  padding: 0.3rem 0.5rem;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 0.2s;
   color: ${({ theme }) => theme.colors.text};
+  font-size: 0.8rem;
+  font-weight: 500;
+  gap: 3px;
+  white-space: nowrap;
 
   &:hover {
     background-color: ${({ theme }) => theme.colors.background};
-    transform: scale(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
 
   &.edit {
     color: ${({ theme }) => theme.colors.primary};
+    border-color: ${({ theme }) => theme.colors.primary}40;
   }
 
   &.sync {
-    color: #4CAF50; /* Vert */
-    &:hover {
-      color: #388E3C; /* Vert foncé */
-    }
+    color: #4CAF50;
+    border-color: #4CAF5040;
   }
 
   &.delete {
-    color: #F44336; /* Rouge */
-    &:hover {
-      color: #D32F2F; /* Rouge foncé */
-    }
+    color: #F44336;
+    border-color: #F4433640;
+  }
+  
+  &.project {
+    color: #2196F3;
+    border-color: #2196F340;
+  }
+
+  svg {
+    font-size: 0.9rem;
   }
 `;
 
 const Actions = styled.div`
   display: flex;
-  gap: 0.5rem;
+  gap: 0.2rem;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
 `;
 
 const DateCell = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: ${({ theme }) => theme.colors.textLight};
+  gap: 0.2rem;
+  color: ${({ theme }) => theme.colors.text};
+  font-size: 0.8rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  width: fit-content;
 `;
 
 const DateIcon = styled.span`
   display: flex;
   align-items: center;
   color: ${({ theme }) => theme.colors.primary};
-  opacity: 0.6;
+  opacity: 0.8;
 `;
 
 const EmptyState = styled.div`
   text-align: center;
-  padding: 3rem 1rem;
+  padding: 4rem 2rem;
   background-color: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid ${({ theme }) => theme.colors.borderColor};
 `;
 
 const EmptyTitle = styled.h3`
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   margin-bottom: 1rem;
   color: ${({ theme }) => theme.colors.text};
 `;
@@ -209,10 +265,11 @@ const EmptyTitle = styled.h3`
 const EmptyText = styled.p`
   color: ${({ theme }) => theme.colors.textLight};
   margin-bottom: 1.5rem;
+  font-size: 1.1rem;
 `;
 
 const EmptyIcon = styled.div`
-  font-size: 3rem;
+  font-size: 4rem;
   color: ${({ theme }) => theme.colors.textLight};
   margin-bottom: 1.5rem;
   opacity: 0.4;
@@ -232,43 +289,38 @@ const ErrorMessage = styled.div`
 
 const SearchContainer = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  background-color: white;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-`;
-
-const SearchRow = styled.div`
-  display: flex;
   align-items: center;
   gap: 1rem;
+  background-color: white;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 1rem 0 2rem 0;
 `;
 
 const SearchInput = styled.div`
   position: relative;
-  flex: 1;
+  min-width: 300px;
+  max-width: 400px;
   
   input {
     width: 100%;
-    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    padding: 0.6rem 1rem 0.6rem 2.5rem;
     border: 1px solid ${({ theme }) => theme.colors.borderColor};
-    border-radius: 4px;
-    font-size: 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
     
     &:focus {
       outline: none;
       border-color: ${({ theme }) => theme.colors.primary};
-      box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primary}30;
+      box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.primary}20;
     }
   }
 `;
 
 const SearchIcon = styled.div`
   position: absolute;
-  left: 0.75rem;
+  left: 0.8rem;
   top: 50%;
   transform: translateY(-50%);
   color: ${({ theme }) => theme.colors.textLight};
@@ -276,65 +328,51 @@ const SearchIcon = styled.div`
   align-items: center;
 `;
 
-const ActiveFiltersContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-`;
-
-const FilterTag = styled.div`
+const FilterSection = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: ${({ theme }) => theme.colors.primary}20;
-  border: 1px solid ${({ theme }) => theme.colors.primary}40;
-  color: ${({ theme }) => theme.colors.primary};
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.9rem;
-  
-  button {
-    display: flex;
-    align-items: center;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    color: ${({ theme }) => theme.colors.primary};
-    font-size: 0.8rem;
-    
-    &:hover {
-      color: ${({ theme }) => theme.colors.danger};
-    }
-  }
+  flex: 1;
 `;
 
-const ExpandableTagsList = styled.div`
-  margin-top: 0.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  animation: fadeIn 0.3s ease;
-  
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
+const FilterLabel = styled.span`
+  color: ${({ theme }) => theme.colors.textLight};
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
 `;
 
 const TagFilterButton = styled.button<{ isActive: boolean }>`
-  background-color: ${({ theme, isActive }) => isActive ? theme.colors.primary : theme.colors.light};
+  background-color: ${({ theme, isActive }) => isActive ? theme.colors.primary : 'transparent'};
   color: ${({ theme, isActive }) => isActive ? theme.colors.white : theme.colors.text};
-  border: none;
-  padding: 0.25rem 0.75rem;
+  border: 1px solid ${({ theme, isActive }) => isActive ? theme.colors.primary : theme.colors.borderColor};
+  padding: 0.4rem 0.8rem;
   border-radius: 20px;
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
   
   &:hover {
-    background-color: ${({ theme, isActive }) => isActive ? theme.colors.primary : theme.colors.border};
+    background-color: ${({ theme, isActive }) => isActive ? theme.colors.primary : theme.colors.background};
+    transform: translateY(-1px);
+  }
+`;
+
+const ClearFiltersButton = styled.button`
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.danger};
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto;
+  border-radius: 4px;
+  
+  &:hover {
+    background-color: ${({ theme }) => theme.colors.danger}10;
   }
 `;
 
@@ -351,30 +389,34 @@ const AuthorBadge = styled.span`
 `;
 
 const TagBadge = styled.span`
-  background-color: ${({ theme }) => theme.colors.secondary}15;
+  background-color: ${({ theme }) => theme.colors.secondary}20;
   color: ${({ theme }) => theme.colors.secondary};
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.85rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-right: 0.25rem;
+  gap: 0.2rem;
+  margin: 0;
   cursor: pointer;
   transition: all 0.2s;
+  border: 1px solid ${({ theme }) => theme.colors.secondary}30;
 
   &:hover {
-    background-color: ${({ theme }) => theme.colors.secondary}25;
+    background-color: ${({ theme }) => theme.colors.secondary}30;
+    transform: translateY(-1px);
   }
 `;
 
 const TagsCell = styled.div`
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
-  min-height: 30px;
-  padding: 4px 0;
+  gap: 0.2rem;
+  min-height: 22px;
   position: relative;
+  padding: 0 4px;
+  border-radius: 3px;
+  align-items: center;
 `;
 
 const BadgesContainer = styled.div`
@@ -392,12 +434,14 @@ const TagAddButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem;
+  padding: 0.4rem;
   border-radius: 50%;
-  margin-left: 0.5rem;
+  margin-right: 0.5rem;
   
   &:hover {
     background-color: ${({ theme }) => theme.colors.light};
+    transform: rotate(90deg);
+    transition: transform 0.3s;
   }
 `;
 
@@ -460,19 +504,21 @@ const TagRemoveButton = styled.button`
 
 // Ajout des nouveaux composants styled pour le groupement et la sélection
 const GroupHeader = styled.div`
-  background-color: ${({ theme }) => theme.colors.light};
-  padding: 0.75rem 1.5rem;
+  background: linear-gradient(to right, ${({ theme }) => theme.colors.light}, ${({ theme }) => theme.colors.background});
+  padding: 0.4rem 0.8rem;
   font-weight: bold;
   color: ${({ theme }) => theme.colors.text};
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   cursor: pointer;
   user-select: none;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
+  font-size: 0.9rem;
+  min-height: 36px;
   
   &:hover {
-    background-color: ${({ theme }) => theme.colors.background};
+    background: linear-gradient(to right, ${({ theme }) => theme.colors.light}, ${({ theme }) => theme.colors.white});
   }
 `;
 
@@ -480,74 +526,138 @@ const GroupIcon = styled.span`
   color: ${({ theme }) => theme.colors.primary};
   display: flex;
   align-items: center;
+  background-color: ${({ theme }) => theme.colors.primary}10;
+  padding: 0.2rem;
+  border-radius: 50%;
 `;
 
 const CheckboxContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  min-width: 20px;
+  min-height: 20px;
 `;
 
-const Checkbox = styled.input`
+const Checkbox = styled.input.attrs({ type: 'checkbox' })`
   width: 16px;
   height: 16px;
   cursor: pointer;
+  border-radius: 3px;
+  border: 1.5px solid ${({ theme }) => theme.colors.primary};
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: white;
+  margin: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:checked {
+    background-color: ${({ theme }) => theme.colors.primary};
+  }
+
+  &:checked::before {
+    content: '✓';
+    color: white;
+    font-size: 11px;
+    position: absolute;
+  }
+
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.primary};
+    background-color: ${({ theme }) => theme.colors.primary}20;
+  }
 `;
 
 const BatchActionsBar = styled.div`
-  position: sticky;
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background-color: ${({ theme }) => theme.colors.primary};
+  background-color: ${({ theme }) => theme.colors.dark};
   color: white;
-  padding: 1rem;
+  padding: 0.6rem 1rem;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-top: 1rem;
-  border-radius: 0 0 8px 8px;
-  animation: slideUp 0.3s ease;
-  
-  @keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-  }
+  align-items: center;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 100;
 `;
 
-const BatchAction = styled.button`
+const BatchActionsLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+`;
+
+const BatchActionsRight = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-  }
 `;
 
 const SelectAllButton = styled.button`
   background: none;
   border: none;
-  color: ${({ theme }) => theme.colors.textLight};
-  font-size: 0.9rem;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   cursor: pointer;
-  padding: 0.25rem;
-  margin-left: 0.5rem;
-  
+  font-size: 0.9rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+
   &:hover {
-    color: ${({ theme }) => theme.colors.primary};
-    text-decoration: underline;
+    background-color: rgba(255, 255, 255, 0.1);
   }
 `;
+
+const BatchActionButton = styled.button`
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+
+  &.delete {
+    background-color: ${({ theme }) => theme.colors.danger}90;
+    border-color: ${({ theme }) => theme.colors.danger};
+
+    &:hover {
+      background-color: ${({ theme }) => theme.colors.danger};
+    }
+  }
+`;
+
+// Modification de la fonction pour afficher les dates au format "1d ago", "2w ago", etc.
+const getRelativeTimeString = (date: string) => {
+  const now = new Date();
+  const then = new Date(date);
+  const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'Just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}min`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d`;
+  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}mo`;
+  return `${Math.floor(diffInSeconds / 31536000)}y`;
+};
 
 const RepositoryList: React.FC = () => {
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -564,6 +674,11 @@ const RepositoryList: React.FC = () => {
   const navigate = useNavigate();
   const { addNotification } = useNotification();
   const { hasToken } = useGitHubToken();
+
+  // Ajout de la fonction pour gérer l'ajout au projet
+  const handleAddToProject = () => {
+    navigate('/projects/add', { state: { repositories: selectedRepos } });
+  };
 
   // Fonction pour extraire le nom d'utilisateur et le nom du dépôt à partir de l'URL Git
   const extractRepoInfo = (url: string): { username: string; repoName: string } => {
@@ -701,15 +816,6 @@ const RepositoryList: React.FC = () => {
         duration: 3000
       });
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
   };
 
   const copyToClipboard = async (text: string) => {
@@ -885,7 +991,7 @@ const RepositoryList: React.FC = () => {
     }
   };
 
-  // Fonction pour afficher les tags d'un dépôt
+  // Mise à jour du rendu des tags pour optimiser l'espace
   const renderTags = (repo: Repository) => {
     const { id, tags } = repo;
     
@@ -896,12 +1002,12 @@ const RepositoryList: React.FC = () => {
             type="text"
             value={newTag}
             onChange={(e) => setNewTag(e.target.value)}
-            placeholder="Enter new tag"
+            placeholder="New tag"
             autoFocus
             onKeyPress={(e) => e.key === 'Enter' && handleAddTag(id)}
           />
           <button onClick={() => handleAddTag(id)}>Add</button>
-          <button onClick={cancelEditingTags} style={{ backgroundColor: '#ccc' }}>Cancel</button>
+          <button onClick={cancelEditingTags}>✕</button>
         </TagInput>
       );
     }
@@ -909,10 +1015,10 @@ const RepositoryList: React.FC = () => {
     if (!tags) {
       return (
         <>
-          <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>
-          <TagAddButton onClick={() => startEditingTags(id)}>
-            <FaPlus size={14} />
+          <TagAddButton onClick={() => startEditingTags(id)} title="Add new tag">
+            <FaPlus size={12} />
           </TagAddButton>
+          <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>No tags</span>
         </>
       );
     }
@@ -922,23 +1028,26 @@ const RepositoryList: React.FC = () => {
     if (tagList.length === 0) {
       return (
         <>
-          <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>
-          <TagAddButton onClick={() => startEditingTags(id)}>
-            <FaPlus size={14} />
+          <TagAddButton onClick={() => startEditingTags(id)} title="Add new tag">
+            <FaPlus size={12} />
           </TagAddButton>
+          <span style={{ color: '#999', fontStyle: 'italic', fontSize: '0.8rem' }}>No tags</span>
         </>
       );
     }
     
     return (
       <>
+        <TagAddButton onClick={() => startEditingTags(id)} title="Add new tag">
+          <FaPlus size={12} />
+        </TagAddButton>
         {tagList.map((tag, index) => (
           <TagBadge
             key={index}
             onClick={() => handleTagFilter(tag)}
-            title="Cliquer pour filtrer par ce tag"
+            title="Click to filter by this tag"
           >
-            <FaTags size={12} />
+            <FaTags size={10} />
             {tag}
             <TagRemoveButton 
               onClick={(e) => {
@@ -947,13 +1056,10 @@ const RepositoryList: React.FC = () => {
               }}
               title="Remove tag"
             >
-              <FaTimes size={12} />
+              <FaTimes size={8} />
             </TagRemoveButton>
           </TagBadge>
         ))}
-        <TagAddButton onClick={() => startEditingTags(id)}>
-          <FaPlus size={14} />
-        </TagAddButton>
       </>
     );
   };
@@ -976,11 +1082,11 @@ const RepositoryList: React.FC = () => {
   };
 
   // Fonction pour gérer la sélection/désélection d'un dépôt
-  const handleSelectRepository = (repoId: string) => {
+  const handleRepoSelect = (id: string) => {
     setSelectedRepos(prev => 
-      prev.includes(repoId)
-        ? prev.filter(id => id !== repoId)
-        : [...prev, repoId]
+      prev.includes(id) 
+        ? prev.filter(repoId => repoId !== id)
+        : [...prev, id]
     );
   };
   
@@ -1168,71 +1274,57 @@ const RepositoryList: React.FC = () => {
     <Container>
       <Header>
         <Title>
-          <TitleIcon><FaGithub size={24} /></TitleIcon>
+          <TitleIcon><FaGithub size={28} /></TitleIcon>
           Git Repositories
         </Title>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <AddButton to="/repositories/add">
-            <FaPlus /> Add Repository
-          </AddButton>
-        </div>
+        <AddButton to="/repositories/add">
+          <FaPlus /> Add Repository
+        </AddButton>
       </Header>
 
       <SearchContainer>
-        <SearchRow>
-          <SearchInput>
-            <SearchIcon>
-              <FaSearch />
-            </SearchIcon>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search repositories or users..."
-            />
-          </SearchInput>
-        </SearchRow>
-        
-        <ActiveFiltersContainer>
-          {searchTerm && (
-            <FilterTag>
-              Search: {searchTerm}
-              <button onClick={() => setSearchTerm('')}>
-                <FaTimes />
-              </button>
-            </FilterTag>
+        <SearchInput>
+          <SearchIcon>
+            <FaSearch size={16} />
+          </SearchIcon>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search repositories or users..."
+          />
+        </SearchInput>
+
+        <FilterSection>
+          {availableTags.length > 0 && (
+            <>
+              <FilterLabel>Tags:</FilterLabel>
+              {availableTags.slice(0, 3).map(tag => (
+                <TagFilterButton
+                  key={tag}
+                  isActive={selectedTags.includes(tag)}
+                  onClick={() => handleTagFilter(tag)}
+                >
+                  {tag}
+                </TagFilterButton>
+              ))}
+              {availableTags.length > 3 && (
+                <TagFilterButton
+                  isActive={false}
+                  onClick={() => {/* TODO: Implement tags dropdown */}}
+                >
+                  +{availableTags.length - 3} more
+                </TagFilterButton>
+              )}
+            </>
           )}
-          
-          {selectedTags.map(tag => (
-            <FilterTag key={tag}>
-              {tag}
-              <button onClick={() => removeTagFilter(tag)}>
-                <FaTimes />
-              </button>
-            </FilterTag>
-          ))}
-          
-          {(selectedTags.length > 0 || searchTerm) && (
-            <FilterTag>
-              <button onClick={clearFilters}>
-                Clear all filters
-              </button>
-            </FilterTag>
-          )}
-        </ActiveFiltersContainer>
-        
-        {availableTags.length > 0 && (
-          <ExpandableTagsList>
-            {availableTags.map(tag => (
-              <TagFilterButton
-                key={tag}
-                isActive={selectedTags.includes(tag)}
-                onClick={() => handleTagFilter(tag)}
-              >
-                {tag}
-              </TagFilterButton>
-            ))}
-          </ExpandableTagsList>
+        </FilterSection>
+
+        {(selectedTags.length > 0 || searchTerm) && (
+          <ClearFiltersButton onClick={clearFilters}>
+            <FaTimes size={12} />
+            Clear filters
+          </ClearFiltersButton>
         )}
       </SearchContainer>
 
@@ -1258,11 +1350,27 @@ const RepositoryList: React.FC = () => {
           <EmptyIcon>
             <FaSearch />
           </EmptyIcon>
-          <EmptyTitle>No results</EmptyTitle>
+          <EmptyTitle>No matching repositories found</EmptyTitle>
           <EmptyText>
-            No repositories match your search criteria.
+            No repositories match your search criteria. Would you like to add a new repository instead?
           </EmptyText>
-          <button onClick={clearFilters}>Clear filters</button>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button 
+              onClick={clearFilters} 
+              style={{ 
+                padding: '0.7rem 1.2rem', 
+                borderRadius: '6px', 
+                border: 'none', 
+                backgroundColor: '#f0f0f0', 
+                cursor: 'pointer' 
+              }}
+            >
+              Clear filters
+            </button>
+            <AddButton to="/repositories/add">
+              <FaPlus /> Add New Repository
+            </AddButton>
+          </div>
         </EmptyState>
       ) : (
         <ListContainer>
@@ -1273,14 +1381,8 @@ const RepositoryList: React.FC = () => {
                 checked={selectedRepos.length === repositories.length && repositories.length > 0}
                 onChange={handleSelectAll}
               />
-              <SelectAllButton onClick={handleSelectAll}>
-                {selectedRepos.length === repositories.length && repositories.length > 0 
-                  ? 'Deselect All' 
-                  : 'Select All'}
-              </SelectAllButton>
             </CheckboxContainer>
             <ListHeaderItem>Repository</ListHeaderItem>
-            <ListHeaderItem>Path</ListHeaderItem>
             <ListHeaderItem>Tags</ListHeaderItem>
             <ListHeaderItem>Last Updated</ListHeaderItem>
             <div>Actions</div>
@@ -1308,8 +1410,8 @@ const RepositoryList: React.FC = () => {
                   <FaGithub size={18} />
                 </GroupIcon>
                 {username} ({repos.length})
-                <div style={{ marginLeft: 'auto', fontSize: '0.9rem' }}>
-                  {expandedGroups.includes(username) ? 'Click to collapse' : 'Click to expand'}
+                <div style={{ marginLeft: 'auto', fontSize: '0.9rem', opacity: 0.7 }}>
+                  {expandedGroups.includes(username) ? '▼' : '►'}
                 </div>
               </GroupHeader>
               
@@ -1319,32 +1421,28 @@ const RepositoryList: React.FC = () => {
                     <Checkbox 
                       type="checkbox" 
                       checked={selectedRepos.includes(repo.id)}
-                      onChange={() => handleSelectRepository(repo.id)}
+                      onChange={() => handleRepoSelect(repo.id)}
                     />
                   </CheckboxContainer>
                   <RepoCell>
-                    <RepoName>{repo.name}</RepoName>
+                    <RepoName onClick={() => handleRepoSelect(repo.id)}>
+                      {repo.name}
+                    </RepoName>
                   </RepoCell>
-                  <PathContainer>
-                    {repo.local_path ? (
-                      <CopyButton 
-                        onClick={() => copyToClipboard(repo.local_path || '')}
-                        title={`Copy path: ${repo.local_path}`}
-                      >
-                        <FaCopy size={16} />
-                      </CopyButton>
-                    ) : (
-                      'N/A'
-                    )}
-                  </PathContainer>
                   <TagsCell>
                     {renderTags(repo)}
                   </TagsCell>
                   <DateCell>
-                    <DateIcon><FaCalendarAlt size={14} /></DateIcon>
-                    {formatDate(repo.last_updated)}
+                    {getRelativeTimeString(repo.last_updated)}
                   </DateCell>
                   <Actions>
+                    <RepoActionButton 
+                      className="project"
+                      onClick={() => handleAddToProject()}
+                      title="Add to project"
+                    >
+                      <FaFolderPlus />
+                    </RepoActionButton>
                     <RepoActionButton 
                       className="sync" 
                       onClick={() => handleSyncRepository(repo.id)}
@@ -1374,20 +1472,27 @@ const RepositoryList: React.FC = () => {
           
           {selectedRepos.length > 0 && (
             <BatchActionsBar>
-              <div>
-                <strong>{selectedRepos.length}</strong> repositories selected
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <BatchAction onClick={handleBatchAddTag}>
-                  <FaTag /> Add Tag
-                </BatchAction>
-                <BatchAction onClick={handleBatchSync}>
-                  <FaSync /> Sync All
-                </BatchAction>
-                <BatchAction onClick={handleBatchDelete} style={{ backgroundColor: 'rgba(244, 67, 54, 0.7)' }}>
-                  <FaTrash /> Delete All
-                </BatchAction>
-              </div>
+              <BatchActionsLeft>
+                <SelectAllButton onClick={handleSelectAll}>
+                  <FaCheckSquare />
+                  {selectedRepos.length === repositories.length ? 'Unselect All' : 'Select All'}
+                </SelectAllButton>
+                <span>{selectedRepos.length} repositories selected</span>
+              </BatchActionsLeft>
+              <BatchActionsRight>
+                <BatchActionButton onClick={handleAddToProject}>
+                  <FaFolderPlus />
+                  Add to Project
+                </BatchActionButton>
+                <BatchActionButton onClick={handleBatchSync}>
+                  <FaSync />
+                  Update All
+                </BatchActionButton>
+                <BatchActionButton className="delete" onClick={handleBatchDelete}>
+                  <FaTrash />
+                  Delete All
+                </BatchActionButton>
+              </BatchActionsRight>
             </BatchActionsBar>
           )}
         </ListContainer>
