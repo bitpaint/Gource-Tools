@@ -4,8 +4,8 @@
   "description": "Application moderne pour visualiser l'historique Git à travers Gource",
   "main": "index.js",
   "scripts": {
-    "start": "concurrently \"npm run start:client\" \"npm run start:server\"",
-    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "start": "npm-run-all --parallel start:client start:server",
+    "dev": "npm-run-all --parallel dev:client dev:server",
     "start:client": "cd client && npm start",
     "start:server": "cd server && npm start",
     "dev:client": "cd client && npm run dev",

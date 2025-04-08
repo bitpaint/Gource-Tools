@@ -61,6 +61,9 @@ export const repositoriesApi = {
   },
   sync: (id: string) => axiosInstance.post(`/repositories/${id}/sync`),
   getBranches: (id: string) => axiosInstance.get(`/repositories/${id}/branches`),
+  getTopics: (id: string) => axiosInstance.get(`/repositories/${id}/topics`),
+  forceUpdateTags: () => axiosInstance.post('/repositories/force-update-tags'),
+  import: (data: any) => axiosInstance.post('/repositories/import', data)
 };
 
 // Service API pour les configurations Gource
@@ -77,6 +80,13 @@ export const gourceApi = {
   getConfigsByProject: (projectId: string) => axiosInstance.get(`/gource/configs?project_id=${projectId}`),
 };
 
+// Service API pour les réglages
+export const settingsApi = {
+  checkGithubToken: () => axiosInstance.get('/settings/github/token'),
+  saveGithubToken: (token: string) => axiosInstance.post('/settings/github/token', { token }),
+  testGithubToken: () => axiosInstance.get('/settings/github/token/test'),
+};
+
 // Méthodes HTTP génériques pour être compatibles avec l'ancien code
 const api = {
   get: (url: string, params?: any) => axiosInstance.get(url, { params }),
@@ -88,6 +98,7 @@ const api = {
   projects: projectsApi,
   repositories: repositoriesApi,
   gource: gourceApi,
+  settings: settingsApi,
 };
 
 export default api; 

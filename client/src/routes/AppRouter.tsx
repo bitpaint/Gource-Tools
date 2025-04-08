@@ -10,6 +10,7 @@ import RepositoryList from '../pages/RepositoryList';
 import AddRepository from '../pages/AddRepository';
 import EditRepository from '../pages/EditRepository';
 import GourceConfig from '../pages/GourceConfig';
+import Settings from '../pages/Settings';
 import NotFound from '../pages/NotFound';
 import LinkRepositoriesToProject from '../pages/LinkRepositoriesToProject';
 
@@ -132,25 +133,9 @@ const AppRouter: React.FC = () => {
         path="/settings" 
         element={
           <Layout>
-            <NotFound />
+            <Settings />
           </Layout>
         } 
-      />
-      <Route
-        path="/settings/gource"
-        element={
-          <Layout>
-            <NotFound />
-          </Layout>
-        }
-      />
-      <Route
-        path="/settings/app"
-        element={
-          <Layout>
-            <NotFound />
-          </Layout>
-        }
       />
       
       {/* 404 route */}

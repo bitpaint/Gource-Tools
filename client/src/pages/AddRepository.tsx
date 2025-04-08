@@ -418,8 +418,8 @@ const AddRepository: React.FC = () => {
     if (isValidUrl(url)) {
       const urlObj = new URL(url);
       
-      // If it's a GitHub or GitLab URL
-      if (urlObj.hostname === 'github.com' || urlObj.hostname === 'gitlab.com') {
+      // If it's a GitHub URL
+      if (urlObj.hostname === 'github.com') {
         const pathParts = urlObj.pathname.split('/').filter(Boolean);
         
         // If it's a web page URL (not .git)
@@ -819,11 +819,10 @@ const AddRepository: React.FC = () => {
                 <Select
                   id="platform"
                   name="platform"
-                  value={importData.platform}
-                  onChange={handleImportDataChange}
+                  value="github"
+                  disabled={true}
                 >
                   <option value="github">GitHub</option>
-                  <option value="gitlab">GitLab</option>
                 </Select>
               </FormGroup>
               

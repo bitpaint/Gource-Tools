@@ -42,6 +42,7 @@ function initializeTables() {
         local_path TEXT,
         branch_default TEXT DEFAULT 'main',
         tags TEXT,
+        last_tags_update DATETIME,
         last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -176,6 +177,34 @@ function initializeTables() {
                 });
               });
             }
+          });
+        }
+      });
+    });
+
+    // Après la création de toutes les tables, ajouter un bloc pour vérifier si last_tags_update existe
+    // et l'ajouter si ce n'est pas le cas
+    db.get("PRAGMA table_info(repositories)", (err, rows) => {
+      if (err) {
+        console.error('Erreur lors de la vérification du schéma de la table repositories:', err.message);
+        return;
+      }
+      
+      // Vérifier si la colonne 'last_tags_update' existe
+      db.get("SELECT 1 FROM pragma_table_info('repositories') WHERE name = 'last_tags_update'", (err, exists) => {
+        if (err) {
+          console.error('Erreur lors de la vérification de la colonne last_tags_update:', err.message);
+          return;
+        }
+        
+        if (!exists) {
+          console.log('Ajout de la colonne last_tags_update à la table repositories...');
+          db.run(`ALTER TABLE repositories ADD COLUMN last_tags_update DATETIME`, (err) => {
+            if (err) {
+              console.error('Erreur lors de l\'ajout de la colonne last_tags_update:', err.message);
+              return;
+            }
+            console.log('Colonne last_tags_update ajoutée avec succès');
           });
         }
       });

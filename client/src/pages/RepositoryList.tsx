@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFolder, FaSearch, FaTags, FaTimes } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
+import { useGitHubToken } from '../components/ui/GitHubTokenContext';
 
 interface Repository {
   id: string;
@@ -75,7 +76,7 @@ const ListHeader = styled.div`
   background-color: ${({ theme }) => theme.colors.dark};
   padding: 0.75rem 1.5rem;
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: minmax(200px, 1fr) 90px 1fr auto auto;
   color: ${({ theme }) => theme.colors.white};
   font-weight: bold;
   align-items: center;
@@ -89,10 +90,10 @@ const ListHeaderItem = styled.div`
 
 const ListItem = styled.div`
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: minmax(200px, 1fr) 90px 1fr auto auto;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid ${({ theme }) => theme.colors.borderColor};
-  align-items: start;
+  align-items: center;
   transition: background-color 0.2s;
   
   &:hover {
@@ -104,17 +105,10 @@ const ListItem = styled.div`
   }
 `;
 
-const RepoNameCell = styled.div`
+const RepoCell = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const RepoIconWrapper = styled.div`
-  font-size: 1.25rem;
-  color: ${({ theme }) => theme.colors.dark};
-  display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.25rem;
 `;
 
 const RepoName = styled.h3`
@@ -126,26 +120,13 @@ const RepoName = styled.h3`
 const PathContainer = styled.div`
   display: flex;
   align-items: center;
-  gap: 5px;
-  max-width: 250px;
-`;
-
-const PathValue = styled.div`
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  cursor: pointer;
-  
-  &:hover {
-    text-decoration: underline;
-  }
+  justify-content: center;
 `;
 
 const CopyButton = styled.button`
   background: none;
   border: none;
-  padding: 2px;
+  padding: 8px;
   cursor: pointer;
   color: ${({ theme }) => theme.colors.textLight};
   display: flex;
@@ -247,42 +228,6 @@ const ErrorMessage = styled.div`
   text-align: center;
   padding: 2rem;
   color: ${({ theme }) => theme.colors.danger};
-`;
-
-const UserGroup = styled.div`
-  margin-bottom: 2rem;
-`;
-
-const UserHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem 1rem;
-  background-color: ${({ theme }) => theme.colors.background};
-  border-radius: 4px;
-  border-left: 4px solid ${({ theme }) => theme.colors.primary};
-`;
-
-const UserName = styled.h2`
-  margin: 0;
-  font-size: 1.3rem;
-  color: ${({ theme }) => theme.colors.text};
-`;
-
-const TagsContainer = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-`;
-
-const Tag = styled.span`
-  background-color: ${({ theme }) => theme.colors.light};
-  color: ${({ theme }) => theme.colors.text};
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 500;
 `;
 
 const SearchContainer = styled.div`
@@ -393,25 +338,6 @@ const TagFilterButton = styled.button<{ isActive: boolean }>`
   }
 `;
 
-const TagFilterToggle = styled.button`
-  background: none;
-  border: none;
-  color: ${({ theme }) => theme.colors.primary};
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  margin-top: 0.5rem;
-  transition: color 0.2s;
-  
-  &:hover {
-    color: ${({ theme }) => theme.colors.primaryDark};
-    text-decoration: underline;
-  }
-`;
-
 const AuthorBadge = styled.span`
   background-color: ${({ theme }) => theme.colors.primary}20;
   color: ${({ theme }) => theme.colors.primary};
@@ -422,7 +348,6 @@ const AuthorBadge = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  margin-right: 0.5rem;
 `;
 
 const TagBadge = styled.span`
@@ -443,6 +368,14 @@ const TagBadge = styled.span`
   }
 `;
 
+const TagsCell = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-height: 30px;
+  padding: 4px 0;
+`;
+
 const BadgesContainer = styled.div`
   display: flex;
   flex-wrap: wrap;
@@ -458,9 +391,36 @@ const RepositoryList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [showTagFilters, setShowTagFilters] = useState(false);
   const navigate = useNavigate();
   const { addNotification } = useNotification();
+  const { hasToken, showTokenDialog } = useGitHubToken();
+
+  // Fonction pour extraire le nom d'utilisateur et le nom du dépôt à partir de l'URL Git
+  const extractRepoInfo = (url: string): { username: string; repoName: string } => {
+    if (!url) return { username: '', repoName: '' };
+    
+    // Nettoyer l'URL
+    let cleanUrl = url.trim().replace(/\.git$/, '');
+    
+    // Gérer les URLs SSH et HTTPS
+    const sshMatch = cleanUrl.match(/git@github\.com:([^/]+)\/([^/]+)/);
+    const httpsMatch = cleanUrl.match(/https:\/\/github\.com\/([^/]+)\/([^/]+)/);
+    
+    if (sshMatch) {
+      return {
+        username: sshMatch[1],
+        repoName: sshMatch[2]
+      };
+    } else if (httpsMatch) {
+      return {
+        username: httpsMatch[1],
+        repoName: httpsMatch[2]
+      };
+    }
+    
+    // Si on ne peut pas extraire, retourner des valeurs par défaut
+    return { username: '', repoName: '' };
+  };
 
   useEffect(() => {
     fetchRepositories();
@@ -531,10 +491,22 @@ const RepositoryList: React.FC = () => {
   const handleSyncRepository = async (id: string) => {
     try {
       await api.repositories.sync(id);
-      fetchRepositories(); // Refresh the list after synchronization
+      
+      addNotification({
+        type: 'success',
+        message: 'Repository synchronized successfully',
+        duration: 3000
+      });
+      
+      // Rafraîchir la liste pour obtenir les tags mis à jour
+      fetchRepositories();
     } catch (err) {
       console.error('Error synchronizing repository:', err);
-      // Handle error (add notification)
+      addNotification({
+        type: 'error',
+        message: 'Failed to synchronize repository',
+        duration: 3000
+      });
     }
   };
 
@@ -546,9 +518,18 @@ const RepositoryList: React.FC = () => {
     try {
       await api.repositories.delete(id);
       fetchRepositories(); // Refresh the list after deletion
+      addNotification({
+        type: 'success',
+        message: 'Repository deleted successfully',
+        duration: 3000
+      });
     } catch (err) {
       console.error('Error deleting repository:', err);
-      // Handle error (add notification)
+      addNotification({
+        type: 'error',
+        message: 'Failed to delete repository',
+        duration: 3000
+      });
     }
   };
 
@@ -627,10 +608,14 @@ const RepositoryList: React.FC = () => {
 
   // Fonction pour afficher les tags d'un dépôt
   const renderTags = (tags: string | null) => {
-    if (!tags) return null;
-    const tagList = tags.split(',').map(tag => tag.trim());
+    if (!tags) return <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>;
+    
+    const tagList = tags.split(',').map(tag => tag.trim()).filter(Boolean);
+    
+    if (tagList.length === 0) return <span style={{ color: '#999', fontStyle: 'italic' }}>No tags</span>;
+    
     return (
-      <BadgesContainer>
+      <>
         {tagList.map((tag, index) => (
           <TagBadge
             key={index}
@@ -641,7 +626,7 @@ const RepositoryList: React.FC = () => {
             {tag}
           </TagBadge>
         ))}
-      </BadgesContainer>
+      </>
     );
   };
 
@@ -662,31 +647,78 @@ const RepositoryList: React.FC = () => {
     setSelectedTags([]);
   };
 
-  // Fonction pour extraire le nom d'utilisateur et le nom du dépôt à partir de l'URL Git
-  const extractRepoInfo = (url: string): { username: string; repoName: string } => {
-    if (!url) return { username: '', repoName: '' };
+  // Dans le composant RepositoryList, j'ajoute une fonction de debug pour afficher les tags
+  const debugTags = () => {
+    console.log("=== DEBUG TAGS ===");
+    console.log("Available tags:", availableTags);
     
-    // Nettoyer l'URL
-    let cleanUrl = url.trim().replace(/\.git$/, '');
+    repositories.forEach(repo => {
+      console.log(`Repo: ${repo.name}`);
+      console.log(`Has tags: ${!!repo.tags}`);
+      if (repo.tags) {
+        console.log(`Tags: ${repo.tags}`);
+        const tagList = repo.tags.split(',').map(tag => tag.trim()).filter(Boolean);
+        console.log(`Parsed tags (${tagList.length}):`, tagList);
+      }
+      console.log("---");
+    });
     
-    // Gérer les URLs SSH et HTTPS
-    const sshMatch = cleanUrl.match(/git@github\.com:([^/]+)\/([^/]+)/);
-    const httpsMatch = cleanUrl.match(/https:\/\/github\.com\/([^/]+)\/([^/]+)/);
-    
-    if (sshMatch) {
-      return {
-        username: sshMatch[1],
-        repoName: sshMatch[2]
-      };
-    } else if (httpsMatch) {
-      return {
-        username: httpsMatch[1],
-        repoName: httpsMatch[2]
-      };
+    addNotification({
+      type: 'info',
+      message: 'Tags info printed to console',
+      duration: 2000
+    });
+  };
+
+  // Function to force update GitHub tags
+  const handleForceUpdateTags = async () => {
+    try {
+      setLoading(true);
+      addNotification({
+        type: 'info',
+        message: 'Updating tags...',
+        duration: 2000
+      });
+      
+      const response = await api.repositories.forceUpdateTags();
+      
+      // Check if we hit the rate limit
+      if (response.status === 429) {
+        addNotification({
+          type: 'warning',
+          message: 'GitHub API rate limit reached. Some repositories were updated, but the process was stopped. Please try again later or check your authentication token.',
+          duration: 5000
+        });
+      } else {
+        addNotification({
+          type: 'success',
+          message: response.data.message,
+          duration: 3000
+        });
+      }
+      
+      // Reload repositories after update
+      await fetchRepositories();
+    } catch (error: any) {
+      console.error('Error updating tags:', error);
+      
+      // Check if it's a rate limit error
+      if (error.response && error.response.status === 429) {
+        addNotification({
+          type: 'error',
+          message: 'GitHub API rate limit reached. Please try again later or check your authentication token.',
+          duration: 5000
+        });
+      } else {
+        addNotification({
+          type: 'error',
+          message: 'Error updating tags. Please try again later.',
+          duration: 3000
+        });
+      }
+    } finally {
+      setLoading(false);
     }
-    
-    // Si on ne peut pas extraire, retourner des valeurs par défaut
-    return { username: '', repoName: '' };
   };
 
   return (
@@ -696,9 +728,64 @@ const RepositoryList: React.FC = () => {
           <TitleIcon><FaGithub size={24} /></TitleIcon>
           Git Repositories
         </Title>
-        <AddButton to="/repositories/add">
-          <FaPlus /> Add Repository
-        </AddButton>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          {!hasToken && (
+            <button 
+              onClick={showTokenDialog}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: '#E91E63',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 500
+              }}
+            >
+              Configure GitHub Token
+            </button>
+          )}
+          <button 
+            onClick={debugTags}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: '#FF9800',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Debug Tags
+          </button>
+          <button 
+            onClick={handleForceUpdateTags}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              padding: '0.5rem 1rem',
+              borderRadius: '4px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+          >
+            Update GitHub Tags
+          </button>
+          <AddButton to="/repositories/add">
+            <FaPlus /> Add Repository
+          </AddButton>
+        </div>
       </Header>
 
       <SearchContainer>
@@ -716,57 +803,46 @@ const RepositoryList: React.FC = () => {
           </SearchInput>
         </SearchRow>
         
-        {(selectedTags.length > 0 || searchTerm) && (
-          <ActiveFiltersContainer>
-            {searchTerm && (
-              <FilterTag>
-                Recherche: {searchTerm}
-                <button onClick={() => setSearchTerm('')}>
-                  <FaTimes />
-                </button>
-              </FilterTag>
-            )}
-            
-            {selectedTags.map(tag => (
-              <FilterTag key={tag}>
-                {tag}
-                <button onClick={() => removeTagFilter(tag)}>
-                  <FaTimes />
-                </button>
-              </FilterTag>
-            ))}
-            
-            {(selectedTags.length > 0 || searchTerm) && (
-              <FilterTag>
-                <button onClick={clearFilters}>
-                  Effacer tous les filtres
-                </button>
-              </FilterTag>
-            )}
-          </ActiveFiltersContainer>
-        )}
+        <ActiveFiltersContainer>
+          {searchTerm && (
+            <FilterTag>
+              Recherche: {searchTerm}
+              <button onClick={() => setSearchTerm('')}>
+                <FaTimes />
+              </button>
+            </FilterTag>
+          )}
+          
+          {selectedTags.map(tag => (
+            <FilterTag key={tag}>
+              {tag}
+              <button onClick={() => removeTagFilter(tag)}>
+                <FaTimes />
+              </button>
+            </FilterTag>
+          ))}
+          
+          {(selectedTags.length > 0 || searchTerm) && (
+            <FilterTag>
+              <button onClick={clearFilters}>
+                Effacer tous les filtres
+              </button>
+            </FilterTag>
+          )}
+        </ActiveFiltersContainer>
         
         {availableTags.length > 0 && (
-          <>
-            <TagFilterToggle onClick={() => setShowTagFilters(!showTagFilters)}>
-              <FaTags />
-              {showTagFilters ? 'Masquer les tags' : 'Filtrer par tags'}
-            </TagFilterToggle>
-            
-            {showTagFilters && (
-              <ExpandableTagsList>
-                {availableTags.map(tag => (
-                  <TagFilterButton
-                    key={tag}
-                    isActive={selectedTags.includes(tag)}
-                    onClick={() => handleTagFilter(tag)}
-                  >
-                    {tag}
-                  </TagFilterButton>
-                ))}
-              </ExpandableTagsList>
-            )}
-          </>
+          <ExpandableTagsList>
+            {availableTags.map(tag => (
+              <TagFilterButton
+                key={tag}
+                isActive={selectedTags.includes(tag)}
+                onClick={() => handleTagFilter(tag)}
+              >
+                {tag}
+              </TagFilterButton>
+            ))}
+          </ExpandableTagsList>
         )}
       </SearchContainer>
 
@@ -799,95 +875,68 @@ const RepositoryList: React.FC = () => {
           <button onClick={clearFilters}>Effacer les filtres</button>
         </EmptyState>
       ) : (
-        Object.entries(groupedRepositories).map(([username, repos]) => (
-          <UserGroup key={username}>
-            <UserHeader>
-              <FaGithub size={20} />
-              <UserName>{username}</UserName>
-            </UserHeader>
-            <ListContainer>
-              <ListHeader>
-                <ListHeaderItem>
-                  <FaGithub /> Repository
-                </ListHeaderItem>
-                <ListHeaderItem>
-                  <FaFolder /> Path
-                </ListHeaderItem>
-                <ListHeaderItem>
-                  <FaCalendarAlt /> Last Updated
-                </ListHeaderItem>
-                <div>Actions</div>
-              </ListHeader>
-              {repos.map((repo) => (
-                <ListItem key={repo.id}>
-                  <RepoNameCell>
-                    <RepoIconWrapper>
-                      <FaGithub />
-                    </RepoIconWrapper>
-                    <div>
-                      <RepoName>{repo.name}</RepoName>
-                      <BadgesContainer>
-                        {repo.url && (
-                          <AuthorBadge>
-                            <FaGithub size={12} />
-                            {extractRepoInfo(repo.url).username || repo.username || ''}
-                          </AuthorBadge>
-                        )}
-                        {renderTags(repo.tags)}
-                      </BadgesContainer>
-                    </div>
-                  </RepoNameCell>
-                  <PathContainer>
-                    {repo.local_path ? (
-                      <>
-                        <PathValue title={repo.local_path}>
-                          {repo.local_path}
-                        </PathValue>
-                        <CopyButton 
-                          onClick={() => copyToClipboard(repo.local_path || '')}
-                          title="Copy path to clipboard"
-                        >
-                          <FaCopy size={14} />
-                        </CopyButton>
-                      </>
-                    ) : (
-                      'Not available'
-                    )}
-                  </PathContainer>
-                  <DateCell>
-                    <DateIcon><FaCalendarAlt size={14} /></DateIcon>
-                    {formatDate(repo.last_updated)}
-                  </DateCell>
-                  <Actions>
-                    <ActionButton 
-                      className="edit" 
-                      onClick={() => navigate(`/repositories/${repo.id}`)}
-                      title="Edit"
-                    >
-                      <FaEdit />
-                    </ActionButton>
-                    {repo.local_path && (
-                      <ActionButton 
-                        className="sync" 
-                        onClick={() => handleSyncRepository(repo.id)}
-                        title="Synchronize"
-                      >
-                        <FaSync />
-                      </ActionButton>
-                    )}
-                    <ActionButton 
-                      className="delete" 
-                      onClick={() => handleDeleteRepository(repo.id)}
-                      title="Delete"
-                    >
-                      <FaTrash />
-                    </ActionButton>
-                  </Actions>
-                </ListItem>
-              ))}
-            </ListContainer>
-          </UserGroup>
-        ))
+        <ListContainer>
+          <ListHeader>
+            <ListHeaderItem>Auteur / Dépôt</ListHeaderItem>
+            <ListHeaderItem>Path</ListHeaderItem>
+            <ListHeaderItem>Tags</ListHeaderItem>
+            <ListHeaderItem>Last Updated</ListHeaderItem>
+            <div>Actions</div>
+          </ListHeader>
+          {Object.values(groupedRepositories).flat().map((repo) => (
+            <ListItem key={repo.id}>
+              <RepoCell>
+                <AuthorBadge>
+                  <FaGithub size={12} />
+                  {repo.url ? extractRepoInfo(repo.url).username : repo.username || ''}
+                </AuthorBadge>
+                <RepoName>{repo.name}</RepoName>
+              </RepoCell>
+              <PathContainer>
+                {repo.local_path ? (
+                  <CopyButton 
+                    onClick={() => copyToClipboard(repo.local_path || '')}
+                    title={`Copy path: ${repo.local_path}`}
+                  >
+                    <FaCopy size={16} />
+                  </CopyButton>
+                ) : (
+                  'N/A'
+                )}
+              </PathContainer>
+              <TagsCell>
+                {repo.tags && renderTags(repo.tags)}
+              </TagsCell>
+              <DateCell>
+                <DateIcon><FaCalendarAlt size={14} /></DateIcon>
+                {formatDate(repo.last_updated)}
+              </DateCell>
+              <Actions>
+                <ActionButton 
+                  className="sync" 
+                  onClick={() => handleSyncRepository(repo.id)}
+                  title="Synchronize"
+                >
+                  <FaSync />
+                </ActionButton>
+                <ActionButton 
+                  className="edit" 
+                  onClick={() => navigate(`/repositories/${repo.id}`)}
+                  title="Edit"
+                >
+                  <FaEdit />
+                </ActionButton>
+                <ActionButton 
+                  className="delete" 
+                  onClick={() => handleDeleteRepository(repo.id)}
+                  title="Delete"
+                >
+                  <FaTrash />
+                </ActionButton>
+              </Actions>
+            </ListItem>
+          ))}
+        </ListContainer>
       )}
     </Container>
   );

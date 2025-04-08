@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { FaGithub } from 'react-icons/fa';
 import api from '../services/api';
 import QuickStart from '../components/ui/QuickStart';
+import { useGitHubToken } from '../components/ui/GitHubTokenContext';
 
 const Container = styled.div`
   width: 100%;
@@ -64,6 +66,53 @@ const LoadingIndicator = styled.span`
   margin-top: ${props => props.theme.spacing.xs};
 `;
 
+const GithubWarningCard = styled.div`
+  background-color: #fef8e8;
+  border-radius: ${props => props.theme.borderRadius.medium};
+  padding: ${props => props.theme.spacing.lg};
+  margin-bottom: ${props => props.theme.spacing.lg};
+  border-left: 4px solid #f39c12;
+  display: flex;
+  align-items: center;
+  gap: ${props => props.theme.spacing.md};
+`;
+
+const WarningIcon = styled.div`
+  font-size: 24px;
+  color: #f39c12;
+`;
+
+const WarningContent = styled.div`
+  flex: 1;
+`;
+
+const WarningTitle = styled.h3`
+  margin: 0 0 ${props => props.theme.spacing.xs} 0;
+  font-size: ${props => props.theme.typography.fontSize.medium};
+  color: #333;
+`;
+
+const WarningText = styled.p`
+  margin: 0 0 ${props => props.theme.spacing.sm} 0;
+  color: ${props => props.theme.colors.textLight};
+  font-size: ${props => props.theme.typography.fontSize.small};
+`;
+
+const ConfigureButton = styled.button`
+  background-color: #f39c12;
+  color: white;
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.small};
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: #e67e22;
+  }
+`;
+
 const Dashboard: React.FC = () => {
   // Local state to store data
   const [projects, setProjects] = useState<any[]>([]);
@@ -74,6 +123,8 @@ const Dashboard: React.FC = () => {
     repositories: true,
     renders: true
   });
+  
+  const { hasToken, showTokenDialog } = useGitHubToken();
 
   // Load data on component mount
   useEffect(() => {
@@ -114,6 +165,24 @@ const Dashboard: React.FC = () => {
         <Title>Dashboard</Title>
         <Subtitle>Welcome to Gource-Tools. Manage your projects and create Gource visualizations easily.</Subtitle>
       </WelcomeText>
+      
+      {!hasToken && (
+        <GithubWarningCard>
+          <WarningIcon>
+            <FaGithub />
+          </WarningIcon>
+          <WarningContent>
+            <WarningTitle>GitHub Token Required</WarningTitle>
+            <WarningText>
+              For optimal performance and to avoid API rate limits, please configure a GitHub personal access token.
+              This will allow the application to retrieve repository information more efficiently.
+            </WarningText>
+            <ConfigureButton onClick={showTokenDialog}>
+              Configure GitHub Token
+            </ConfigureButton>
+          </WarningContent>
+        </GithubWarningCard>
+      )}
       
       <QuickStart 
         projectCount={projectCount}

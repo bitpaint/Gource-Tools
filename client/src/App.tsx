@@ -5,6 +5,7 @@ import theme from './styles/theme';
 import GlobalStyles from './styles/GlobalStyles';
 import AppRouter from './routes/AppRouter';
 import { NotificationProvider } from './components/ui/NotificationContext';
+import { GitHubTokenProvider } from './components/ui/GitHubTokenContext';
 
 function App() {
   return (
@@ -12,7 +13,9 @@ function App() {
       <GlobalStyles />
       <Router>
         <NotificationProvider>
-          <AppRouter />
+          <GitHubTokenProvider>
+            <AppRouter />
+          </GitHubTokenProvider>
         </NotificationProvider>
       </Router>
     </ThemeProvider>

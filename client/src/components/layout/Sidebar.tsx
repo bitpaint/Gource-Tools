@@ -178,11 +178,8 @@ const Sidebar: React.FC = () => {
               SETTINGS
             </SectionTitleText>
           </SectionTitle>
-          <NavLink to="/settings/gource" className={({ isActive }) => isActive ? 'active' : ''}>
-            Gource Settings
-          </NavLink>
-          <NavLink to="/settings/app" className={({ isActive }) => isActive ? 'active' : ''}>
-            App Settings
+          <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}>
+            General Settings
           </NavLink>
         </SidebarSection>
         
