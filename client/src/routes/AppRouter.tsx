@@ -10,6 +10,8 @@ import RepositoryList from '../pages/RepositoryList';
 import AddRepository from '../pages/AddRepository';
 import EditRepository from '../pages/EditRepository';
 import GourceConfig from '../pages/GourceConfig';
+import ProfilesList from '../pages/ProfilesList';
+import ProfileForm from '../pages/ProfileForm';
 import Settings from '../pages/Settings';
 import NotFound from '../pages/NotFound';
 import LinkRepositoriesToProject from '../pages/LinkRepositoriesToProject';
@@ -98,6 +100,32 @@ const AppRouter: React.FC = () => {
         element={
           <Layout>
             <EditRepository />
+          </Layout>
+        } 
+      />
+      
+      {/* Gource Profiles routes */}
+      <Route 
+        path="/profiles" 
+        element={
+          <Layout>
+            <ProfilesList />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/profiles/create" 
+        element={
+          <Layout>
+            <ProfileForm />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/profiles/:profileId" 
+        element={
+          <Layout>
+            <ProfileForm />
           </Layout>
         } 
       />

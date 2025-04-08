@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { NavLink as RouterNavLink } from 'react-router-dom';
-import { FaPlus, FaGithub, FaFolder, FaPlay, FaCog, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaPlus, FaGithub, FaFolder, FaPlay, FaCog, FaExternalLinkAlt, FaList } from 'react-icons/fa';
 
 const SidebarContainer = styled.aside`
   width: 250px;
@@ -151,6 +151,21 @@ const Sidebar: React.FC = () => {
           </SectionTitle>
           <NavLink to="/projects" end className={({ isActive }) => isActive ? 'active' : ''}>
             All Projects
+          </NavLink>
+        </SidebarSection>
+
+        <SidebarSection>
+          <SectionTitle>
+            <SectionTitleText>
+              <SectionIcon><FaList /></SectionIcon>
+              PROFILES
+            </SectionTitleText>
+            <AddButton to="/profiles/create" title="Create Profile">
+              <FaPlus size={12} />
+            </AddButton>
+          </SectionTitle>
+          <NavLink to="/profiles" end className={({ isActive }) => isActive ? 'active' : ''}>
+            All Profiles
           </NavLink>
         </SidebarSection>
 

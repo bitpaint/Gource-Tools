@@ -68,6 +68,7 @@ export const repositoriesApi = {
 
 // Service API pour les configurations Gource
 export const gourceApi = {
+  // Configuration Gource (ancienne structure)
   getConfigs: (projectId?: string) => {
     const url = projectId ? `/gource/configs?project_id=${projectId}` : '/gource/configs';
     return axiosInstance.get(url);
@@ -75,9 +76,29 @@ export const gourceApi = {
   getConfigById: (id: string) => axiosInstance.get(`/gource/configs/${id}`),
   createConfig: (data: any) => axiosInstance.post('/gource/configs', data),
   updateConfig: (id: string, data: any) => axiosInstance.put(`/gource/configs/${id}`, data),
+  getConfigsByProject: (projectId: string) => axiosInstance.get(`/gource/configs?project_id=${projectId}`),
+  
+  // Profils Gource (nouvelle structure)
+  getProfiles: () => axiosInstance.get('/gource/profiles'),
+  getProfileById: (id: string) => axiosInstance.get(`/gource/profiles/${id}`),
+  createProfile: (data: any) => axiosInstance.post('/gource/profiles', data),
+  updateProfile: (id: string, data: any) => axiosInstance.put(`/gource/profiles/${id}`, data),
+  deleteProfile: (id: string) => axiosInstance.delete(`/gource/profiles/${id}`),
+  
+  // Associations entre profils et projets
+  getProfileProjects: (profileId: string) => axiosInstance.get(`/gource/profiles/${profileId}/projects`),
+  getProjectProfiles: (projectId: string) => axiosInstance.get(`/gource/projects/${projectId}/profiles`),
+  linkProfileToProject: (profileId: string, projectId: string) => 
+    axiosInstance.post(`/gource/profiles/${profileId}/projects/${projectId}`),
+  setProfileAsDefault: (profileId: string, projectId: string) => 
+    axiosInstance.put(`/gource/profiles/${profileId}/projects/${projectId}/default`),
+  unlinkProfileFromProject: (profileId: string, projectId: string) => 
+    axiosInstance.delete(`/gource/profiles/${profileId}/projects/${projectId}`),
+  
+  // Rendering
   createRender: (data: any) => axiosInstance.post('/gource/renders', data),
   getRenderStatus: (id: string) => axiosInstance.get(`/gource/renders/${id}/status`),
-  getConfigsByProject: (projectId: string) => axiosInstance.get(`/gource/configs?project_id=${projectId}`),
+  getProjectDefaultProfile: (projectId: string) => axiosInstance.get(`/gource/projects/${projectId}/default-profile`),
 };
 
 // Service API pour les réglages
