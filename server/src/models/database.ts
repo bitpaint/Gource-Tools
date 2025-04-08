@@ -274,13 +274,6 @@ function initializeTables() {
     });
 
     console.log('Database tables created or already exist');
-    
-    // Initialiser le profil Gource par défaut
-    import('./initDefaultGourceProfile').then(module => {
-      module.initDefaultGourceProfile();
-    }).catch(err => {
-      console.error('Erreur lors du chargement du module d\'initialisation du profil Gource par défaut:', err);
-    });
   });
 }
 

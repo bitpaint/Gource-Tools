@@ -72,15 +72,6 @@ const EditButton = styled(Button)`
   }
 `;
 
-const GourceButton = styled(Button)`
-  background-color: #2196f3;
-  color: white;
-  
-  &:hover {
-    background-color: #0b7dda;
-  }
-`;
-
 const DeleteButton = styled(Button)`
   background-color: #f44336;
   color: white;
@@ -230,10 +221,6 @@ const ProjectDetail = () => {
     navigate(`/projects/${safeProjectId}/edit`);
   };
   
-  const handleGourceConfig = () => {
-    navigate(`/projects/${safeProjectId}/gource`);
-  };
-  
   const handleAddRepository = () => {
     navigate(`/projects/${safeProjectId}/link-repositories`);
   };
@@ -312,9 +299,6 @@ const ProjectDetail = () => {
           <LastModified>Last modified: {formatDate(project.last_modified)}</LastModified>
         </div>
         <ButtonGroup>
-          <GourceButton onClick={handleGourceConfig}>
-            Gource Configuration
-          </GourceButton>
           <EditButton onClick={handleEditProject}>
             Edit
           </EditButton>

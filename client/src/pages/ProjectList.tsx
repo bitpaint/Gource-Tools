@@ -636,26 +636,11 @@ const ProjectList: React.FC = () => {
                 {getRelativeTimeString(project.last_modified)}
               </DateCell>
               <Actions>
-                <ActionButton 
-                  className="play"
-                  onClick={() => navigate(`/projects/${project.id}/gource`)}
-                  title="Configure Gource"
-                >
-                  <FaPlay />
+                <ActionButton className="edit" onClick={() => navigate(`/projects/${project.id}/edit`)} title="Edit project">
+                  <FaEdit /> Edit
                 </ActionButton>
-                <ActionButton 
-                  className="edit" 
-                  onClick={() => navigate(`/projects/${project.id}`)}
-                  title="Edit"
-                >
-                  <FaEdit />
-                </ActionButton>
-                <ActionButton 
-                  className="delete" 
-                  onClick={() => handleDeleteProject(project.id)}
-                  title="Delete"
-                >
-                  <FaTrash />
+                <ActionButton className="delete" onClick={() => handleDeleteProject(project.id)} title="Delete project">
+                  <FaTrash /> Delete
                 </ActionButton>
               </Actions>
             </ListItem>

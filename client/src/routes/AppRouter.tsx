@@ -9,12 +9,9 @@ import ProjectDetail from '../pages/ProjectDetail';
 import RepositoryList from '../pages/RepositoryList';
 import AddRepository from '../pages/AddRepository';
 import EditRepository from '../pages/EditRepository';
-import GourceConfig from '../pages/GourceConfig';
-import ProfilesList from '../pages/ProfilesList';
-import ProfileForm from '../pages/ProfileForm';
-import Settings from '../pages/Settings';
-import NotFound from '../pages/NotFound';
 import LinkRepositoriesToProject from '../pages/LinkRepositoriesToProject';
+import NotFound from '../pages/NotFound';
+import Settings from '../pages/Settings';
 
 const AppRouter: React.FC = () => {
   return (
@@ -65,7 +62,7 @@ const AppRouter: React.FC = () => {
         path="/projects/:projectId/gource" 
         element={
           <Layout>
-            <GourceConfig />
+            <NotFound />
           </Layout>
         } 
       />
@@ -104,51 +101,9 @@ const AppRouter: React.FC = () => {
         } 
       />
       
-      {/* Gource Profiles routes */}
-      <Route 
-        path="/profiles" 
-        element={
-          <Layout>
-            <ProfilesList />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/profiles/create" 
-        element={
-          <Layout>
-            <ProfileForm />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/profiles/:profileId" 
-        element={
-          <Layout>
-            <ProfileForm />
-          </Layout>
-        } 
-      />
-      
       {/* Render routes */}
       <Route 
-        path="/renders" 
-        element={
-          <Layout>
-            <NotFound />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/renders/create" 
-        element={
-          <Layout>
-            <NotFound />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/renders/:renderId" 
+        path="/render" 
         element={
           <Layout>
             <NotFound />

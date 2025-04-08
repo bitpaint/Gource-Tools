@@ -199,7 +199,7 @@ const QuickStart: React.FC<QuickStartProps> = ({ projectCount, repositoryCount, 
     actionButtonText = "Create a Project";
   } else if (activeStep === 3) {
     actionButtonPath = "/projects";
-    actionButtonText = "Configure Gource";
+    actionButtonText = "View Projects";
   } else if (activeStep === 4) {
     actionButtonPath = "/renders/create";
     actionButtonText = "Create a Render";
@@ -212,7 +212,7 @@ const QuickStart: React.FC<QuickStartProps> = ({ projectCount, repositoryCount, 
   } else if (activeStep === 2) {
     statusText = "Repository added. Create a project next.";
   } else if (activeStep === 3) {
-    statusText = "Project created. Configure Gource settings.";
+    statusText = "Project created. Manage your projects.";
   } else if (activeStep === 4) {
     statusText = "Ready to render visualization.";
   } else if (activeStep === 5) {

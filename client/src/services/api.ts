@@ -3,7 +3,6 @@
  */
 
 import axios from 'axios';
-import { GourceProfileFormData } from '../components/ProfileForm';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
@@ -67,66 +66,14 @@ export const repositoriesApi = {
   import: (data: any) => axiosInstance.post('/api/repositories/import', data)
 };
 
-interface GourceProfile {
-  id: string;
-  name: string;
-  description: string;
-  is_default: boolean;
-  // autres paramètres selon la structure définie dans ProfileForm.tsx
-}
-
 interface RenderOptions {
   profile_id: string;
   output_format: 'mp4' | 'webm' | 'gif';
   quality: 'low' | 'medium' | 'high';
 }
 
-// Service API pour les configurations Gource
-export const gourceApi = {
-  // Configuration Gource (ancienne structure)
-  getConfigs: (projectId?: string) => {
-    const url = projectId ? `/api/gource/configs?project_id=${projectId}` : '/api/gource/configs';
-    return axiosInstance.get(url);
-  },
-  getConfigById: (id: string) => axiosInstance.get(`/api/gource/configs/${id}`),
-  createConfig: (data: any) => axiosInstance.post('/api/gource/configs', data),
-  updateConfig: (id: string, data: any) => axiosInstance.put(`/api/gource/configs/${id}`, data),
-  getConfigsByProject: (projectId: string) => axiosInstance.get(`/api/gource/configs?project_id=${projectId}`),
-  
-  // Profils Gource (nouvelle structure)
-  getProfiles: async () => {
-    const response = await axiosInstance.get('/api/gource/profiles');
-    return response.data;
-  },
-  getProfileById: (id: string) => axiosInstance.get(`/api/gource/profiles/${id}`),
-  createProfile: async (data: any) => axiosInstance.post('/api/gource/profiles', data),
-  updateProfile: async (id: string, data: any) => axiosInstance.put(`/api/gource/profiles/${id}`, data),
-  deleteProfile: async (id: string) => axiosInstance.delete(`/api/gource/profiles/${id}`),
-  
-  // Associations entre profils et projets
-  getProfileProjects: (profileId: string) => axiosInstance.get(`/api/gource/profiles/${profileId}/projects`),
-  getProjectProfiles: async (projectId: string) => {
-    const response = await axiosInstance.get(`/api/gource/projects/${projectId}/profiles`);
-    return response.data;
-  },
-  linkProfileToProject: async (projectId: string, profileId: string) => {
-    const response = await axiosInstance.post(`/api/gource/projects/${projectId}/profiles/${profileId}`);
-    return response.data;
-  },
-  unlinkProfileFromProject: async (projectId: string, profileId: string) => {
-    const response = await axiosInstance.delete(`/api/gource/projects/${projectId}/profiles/${profileId}`);
-    return response.data;
-  },
-  setProfileAsDefault: async (projectId: string, profileId: string) => {
-    const response = await axiosInstance.put(`/api/gource/projects/${projectId}/profiles/${profileId}/default`);
-    return response.data;
-  },
-  
-  // Rendering
-  createRender: (data: any) => axiosInstance.post('/api/gource/renders', data),
-  getRenderStatus: (id: string) => axiosInstance.get(`/api/gource/renders/${id}/status`),
-  getProjectDefaultProfile: (projectId: string) => axiosInstance.get(`/api/gource/projects/${projectId}/default-profile`),
-};
+// Service API pour les fonctionnalités Gource (vide après suppression des fonctionnalités)
+export const gourceApi = {};
 
 // Service API pour les réglages
 export const settingsApi = {
@@ -147,54 +94,7 @@ const api = {
   projects: projectsApi,
   repositories: repositoriesApi,
   gource: gourceApi,
-  settings: settingsApi,
-  
-  // Profils Gource
-  getProfiles: async () => {
-    const response = await axiosInstance.get('/api/gource/profiles');
-    return response.data;
-  },
-  
-  getProfile: async (profileId: string) => {
-    const response = await axiosInstance.get(`/api/gource/profiles/${profileId}`);
-    return response.data;
-  },
-  
-  createProfile: async (profileData: GourceProfileFormData) => {
-    const response = await axiosInstance.post('/api/gource/profiles', profileData);
-    return response.data;
-  },
-  
-  updateProfile: async (profileId: string, profileData: GourceProfileFormData) => {
-    const response = await axiosInstance.put(`/api/gource/profiles/${profileId}`, profileData);
-    return response.data;
-  },
-  
-  deleteProfile: async (profileId: string) => {
-    const response = await axiosInstance.delete(`/api/gource/profiles/${profileId}`);
-    return response.data;
-  },
-  
-  // Gestion des profils liés aux projets
-  getProjectProfiles: async (projectId: string) => {
-    const response = await axiosInstance.get(`/api/gource/projects/${projectId}/profiles`);
-    return response.data;
-  },
-  
-  linkProfileToProject: async (projectId: string, profileId: string) => {
-    const response = await axiosInstance.post(`/api/gource/projects/${projectId}/profiles/${profileId}`);
-    return response.data;
-  },
-  
-  unlinkProfileFromProject: async (projectId: string, profileId: string) => {
-    const response = await axiosInstance.delete(`/api/gource/projects/${projectId}/profiles/${profileId}`);
-    return response.data;
-  },
-  
-  setProfileAsDefault: async (projectId: string, profileId: string) => {
-    const response = await axiosInstance.put(`/api/gource/projects/${projectId}/profiles/${profileId}/default`);
-    return response.data;
-  },
+  settings: settingsApi
 };
 
 export default api; 
