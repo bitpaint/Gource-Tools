@@ -15,26 +15,14 @@ export const GitHubTokenProvider: React.FC<{ children: ReactNode }> = ({ childre
   const [hasToken, setHasToken] = useState<boolean>(false);
   const [tokenSource, setTokenSource] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
-  const [initialCheckDone, setInitialCheckDone] = useState<boolean>(false);
 
   const checkForToken = async () => {
     try {
       const response = await api.settings.checkGithubToken();
       setHasToken(response.data.hasToken);
       setTokenSource(response.data.source);
-      
-      // Si aucun token n'est trouvé et que c'est la première vérification, ouvrir le dialogue
-      if (!response.data.hasToken && !initialCheckDone) {
-        // Délai court pour permettre au reste de l'application de se charger
-        setTimeout(() => {
-          setIsDialogOpen(true);
-        }, 500);
-      }
-      
-      setInitialCheckDone(true);
     } catch (error) {
-      console.error('Erreur lors de la vérification du token GitHub:', error);
-      setInitialCheckDone(true);
+      console.error('Error checking GitHub token:', error);
     }
   };
 
@@ -48,7 +36,7 @@ export const GitHubTokenProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const handleDialogClose = () => {
     setIsDialogOpen(false);
-    // Vérifier à nouveau le statut du token après la fermeture du dialogue
+    // Check token status again after dialog closes
     checkForToken();
   };
 
@@ -58,7 +46,7 @@ export const GitHubTokenProvider: React.FC<{ children: ReactNode }> = ({ childre
       setHasToken(false);
       setTokenSource(null);
     } catch (error) {
-      console.error('Erreur lors de la suppression du token GitHub:', error);
+      console.error('Error removing GitHub token:', error);
     }
   };
 

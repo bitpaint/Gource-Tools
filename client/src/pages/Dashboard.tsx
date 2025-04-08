@@ -4,6 +4,7 @@ import { FaGithub } from 'react-icons/fa';
 import api from '../services/api';
 import QuickStart from '../components/ui/QuickStart';
 import { useGitHubToken } from '../components/ui/GitHubTokenContext';
+import { useNotification } from '../components/ui/NotificationContext';
 
 const Container = styled.div`
   width: 100%;
@@ -67,11 +68,11 @@ const LoadingIndicator = styled.span`
 `;
 
 const GithubWarningCard = styled.div`
-  background-color: #fef8e8;
+  background-color: #f8f9fa;
   border-radius: ${props => props.theme.borderRadius.medium};
   padding: ${props => props.theme.spacing.lg};
   margin-bottom: ${props => props.theme.spacing.lg};
-  border-left: 4px solid #f39c12;
+  border-left: 4px solid #6c757d;
   display: flex;
   align-items: center;
   gap: ${props => props.theme.spacing.md};
@@ -79,7 +80,7 @@ const GithubWarningCard = styled.div`
 
 const WarningIcon = styled.div`
   font-size: 24px;
-  color: #f39c12;
+  color: #6c757d;
 `;
 
 const WarningContent = styled.div`
@@ -98,8 +99,14 @@ const WarningText = styled.p`
   font-size: ${props => props.theme.typography.fontSize.small};
 `;
 
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+`;
+
 const ConfigureButton = styled.button`
-  background-color: #f39c12;
+  background-color: #0366d6;
   color: white;
   padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
   border: none;
@@ -109,7 +116,22 @@ const ConfigureButton = styled.button`
   transition: background-color 0.2s;
   
   &:hover {
-    background-color: #e67e22;
+    background-color: #0353b4;
+  }
+`;
+
+const SkipButton = styled.button`
+  background-color: #f5f5f5;
+  color: #333;
+  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
+  border: none;
+  border-radius: ${props => props.theme.borderRadius.small};
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: #e5e5e5;
   }
 `;
 
@@ -125,6 +147,7 @@ const Dashboard: React.FC = () => {
   });
   
   const { hasToken, showTokenDialog } = useGitHubToken();
+  const { addNotification } = useNotification();
 
   // Load data on component mount
   useEffect(() => {
@@ -159,6 +182,20 @@ const Dashboard: React.FC = () => {
   const repositoryCount = repositories.length || 0;
   const renderCount = renders.length || 0;
 
+  // Function to dismiss token warning and continue
+  const handleSkipToken = () => {
+    addNotification({
+      type: 'info',
+      message: 'Using GitHub API without authentication (limited to 60 requests per hour)',
+      duration: 5000
+    });
+    
+    // Here you would set a state or localStorage flag to hide the warning
+    // This is just a placeholder - implement based on your app's state management
+    localStorage.setItem('skipGitHubTokenWarning', 'true');
+    window.location.reload();
+  };
+
   return (
     <Container>
       <WelcomeText>
@@ -166,20 +203,25 @@ const Dashboard: React.FC = () => {
         <Subtitle>Welcome to Gource-Tools. Manage your projects and create Gource visualizations easily.</Subtitle>
       </WelcomeText>
       
-      {!hasToken && (
+      {!hasToken && !localStorage.getItem('skipGitHubTokenWarning') && (
         <GithubWarningCard>
           <WarningIcon>
             <FaGithub />
           </WarningIcon>
           <WarningContent>
-            <WarningTitle>GitHub Token Required</WarningTitle>
+            <WarningTitle>Enhance your GitHub experience</WarningTitle>
             <WarningText>
-              For optimal performance and to avoid API rate limits, please configure a GitHub personal access token.
-              This will allow the application to retrieve repository information more efficiently.
+              For better performance with GitHub repositories, you can configure a personal access token.
+              This will increase the API rate limit from 60 to 5,000 requests per hour.
             </WarningText>
-            <ConfigureButton onClick={showTokenDialog}>
-              Configure GitHub Token
-            </ConfigureButton>
+            <ButtonGroup>
+              <ConfigureButton onClick={showTokenDialog}>
+                Configure GitHub Token
+              </ConfigureButton>
+              <SkipButton onClick={handleSkipToken}>
+                Continue without token
+              </SkipButton>
+            </ButtonGroup>
           </WarningContent>
         </GithubWarningCard>
       )}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import styled from 'styled-components';
-import { FaGithub, FaCog, FaExclamationTriangle, FaKey } from 'react-icons/fa';
+import { FaGithub, FaCog, FaExclamationTriangle, FaKey, FaInfoCircle } from 'react-icons/fa';
 import { useGitHubToken } from '../ui/GitHubTokenContext';
 
 const NavContainer = styled.nav`
@@ -96,7 +96,7 @@ const TokenAlertButton = styled.button`
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #f39c12;
+  background-color: #6c757d;
   color: white;
   border: none;
   border-radius: 4px;
@@ -108,7 +108,7 @@ const TokenAlertButton = styled.button`
   transition: background-color 0.2s;
   
   &:hover {
-    background-color: #e67e22;
+    background-color: #5a6268;
   }
   
   svg {
@@ -141,9 +141,8 @@ const Navbar: React.FC = () => {
       <RightLinks>
         {!hasToken && (
           <TokenAlertButton onClick={showTokenDialog}>
-            <FaExclamationTriangle />
-            GITHUB TOKEN REQUIRED
-            <FaKey />
+            <FaInfoCircle />
+            GITHUB TOKEN
           </TokenAlertButton>
         )}
         <RightNavItem $active={path === '/settings' || path.startsWith('/settings/')}>

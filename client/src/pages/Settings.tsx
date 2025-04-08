@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaGithub, FaSave, FaInfoCircle, FaCog, FaPaintBrush, FaTrash, FaKey, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaGithub, FaSave, FaInfoCircle, FaCog, FaPaintBrush, FaTrash, FaKey, FaCheck, FaTimes, FaRegClock, FaStar, FaExternalLinkAlt } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 import { useGitHubToken } from '../components/ui/GitHubTokenContext';
@@ -188,6 +188,119 @@ const ButtonGroup = styled.div`
   margin-top: 20px;
 `;
 
+const LinkButton = styled.a`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  background: #4078c0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  text-decoration: none;
+  
+  &:hover {
+    background: #2f5bb7;
+  }
+  
+  &:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+  }
+  
+  svg {
+    margin-right: 8px;
+  }
+`;
+
+const ComparisonCard = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 20px 0;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+`;
+
+const PlanColumn = styled.div<{ $isPro?: boolean }>`
+  padding: 20px;
+  background: ${props => props.$isPro ? '#f0f7ff' : '#f5f5f5'};
+  border-left: ${props => props.$isPro ? '4px solid #0366d6' : 'none'};
+  
+  h3 {
+    font-size: 18px;
+    margin: 0 0 15px 0;
+    color: ${props => props.$isPro ? '#0366d6' : '#666'};
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+`;
+
+const FeatureList = styled.ul`
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  
+  li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: #333;
+    
+    svg {
+      color: #0366d6;
+    }
+  }
+`;
+
+const SetupTime = styled.div`
+  font-size: 14px;
+  color: #666;
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  
+  svg {
+    color: #0366d6;
+  }
+`;
+
+const RateLimit = styled.div`
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 15px 0;
+  
+  span {
+    font-size: 14px;
+    color: #666;
+    font-weight: normal;
+  }
+`;
+
+const ScopeInfo = styled.div`
+  background: #f6f8fa;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 15px 0;
+  font-size: 14px;
+  color: #666;
+  
+  strong {
+    color: #333;
+    display: block;
+    margin-bottom: 4px;
+  }
+`;
+
 const Settings: React.FC = () => {
   const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
@@ -307,10 +420,54 @@ const Settings: React.FC = () => {
                     : tokenSource === 'gitCredentialManager' 
                       ? 'found in Git Credential Manager' 
                       : 'configured via GitHub CLI'}.`
-                : 'Without a GitHub token, you are limited to 60 API requests per hour.'}
+                : 'Configure a GitHub token to increase your API rate limits.'}
             </TokenDescription>
           </TokenInfo>
         </TokenStatusCard>
+
+        <ComparisonCard>
+          <PlanColumn>
+            <h3><FaRegClock /> Basic</h3>
+            <SetupTime>
+              <FaRegClock /> Setup: 0 min
+            </SetupTime>
+            <RateLimit>
+              60 <span>requests/hour</span>
+            </RateLimit>
+            <FeatureList>
+              <li><FaCheck /> Access to public repositories</li>
+              <li><FaCheck /> Basic GitHub API usage</li>
+              <li><FaTimes /> Limited rate for repository scanning</li>
+            </FeatureList>
+          </PlanColumn>
+          
+          <PlanColumn $isPro>
+            <h3><FaStar /> Enhanced Access</h3>
+            <SetupTime>
+              <FaRegClock /> Setup: ~1 min
+            </SetupTime>
+            <RateLimit>
+              5,000 <span>requests/hour</span>
+            </RateLimit>
+            <FeatureList>
+              <li><FaCheck /> Access to all repositories</li>
+              <li><FaCheck /> Increased API rate limits</li>
+              <li><FaCheck /> Faster repository scanning</li>
+            </FeatureList>
+            <ScopeInfo>
+              <strong>Required token scopes:</strong>
+              • For public repositories: <code>public_repo</code><br />
+              • For private repositories: <code>repo</code>
+            </ScopeInfo>
+            <LinkButton 
+              href="https://github.com/settings/tokens/new" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <FaExternalLinkAlt /> Create token on GitHub
+            </LinkButton>
+          </PlanColumn>
+        </ComparisonCard>
         
         {hasToken ? (
           <ButtonGroup>
@@ -319,60 +476,29 @@ const Settings: React.FC = () => {
             </DangerButton>
           </ButtonGroup>
         ) : (
-          <>
-            <InfoMessage>
-              <FaInfoCircle />
-              <div>
-                <strong>Why do I need a GitHub token?</strong>
-                <p>
-                  GitHub API has rate limits for unauthenticated requests (60 per hour).
-                  With a token, this limit increases to 5,000 requests per hour, ensuring better performance
-                  when working with GitHub repositories, especially when fetching tags and metadata.
-                </p>
-              </div>
-            </InfoMessage>
-            
-            <ButtonGroup>
-              <Button onClick={showTokenDialog}>
-                <FaKey /> Configure GitHub Token
-              </Button>
-            </ButtonGroup>
-            
-            <FormGroup style={{ marginTop: '20px' }}>
-              <Label htmlFor="github-token">Or Enter GitHub Personal Access Token</Label>
-              <Input
-                type="password"
-                id="github-token"
-                value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
-                placeholder="ghp_your_github_token"
-              />
-              <HelpText>
-                You can create a token in your GitHub settings under Developer Settings {'>'} Personal Access Tokens.
-                Required permissions: 'public_repo' or 'repo' (for private repositories).
-              </HelpText>
-              
-              <Button 
-                onClick={handleSaveToken} 
-                disabled={loading || !githubToken.trim()}
-                style={{ marginTop: '10px' }}
-              >
-                <FaSave /> Save Token
-              </Button>
-              
-              {testResult && (
-                testResult.success ? (
-                  <SuccessMessage>
-                    {testResult.message}
-                  </SuccessMessage>
-                ) : (
-                  <ErrorMessage>
-                    {testResult.message}
-                  </ErrorMessage>
-                )
-              )}
-            </FormGroup>
-          </>
+          <ButtonGroup>
+            <Input
+              type="password"
+              placeholder="Enter your GitHub token"
+              value={githubToken}
+              onChange={(e) => setGithubToken(e.target.value)}
+            />
+            <Button onClick={handleSaveToken} disabled={loading || !githubToken.trim()}>
+              <FaKey /> Save Token
+            </Button>
+          </ButtonGroup>
+        )}
+        
+        {testResult && (
+          testResult.success ? (
+            <SuccessMessage>
+              {testResult.message}
+            </SuccessMessage>
+          ) : (
+            <ErrorMessage>
+              {testResult.message}
+            </ErrorMessage>
+          )
         )}
       </Section>
 

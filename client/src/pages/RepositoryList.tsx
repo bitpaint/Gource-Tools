@@ -729,25 +729,6 @@ const RepositoryList: React.FC = () => {
           Git Repositories
         </Title>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          {!hasToken && (
-            <button 
-              onClick={showTokenDialog}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                backgroundColor: '#E91E63',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '4px',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: 500
-              }}
-            >
-              Configure GitHub Token
-            </button>
-          )}
           <button 
             onClick={debugTags}
             style={{
