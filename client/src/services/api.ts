@@ -85,6 +85,7 @@ export const settingsApi = {
   checkGithubToken: () => axiosInstance.get('/settings/github/token'),
   saveGithubToken: (token: string) => axiosInstance.post('/settings/github/token', { token }),
   testGithubToken: () => axiosInstance.get('/settings/github/token/test'),
+  removeGithubToken: () => axiosInstance.delete('/settings/github/token')
 };
 
 // Méthodes HTTP génériques pour être compatibles avec l'ancien code

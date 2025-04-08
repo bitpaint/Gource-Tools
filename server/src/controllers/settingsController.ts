@@ -64,20 +64,22 @@ export const saveGithubToken = async (req: Request, res: Response) => {
     
     // Replace or add the GITHUB_TOKEN variable
     const envLines = envContent.split('\n');
-    const tokenLineIndex = envLines.findIndex(line => line.startsWith('GITHUB_TOKEN='));
     
-    if (tokenLineIndex >= 0) {
-      // Replace the existing line
-      envLines[tokenLineIndex] = `GITHUB_TOKEN=${token}`;
-    } else {
-      // Add a new line
-      envLines.push(`GITHUB_TOKEN=${token}`);
-    }
+    // Supprimer les marqueurs spécifiques au GitHub token
+    const filteredLines = envLines.filter(line => 
+      !line.startsWith('GITHUB_TOKEN=') && 
+      !line.startsWith('GITHUB_TOKEN_DISABLED=')
+    );
+    
+    // Add the token
+    filteredLines.push(`GITHUB_TOKEN=${token}`);
     
     // Write to the .env file
-    fs.writeFileSync(envPath, envLines.join('\n'));
+    fs.writeFileSync(envPath, filteredLines.join('\n'));
     
     // Reload environment variables
+    process.env.GITHUB_TOKEN = token;
+    delete process.env.GITHUB_TOKEN_DISABLED;
     dotenv.config();
     
     return res.json({ success: true });
@@ -142,6 +144,39 @@ export const testGithubToken = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: 'Error testing token'
+    });
+  }
+};
+
+// Supprimer le token GitHub du fichier .env
+export const removeGithubToken = async (req: Request, res: Response) => {
+  try {
+    // Lire le contenu actuel du fichier .env
+    let envContent = '';
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+    }
+    
+    // Supprimer la ligne avec GITHUB_TOKEN
+    const envLines = envContent.split('\n');
+    const updatedEnvLines = envLines.filter(line => !line.startsWith('GITHUB_TOKEN='));
+    
+    // Ajouter un marqueur pour indiquer que le token a été explicitement désactivé
+    updatedEnvLines.push('GITHUB_TOKEN_DISABLED=true');
+    
+    // Écrire dans le fichier .env
+    fs.writeFileSync(envPath, updatedEnvLines.join('\n'));
+    
+    // Recharger les variables d'environnement
+    delete process.env.GITHUB_TOKEN;
+    process.env.GITHUB_TOKEN_DISABLED = 'true';
+    dotenv.config();
+    
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing GitHub token:', error);
+    return res.status(500).json({ 
+      error: 'Error removing GitHub token'
     });
   }
 }; 

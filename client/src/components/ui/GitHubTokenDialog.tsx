@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { FaGithub, FaInfoCircle, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaGithub, FaInfoCircle, FaExternalLinkAlt, FaExclamationTriangle, FaCheck } from 'react-icons/fa';
 import { useNotification } from './NotificationContext';
 import api from '../../services/api';
 
@@ -150,6 +150,30 @@ const InfoCard = styled.div`
   }
 `;
 
+const WarningCard = styled.div`
+  background-color: #fff9e6;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 20px;
+  border-left: 4px solid #f39c12;
+  
+  h4 {
+    margin-top: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    color: #333;
+  }
+  
+  p {
+    margin-bottom: 0;
+    line-height: 1.5;
+    font-size: 14px;
+    color: #555;
+  }
+`;
+
 const LinkButton = styled.a`
   display: inline-flex;
   align-items: center;
@@ -197,11 +221,39 @@ const SecondaryButton = styled(Button)`
   }
 `;
 
+const WarningButton = styled(Button)`
+  background-color: #f39c12;
+  color: white;
+  
+  &:hover:not(:disabled) {
+    background-color: #e67e22;
+  }
+`;
+
+const ScopeOption = styled.div`
+  margin: 12px 0;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  padding: 10px;
+  background-color: #f6f8fa;
+`;
+
+const ScopeTitle = styled.div`
+  font-weight: 500;
+  margin-bottom: 5px;
+`;
+
+const ScopeDescription = styled.div`
+  font-size: 13px;
+  color: #666;
+`;
+
 const GitHubTokenDialog: React.FC<GitHubTokenDialogProps> = ({ isOpen, onClose }) => {
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showWarning, setShowWarning] = useState(false);
   const { addNotification } = useNotification();
 
   if (!isOpen) return null;
@@ -247,6 +299,10 @@ const GitHubTokenDialog: React.FC<GitHubTokenDialogProps> = ({ isOpen, onClose }
     }
   };
 
+  const prepareToSkip = () => {
+    setShowWarning(true);
+  };
+
   const skipForNow = () => {
     addNotification({
       type: 'warning',
@@ -261,53 +317,89 @@ const GitHubTokenDialog: React.FC<GitHubTokenDialogProps> = ({ isOpen, onClose }
       <DialogContainer>
         <DialogHeader>
           <FaGithub />
-          <DialogTitle>GitHub Authentication Required</DialogTitle>
+          <DialogTitle>GitHub Authentication</DialogTitle>
         </DialogHeader>
         
         <DialogContent>
-          <InfoCard>
-            <h3><FaInfoCircle /> Why do we need a GitHub token?</h3>
-            <p>
-              GitHub API has rate limits for unauthenticated requests. To ensure optimal performance
-              and avoid interruptions, please provide a GitHub personal access token.
-            </p>
-            <LinkButton 
-              href="https://github.com/settings/tokens/new" 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              Create token on GitHub <FaExternalLinkAlt size={12} />
-            </LinkButton>
-          </InfoCard>
-          
-          <Label htmlFor="github-token">GitHub Personal Access Token</Label>
-          <Input
-            type="password"
-            id="github-token"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="ghp_your_github_token"
-          />
-          
-          <HelpText>
-            Create a token with at least the <strong>public_repo</strong> scope (or <strong>repo</strong> scope for private repositories).
-            This token will be stored in your .env file.
-          </HelpText>
-          
-          {error && <ErrorMessage>{error}</ErrorMessage>}
-          {success && <SuccessMessage>{success}</SuccessMessage>}
+          {!showWarning ? (
+            <>
+              <InfoCard>
+                <h3><FaInfoCircle /> Pourquoi un token GitHub est recommandé</h3>
+                <p>
+                  L'API GitHub limite les requêtes sans authentification à 60 par heure.
+                  Avec un token, cette limite passe à 5 000 requêtes par heure, améliorant 
+                  considérablement les performances lors de l'utilisation de plusieurs dépôts.
+                </p>
+                <ScopeOption>
+                  <ScopeTitle>Scopes requis pour votre token</ScopeTitle>
+                  <ScopeDescription>
+                    <strong>Pour les dépôts publics uniquement :</strong> Cochez l'option <code>public_repo</code><br />
+                    <strong>Pour les dépôts privés :</strong> Cochez l'option <code>repo</code> (dans le menu principal)
+                  </ScopeDescription>
+                </ScopeOption>
+                <LinkButton 
+                  href="https://github.com/settings/tokens/new" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  Créer un token sur GitHub <FaExternalLinkAlt size={12} />
+                </LinkButton>
+              </InfoCard>
+              
+              <Label htmlFor="github-token">Token d'accès personnel GitHub</Label>
+              <Input
+                type="password"
+                id="github-token"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="ghp_your_github_token"
+              />
+              
+              <HelpText>
+                Ce token sera stocké uniquement dans votre fichier .env local.
+                Vous pouvez le supprimer ou le modifier à tout moment depuis la page Paramètres.
+              </HelpText>
+              
+              {error && <ErrorMessage>{error}</ErrorMessage>}
+              {success && <SuccessMessage>{success}</SuccessMessage>}
+            </>
+          ) : (
+            <WarningCard>
+              <h4><FaInfoCircle /> Utilisation sans token GitHub</h4>
+              <p>
+                Sans token GitHub, l'application fonctionnera avec une limite de 60 requêtes API par heure. 
+                Cela peut être suffisant pour une utilisation occasionnelle avec peu de dépôts.
+              </p>
+              <p style={{ marginTop: '10px' }}>
+                Vous pourrez toujours ajouter un token plus tard depuis la page Paramètres si nécessaire.
+              </p>
+            </WarningCard>
+          )}
         </DialogContent>
         
         <DialogFooter>
-          <SecondaryButton onClick={skipForNow}>
-            Skip for now
-          </SecondaryButton>
-          <PrimaryButton 
-            onClick={handleSaveToken} 
-            disabled={loading || !token.trim()}
-          >
-            {loading ? 'Saving...' : 'Save Token'}
-          </PrimaryButton>
+          {!showWarning ? (
+            <>
+              <SecondaryButton onClick={prepareToSkip}>
+                Continuer sans token
+              </SecondaryButton>
+              <PrimaryButton 
+                onClick={handleSaveToken} 
+                disabled={loading || !token.trim()}
+              >
+                {loading ? 'Enregistrement...' : 'Enregistrer le token'}
+              </PrimaryButton>
+            </>
+          ) : (
+            <>
+              <SecondaryButton onClick={() => setShowWarning(false)}>
+                Retour
+              </SecondaryButton>
+              <PrimaryButton onClick={skipForNow}>
+                <FaCheck size={12} style={{ marginRight: '5px' }} /> Continuer sans token
+              </PrimaryButton>
+            </>
+          )}
         </DialogFooter>
       </DialogContainer>
     </Overlay>

@@ -9,6 +9,12 @@ import axios from 'axios';
  * 4. Returns null if no credential is found
  */
 export async function getGitHubCredentials(): Promise<string | null> {
+    // Vérifier si le token a été explicitement supprimé
+    if (process.env.GITHUB_TOKEN_DISABLED === 'true') {
+        console.log('GitHub token has been explicitly disabled by user');
+        return null;
+    }
+
     // 1. Check .env first
     if (process.env.GITHUB_TOKEN) {
         // Make sure it's not the masked token
@@ -21,6 +27,11 @@ export async function getGitHubCredentials(): Promise<string | null> {
         return token;
     }
 
+    // Si aucun token n'est trouvé dans .env, on n'utilise pas les autres sources
+    // pour éviter que le token ne revienne automatiquement après suppression
+    return null;
+
+    /* Anciennes méthodes désactivées pour respecter la suppression manuelle
     // 2. Try to get token from Git Credential Manager
     try {
         const output = execSync('git credential fill', {
@@ -60,6 +71,7 @@ export async function getGitHubCredentials(): Promise<string | null> {
     } catch (error) {
         console.log('Info: GitHub CLI not available or not authenticated');
     }
+    */
 
     // 4. Return null to use unauthenticated API
     console.log('Warning: Using GitHub API without authentication (rate limit may apply)');

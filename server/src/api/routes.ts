@@ -45,6 +45,7 @@ router.get('/gource/renders/:id/status', gourceController.getRenderStatus);
 router.get('/settings/github/token', settingsController.checkGithubToken);
 router.post('/settings/github/token', settingsController.saveGithubToken);
 router.get('/settings/github/token/test', settingsController.testGithubToken);
+router.delete('/settings/github/token', settingsController.removeGithubToken);
 
 // Placeholder pour les routes futures
 router.get('/renders', (req, res) => {

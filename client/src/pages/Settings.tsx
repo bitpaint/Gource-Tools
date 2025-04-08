@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaGithub, FaSave, FaInfoCircle, FaCog, FaPaintBrush } from 'react-icons/fa';
+import { FaGithub, FaSave, FaInfoCircle, FaCog, FaPaintBrush, FaTrash, FaKey, FaCheck, FaTimes } from 'react-icons/fa';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
+import { useGitHubToken } from '../components/ui/GitHubTokenContext';
 
 const SettingsContainer = styled.div`
   padding: 20px;
@@ -92,10 +93,22 @@ const Button = styled.button`
   }
 `;
 
+const DangerButton = styled(Button)`
+  background: #e74c3c;
+  
+  &:hover {
+    background: #c0392b;
+  }
+`;
+
 const ErrorMessage = styled.div`
   color: #e74c3c;
   font-size: 14px;
   margin-top: 5px;
+  padding: 8px;
+  background: #fff9f9;
+  border-radius: 4px;
+  border-left: 3px solid #e74c3c;
 `;
 
 const SuccessMessage = styled.div`
@@ -126,31 +139,71 @@ const InfoMessage = styled.div`
   }
 `;
 
+const TokenStatusCard = styled.div<{ $hasToken: boolean }>`
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  background-color: ${props => props.$hasToken ? '#f0fff4' : '#fff5f5'};
+  border: 1px solid ${props => props.$hasToken ? '#68d391' : '#feb2b2'};
+`;
+
+const TokenIcon = styled.div<{ $hasToken: boolean }>`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: ${props => props.$hasToken ? '#38a169' : '#e53e3e'};
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 16px;
+  flex-shrink: 0;
+  
+  svg {
+    font-size: 20px;
+  }
+`;
+
+const TokenInfo = styled.div`
+  flex: 1;
+`;
+
+const TokenTitle = styled.h3`
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+`;
+
+const TokenDescription = styled.p`
+  margin: 0;
+  color: #666;
+  font-size: 14px;
+`;
+
+const ButtonGroup = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+`;
+
 const Settings: React.FC = () => {
   const [githubToken, setGithubToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-  const [tokenSource, setTokenSource] = useState<string | null>(null);
   const { addNotification } = useNotification();
-
-  // Check if a token already exists
-  useEffect(() => {
-    const checkToken = async () => {
-      try {
-        const response = await api.settings.checkGithubToken();
-        if (response.data.hasToken) {
-          setGithubToken('••••••••••••••••••••'); // Token masked for security
-          setTokenSource(response.data.source);
-        }
-      } catch (error) {
-        console.error('Error checking token:', error);
-      }
-    };
-    
-    checkToken();
-  }, []);
+  const { hasToken, tokenSource, showTokenDialog, removeToken } = useGitHubToken();
 
   const handleSaveToken = async () => {
+    if (!githubToken.trim()) {
+      addNotification({
+        type: 'error',
+        message: 'Please enter a GitHub token'
+      });
+      return;
+    }
+
     setLoading(true);
     setTestResult(null);
     
@@ -158,13 +211,31 @@ const Settings: React.FC = () => {
       const response = await api.settings.saveGithubToken(githubToken);
       
       if (response.data.success) {
-        addNotification({
-          type: 'success',
-          message: 'GitHub token saved successfully'
+        // Tester le token
+        const testResponse = await api.settings.testGithubToken();
+        
+        setTestResult({
+          success: testResponse.data.success,
+          message: testResponse.data.message
         });
         
-        // Test the token
-        await testGithubToken();
+        if (testResponse.data.success) {
+          addNotification({
+            type: 'success',
+            message: 'GitHub token saved successfully'
+          });
+          // Vider le champ de saisie pour des raisons de sécurité
+          setGithubToken('');
+          // Rafraîchir la page après un court délai
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          addNotification({
+            type: 'warning',
+            message: 'Token saved but validation failed'
+          });
+        }
       } else {
         addNotification({
           type: 'error',
@@ -181,19 +252,31 @@ const Settings: React.FC = () => {
     }
   };
   
-  const testGithubToken = async () => {
+  const handleRemoveToken = async () => {
+    if (!window.confirm('Are you sure you want to remove your GitHub token? This will limit your API usage.')) {
+      return;
+    }
+    
+    setLoading(true);
+    
     try {
-      const response = await api.settings.testGithubToken();
+      await removeToken();
+      addNotification({
+        type: 'success',
+        message: 'GitHub token removed successfully'
+      });
       
-      setTestResult({
-        success: response.data.success,
-        message: response.data.message
-      });
+      // Rafraîchir la page après un court délai
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (error) {
-      setTestResult({
-        success: false,
-        message: 'Error testing token'
+      addNotification({
+        type: 'error',
+        message: 'Error removing token'
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -207,76 +290,89 @@ const Settings: React.FC = () => {
           <FaGithub /> GitHub Configuration
         </SectionTitle>
         
-        {tokenSource && (
-          <InfoMessage>
-            <FaInfoCircle />
-            <div>
-              <strong>Automatic GitHub Token Detection</strong>
-              <p>
-                The application has automatically detected a valid GitHub token from {
-                  tokenSource === 'env' ? 'your .env file' :
-                  tokenSource === 'gitCredentialManager' ? 'Git Credential Manager (Git\'s secure storage)' :
-                  tokenSource === 'githubCLI' ? 'GitHub CLI' : 'an unknown source'
-                }.
-                This is not a security issue, but a feature to facilitate authentication.
-                You can replace this token with your own if you wish.
-              </p>
-            </div>
-          </InfoMessage>
-        )}
+        <TokenStatusCard $hasToken={hasToken}>
+          <TokenIcon $hasToken={hasToken}>
+            {hasToken ? <FaCheck /> : <FaTimes />}
+          </TokenIcon>
+          <TokenInfo>
+            <TokenTitle>
+              {hasToken 
+                ? 'GitHub Token Configured' 
+                : 'No GitHub Token Found'}
+            </TokenTitle>
+            <TokenDescription>
+              {hasToken 
+                ? `Your GitHub token is currently ${tokenSource === 'env' 
+                    ? 'stored in your .env file' 
+                    : tokenSource === 'gitCredentialManager' 
+                      ? 'found in Git Credential Manager' 
+                      : 'configured via GitHub CLI'}.`
+                : 'Without a GitHub token, you are limited to 60 API requests per hour.'}
+            </TokenDescription>
+          </TokenInfo>
+        </TokenStatusCard>
         
-        <FormGroup>
-          <Label htmlFor="github-token">GitHub Personal Access Token</Label>
-          <Input
-            type="password"
-            id="github-token"
-            value={githubToken}
-            onChange={(e) => setGithubToken(e.target.value)}
-            placeholder="ghp_your_github_token"
-          />
-          {tokenSource && (
-            <SuccessMessage>
-              {tokenSource === 'env' && "✅ Token found in .env file"}
-              {tokenSource === 'gitCredentialManager' && "✅ Token found in Git Credential Manager"}
-              {tokenSource === 'githubCLI' && "✅ Token found via GitHub CLI"}
-            </SuccessMessage>
-          )}
-          <HelpText>
-            This token is used to increase GitHub API rate limits and access more information.
-            You can create a token in your GitHub settings under Developer Settings {'>'} Personal Access Tokens.
-            Required permissions: 'public_repo' or 'repo' (for private repositories).
-          </HelpText>
-        </FormGroup>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <Button 
-            onClick={handleSaveToken} 
-            disabled={loading || !githubToken}
-          >
-            <FaSave /> Save Token
-          </Button>
-          
-          {tokenSource && (
-            <Button 
-              onClick={testGithubToken} 
-              disabled={loading}
-              style={{ background: '#2ecc71' }}
-            >
-              Test Current Token
-            </Button>
-          )}
-        </div>
-        
-        {testResult && (
-          testResult.success ? (
-            <SuccessMessage>
-              {testResult.message}
-            </SuccessMessage>
-          ) : (
-            <ErrorMessage>
-              {testResult.message}
-            </ErrorMessage>
-          )
+        {hasToken ? (
+          <ButtonGroup>
+            <DangerButton onClick={handleRemoveToken} disabled={loading}>
+              <FaTrash /> Remove Token
+            </DangerButton>
+          </ButtonGroup>
+        ) : (
+          <>
+            <InfoMessage>
+              <FaInfoCircle />
+              <div>
+                <strong>Why do I need a GitHub token?</strong>
+                <p>
+                  GitHub API has rate limits for unauthenticated requests (60 per hour).
+                  With a token, this limit increases to 5,000 requests per hour, ensuring better performance
+                  when working with GitHub repositories, especially when fetching tags and metadata.
+                </p>
+              </div>
+            </InfoMessage>
+            
+            <ButtonGroup>
+              <Button onClick={showTokenDialog}>
+                <FaKey /> Configure GitHub Token
+              </Button>
+            </ButtonGroup>
+            
+            <FormGroup style={{ marginTop: '20px' }}>
+              <Label htmlFor="github-token">Or Enter GitHub Personal Access Token</Label>
+              <Input
+                type="password"
+                id="github-token"
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
+                placeholder="ghp_your_github_token"
+              />
+              <HelpText>
+                You can create a token in your GitHub settings under Developer Settings {'>'} Personal Access Tokens.
+                Required permissions: 'public_repo' or 'repo' (for private repositories).
+              </HelpText>
+              
+              <Button 
+                onClick={handleSaveToken} 
+                disabled={loading || !githubToken.trim()}
+                style={{ marginTop: '10px' }}
+              >
+                <FaSave /> Save Token
+              </Button>
+              
+              {testResult && (
+                testResult.success ? (
+                  <SuccessMessage>
+                    {testResult.message}
+                  </SuccessMessage>
+                ) : (
+                  <ErrorMessage>
+                    {testResult.message}
+                  </ErrorMessage>
+                )
+              )}
+            </FormGroup>
+          </>
         )}
       </Section>
 
