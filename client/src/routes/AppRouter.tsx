@@ -94,7 +94,7 @@ const AppRouter: React.FC = () => {
         } 
       />
       <Route 
-        path="/repositories/:repoId/edit" 
+        path="/repositories/:repoId" 
         element={
           <Layout>
             <EditRepository />
