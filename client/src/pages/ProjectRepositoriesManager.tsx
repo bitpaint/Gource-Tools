@@ -1,19 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from 'styled-components';
+import { FaSearch, FaLink, FaPlus, FaArrowLeft } from 'react-icons/fa';
 import api from '../services/api';
+import { useNotification } from '../components/ui/NotificationContext';
+import { Project, Repository } from '../types';
 
-interface Repository {
-  id: string;
-  name: string;
-  url: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-}
-
+// Styled Components
 const Container = styled.div`
   padding: 2rem;
 `;
@@ -33,12 +26,29 @@ const Subtitle = styled.p`
   margin: 0;
 `;
 
+const BackButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: ${({ theme }) => theme.colors.primary};
+  font-weight: 500;
+  padding: 0;
+  margin-bottom: 1rem;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+`;
+
 const Form = styled.form`
   background: white;
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
+  max-width: 800px;
 `;
 
 const FormGroup = styled.div`
@@ -52,9 +62,14 @@ const Label = styled.label`
   color: ${({ theme }) => theme.colors.text};
 `;
 
-const Input = styled.input`
+const SearchContainer = styled.div`
+  position: relative;
+  margin-bottom: 1rem;
+`;
+
+const SearchInput = styled.input`
   width: 100%;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
   border: 1px solid ${({ theme }) => theme.colors.background};
   border-radius: 4px;
   font-size: 1rem;
@@ -66,13 +81,62 @@ const Input = styled.input`
   }
 `;
 
-const SearchInput = styled(Input)`
-  margin-bottom: 1rem;
+const SearchIcon = styled.div`
+  position: absolute;
+  left: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${({ theme }) => theme.colors.textLight};
+`;
+
+const RepositoriesList = styled.div`
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid ${({ theme }) => theme.colors.background};
+  border-radius: 4px;
+`;
+
+const RepositoryItem = styled.div<{ $selected: boolean }>`
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.background};
+  background-color: ${({ $selected, theme }) => $selected ? `${theme.colors.primary}10` : 'transparent'};
+  cursor: pointer;
+  
+  &:hover {
+    background-color: ${({ $selected, theme }) => $selected ? `${theme.colors.primary}20` : theme.colors.background};
+  }
+  
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const RepositoryInfo = styled.div`
+  flex: 1;
+  margin-left: 1rem;
+`;
+
+const RepositoryName = styled.div`
+  font-weight: 500;
+`;
+
+const RepositoryUrl = styled.div`
+  font-size: 0.85rem;
+  color: ${({ theme }) => theme.colors.textLight};
+`;
+
+const EmptyMessage = styled.div`
+  padding: 1.5rem;
+  text-align: center;
+  color: ${({ theme }) => theme.colors.textLight};
 `;
 
 const ButtonContainer = styled.div`
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 1rem;
   margin-top: 2rem;
 `;
@@ -83,6 +147,9 @@ const Button = styled.button`
   border-radius: 4px;
   font-weight: 500;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   transition: background-color 0.2s;
 `;
 
@@ -95,13 +162,20 @@ const CancelButton = styled(Button)`
   }
 `;
 
-const SubmitButton = styled(Button)`
-  background-color: ${({ theme }) => theme.colors.primary};
+const SubmitButton = styled(Button)<{ $disabled?: boolean }>`
+  background-color: ${({ theme, $disabled }) => $disabled ? `${theme.colors.primary}80` : theme.colors.primary};
   color: white;
+  cursor: ${({ $disabled }) => $disabled ? 'not-allowed' : 'pointer'};
   
   &:hover {
-    background-color: ${({ theme }) => theme.colors.primary}dd;
+    background-color: ${({ theme, $disabled }) => $disabled ? `${theme.colors.primary}80` : `${theme.colors.primary}dd`};
   }
+`;
+
+const InfoMessage = styled.div`
+  color: ${({ theme }) => theme.colors.textLight};
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
 `;
 
 const ErrorMessage = styled.div`
@@ -117,65 +191,15 @@ const SuccessMessage = styled.div`
   font-weight: 500;
 `;
 
-const InfoText = styled.div`
-  margin-top: 0.5rem;
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.colors.text}99;
-`;
-
-const RepositoriesList = styled.div`
-  margin-top: 1rem;
-  max-height: 400px;
-  overflow-y: auto;
-  border: 1px solid ${({ theme }) => theme.colors.background};
-  border-radius: 4px;
-`;
-
-const EmptyMessage = styled.div`
-  padding: 1rem;
-  text-align: center;
-  color: ${({ theme }) => theme.colors.text}99;
-`;
-
-const RepositoryItem = styled.div<{ $selected: boolean }>`
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.background};
-  background-color: ${({ $selected, theme }) => $selected ? theme.colors.background : 'transparent'};
-  cursor: pointer;
-  
-  &:hover {
-    background-color: ${({ theme }) => theme.colors.background};
-  }
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const Checkbox = styled.input`
-  margin-right: 1rem;
-`;
-
-const RepositoryInfo = styled.div`
-  flex: 1;
-`;
-
-const RepositoryName = styled.div`
-  font-weight: 500;
-`;
-
-const RepositoryUrl = styled.div`
-  font-size: 0.85rem;
-  color: ${({ theme }) => theme.colors.textLight};
+const Checkbox = styled.input.attrs({ type: 'checkbox' })`
+  width: 16px;
+  height: 16px;
 `;
 
 const AddNewButton = styled(Button)`
   background-color: transparent;
   color: ${({ theme }) => theme.colors.primary};
   border: 1px solid ${({ theme }) => theme.colors.primary};
-  margin-bottom: 1rem;
   
   &:hover {
     background-color: ${({ theme }) => theme.colors.background};
@@ -183,13 +207,13 @@ const AddNewButton = styled(Button)`
 `;
 
 /**
- * LinkRepositoriesToProject - Component for linking existing repositories to a project
- * This component is specifically for linking repositories that already exist in the system
- * NOT for downloading new repositories (use AddRepository for that)
+ * ProjectRepositoriesManager - Component for managing repository connections to a project
+ * This component allows linking existing repositories to a project or adding new ones
  */
-const LinkRepositoriesToProject: React.FC = () => {
+const ProjectRepositoriesManager: React.FC = () => {
   const { projectIdOrSlug } = useParams<{ projectIdOrSlug: string }>();
   const navigate = useNavigate();
+  const { addNotification } = useNotification();
   
   const [project, setProject] = useState<Project | null>(null);
   const [projectId, setProjectId] = useState<string>('');
@@ -224,6 +248,11 @@ const LinkRepositoriesToProject: React.FC = () => {
     } catch (err) {
       console.error('Error loading project:', err);
       setError('Error loading project. Please try again.');
+      addNotification({
+        type: 'error',
+        message: 'Error loading project. Please try again.',
+        duration: 3000
+      });
     }
   };
   
@@ -262,7 +291,7 @@ const LinkRepositoriesToProject: React.FC = () => {
     } else {
       const filtered = repositories.filter(repo => 
         repo.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        repo.url.toLowerCase().includes(searchTerm.toLowerCase())
+        (repo.url && repo.url.toLowerCase().includes(searchTerm.toLowerCase()))
       );
       setFilteredRepositories(filtered);
     }
@@ -305,7 +334,11 @@ const LinkRepositoriesToProject: React.FC = () => {
       await Promise.all(promises);
       
       setSuccess(`Successfully linked ${selectedRepositories.length} repositories to project`);
-      setSelectedRepositories([]);
+      addNotification({
+        type: 'success',
+        message: `Successfully linked ${selectedRepositories.length} repositories to project`,
+        duration: 3000
+      });
       
       // Navigate back to project detail page after successful link
       setTimeout(() => {
@@ -320,33 +353,47 @@ const LinkRepositoriesToProject: React.FC = () => {
   };
   
   const handleAddNewRepository = () => {
-    navigate('/repositories/add');
+    navigate('/repositories/add', { 
+      state: { returnToProject: true, projectId: projectId } 
+    });
+  };
+  
+  const handleCancel = () => {
+    navigate(`/projects/${projectId}`);
   };
   
   return (
     <Container>
+      <BackButton onClick={handleCancel}>
+        <FaArrowLeft size={12} /> Back to project
+      </BackButton>
+      
       <Header>
         <Title>Link Repositories to Project</Title>
         {project && <Subtitle>Project: {project.name}</Subtitle>}
       </Header>
       
       <Form onSubmit={handleSubmit}>
-        <AddNewButton type="button" onClick={handleAddNewRepository}>
-          Download New Repository
-        </AddNewButton>
-        
-        <FormGroup>
-          <Label>Search Repositories</Label>
-          <SearchInput 
-            type="text" 
-            value={searchTerm} 
-            onChange={handleSearchChange}
-            placeholder="Search by name or URL"
-          />
-        </FormGroup>
+        <ButtonContainer>
+          <AddNewButton type="button" onClick={handleAddNewRepository}>
+            <FaPlus size={14} /> Add New Repository
+          </AddNewButton>
+        </ButtonContainer>
         
         <FormGroup>
           <Label>Available Repositories</Label>
+          <SearchContainer>
+            <SearchIcon>
+              <FaSearch size={14} />
+            </SearchIcon>
+            <SearchInput 
+              type="text" 
+              value={searchTerm} 
+              onChange={handleSearchChange}
+              placeholder="Search by name or URL"
+            />
+          </SearchContainer>
+          
           {loading ? (
             <EmptyMessage>Loading repositories...</EmptyMessage>
           ) : filteredRepositories.length > 0 ? (
@@ -358,7 +405,6 @@ const LinkRepositoriesToProject: React.FC = () => {
                   onClick={() => handleRepositorySelect(repo.id)}
                 >
                   <Checkbox 
-                    type="checkbox" 
                     checked={selectedRepositories.includes(repo.id)}
                     onChange={() => {}}
                   />
@@ -371,7 +417,7 @@ const LinkRepositoriesToProject: React.FC = () => {
             </RepositoriesList>
           ) : (
             <EmptyMessage>
-              No available repositories found. Download new repositories first.
+              No available repositories found. Add new repositories first.
             </EmptyMessage>
           )}
         </FormGroup>
@@ -379,17 +425,18 @@ const LinkRepositoriesToProject: React.FC = () => {
         {error && <ErrorMessage>{error}</ErrorMessage>}
         {success && <SuccessMessage>{success}</SuccessMessage>}
         
-        <InfoText>
+        <InfoMessage>
           Select repositories you want to link to this project. You can only link repositories 
-          that have already been downloaded to the system.
-        </InfoText>
+          that have already been added to the system.
+        </InfoMessage>
         
         <ButtonContainer>
-          <CancelButton type="button" onClick={() => navigate(`/projects/${projectId}`)}>
+          <CancelButton type="button" onClick={handleCancel}>
             Cancel
           </CancelButton>
           <SubmitButton 
             type="submit" 
+            $disabled={submitting || selectedRepositories.length === 0}
             disabled={submitting || selectedRepositories.length === 0}
           >
             {submitting ? 'Linking...' : 'Link Selected Repositories'}
@@ -400,4 +447,4 @@ const LinkRepositoriesToProject: React.FC = () => {
   );
 };
 
-export default LinkRepositoriesToProject; 
+export default ProjectRepositoriesManager; 

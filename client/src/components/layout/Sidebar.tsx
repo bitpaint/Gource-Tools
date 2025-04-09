@@ -154,21 +154,9 @@ const Sidebar: React.FC = () => {
           </NavLink>
         </SidebarSection>
 
-        <SidebarSection>
-          <SectionTitle>
-            <SectionTitleText>
-              <SectionIcon><FaList /></SectionIcon>
-              PROFILES
-            </SectionTitleText>
-            <AddButton to="/profiles/create" title="Create Profile">
-              <FaPlus size={12} />
-            </AddButton>
-          </SectionTitle>
-          <NavLink to="/profiles" end className={({ isActive }) => isActive ? 'active' : ''}>
-            All Profiles
-          </NavLink>
-        </SidebarSection>
+        {/* Removed the PROFILES section as it's not implemented */}
 
+        {/* Commented out the RENDERS section until fully implemented 
         <SidebarSection>
           <SectionTitle>
             <SectionTitleText>
@@ -179,10 +167,17 @@ const Sidebar: React.FC = () => {
               <FaPlus size={12} />
             </AddButton>
           </SectionTitle>
+          <NavLink to="/render" end className={({ isActive }) => isActive ? 'active' : ''}>
+            Render
+          </NavLink>
+          <NavLink to="/render/queue" end className={({ isActive }) => isActive ? 'active' : ''}>
+            Queue
+          </NavLink>
           <NavLink to="/renders" end className={({ isActive }) => isActive ? 'active' : ''}>
             All Renders
           </NavLink>
         </SidebarSection>
+        */}
       </SidebarContent>
       
       <SidebarFooter>
@@ -194,19 +189,16 @@ const Sidebar: React.FC = () => {
             </SectionTitleText>
           </SectionTitle>
           <NavLink to="/settings" className={({ isActive }) => isActive ? 'active' : ''}>
-            General Settings
+            App Settings
           </NavLink>
         </SidebarSection>
         
         <SidebarSection>
-          <ExternalLink 
-            href="https://github.com/bitpaint/Gource-Tools" 
-            target="_blank" 
-            rel="noopener noreferrer"
-          >
-            <SectionIcon><FaGithub /></SectionIcon>
-            GitHub
-            <LinkIcon><FaExternalLinkAlt size={10} /></LinkIcon>
+          <ExternalLink href="https://github.com/yourusername/gource-tools" target="_blank" rel="noopener noreferrer">
+            GitHub Repository
+            <LinkIcon>
+              <FaExternalLinkAlt size={10} />
+            </LinkIcon>
           </ExternalLink>
         </SidebarSection>
       </SidebarFooter>

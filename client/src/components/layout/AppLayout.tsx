@@ -30,11 +30,11 @@ const ContentWrapper = styled.main`
   height: 100%;
 `;
 
-interface LayoutProps {
+interface AppLayoutProps {
   children: React.ReactNode;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <LayoutContainer>
       <Navbar />
@@ -50,4 +50,4 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   );
 };
 
-export default Layout; 
+export default AppLayout; 

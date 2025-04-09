@@ -1,6 +1,6 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import Layout from '../components/layout/Layout';
+import { Routes, Route, Outlet } from 'react-router-dom';
+import AppLayout from '../components/layout/AppLayout';
 import Dashboard from '../pages/Dashboard';
 import ProjectList from '../pages/ProjectList';
 import CreateProject from '../pages/CreateProject';
@@ -9,9 +9,10 @@ import ProjectDetail from '../pages/ProjectDetail';
 import RepositoryList from '../pages/RepositoryList';
 import AddRepository from '../pages/AddRepository';
 import EditRepository from '../pages/EditRepository';
-import LinkRepositoriesToProject from '../pages/LinkRepositoriesToProject';
+import ProjectRepositoriesManager from '../pages/ProjectRepositoriesManager';
 import NotFound from '../pages/NotFound';
 import Settings from '../pages/Settings';
+import RepositoryProjectsManager from '../pages/RepositoryProjectsManager';
 
 const AppRouter: React.FC = () => {
   return (
@@ -19,9 +20,9 @@ const AppRouter: React.FC = () => {
       <Route 
         path="/" 
         element={
-          <Layout>
+          <AppLayout>
             <Dashboard />
-          </Layout>
+          </AppLayout>
         } 
       />
       
@@ -29,49 +30,30 @@ const AppRouter: React.FC = () => {
       <Route 
         path="/projects" 
         element={
-          <Layout>
-            <ProjectList />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/projects/create" 
-        element={
-          <Layout>
-            <CreateProject />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/projects/:projectIdOrSlug" 
-        element={
-          <Layout>
-            <ProjectDetail />
-          </Layout>
-        } 
-      />
+          <AppLayout>
+            <Outlet />
+          </AppLayout>
+        }
+      >
+        <Route index element={<ProjectList />} />
+        <Route path="create" element={<CreateProject />} />
+        <Route path=":projectIdOrSlug" element={<ProjectDetail />} />
+        <Route path=":projectIdOrSlug/link-repositories" element={<ProjectRepositoriesManager />} />
+      </Route>
       <Route 
         path="/projects/:projectIdOrSlug/edit" 
         element={
-          <Layout>
+          <AppLayout>
             <EditProject />
-          </Layout>
+          </AppLayout>
         } 
       />
       <Route 
         path="/projects/:projectIdOrSlug/gource" 
         element={
-          <Layout>
+          <AppLayout>
             <NotFound />
-          </Layout>
-        } 
-      />
-      <Route 
-        path="/projects/:projectIdOrSlug/link-repositories" 
-        element={
-          <Layout>
-            <LinkRepositoriesToProject />
-          </Layout>
+          </AppLayout>
         } 
       />
       
@@ -79,25 +61,33 @@ const AppRouter: React.FC = () => {
       <Route 
         path="/repositories" 
         element={
-          <Layout>
+          <AppLayout>
             <RepositoryList />
-          </Layout>
+          </AppLayout>
         } 
       />
       <Route 
         path="/repositories/add" 
         element={
-          <Layout>
+          <AppLayout>
             <AddRepository />
-          </Layout>
+          </AppLayout>
+        } 
+      />
+      <Route 
+        path="/repositories/select-project" 
+        element={
+          <AppLayout>
+            <RepositoryProjectsManager />
+          </AppLayout>
         } 
       />
       <Route 
         path="/repositories/:repoIdOrSlug" 
         element={
-          <Layout>
+          <AppLayout>
             <EditRepository />
-          </Layout>
+          </AppLayout>
         } 
       />
       
@@ -105,19 +95,22 @@ const AppRouter: React.FC = () => {
       <Route 
         path="/render" 
         element={
-          <Layout>
-            <NotFound />
-          </Layout>
+          <AppLayout>
+            <Outlet />
+          </AppLayout>
         } 
-      />
+      >
+        <Route index element={<NotFound />} />
+        <Route path="queue" element={<NotFound />} />
+      </Route>
       
       {/* Settings routes */}
       <Route 
         path="/settings" 
         element={
-          <Layout>
+          <AppLayout>
             <Settings />
-          </Layout>
+          </AppLayout>
         } 
       />
       
@@ -125,9 +118,9 @@ const AppRouter: React.FC = () => {
       <Route 
         path="*" 
         element={
-          <Layout>
+          <AppLayout>
             <NotFound />
-          </Layout>
+          </AppLayout>
         } 
       />
     </Routes>

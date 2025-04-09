@@ -1,26 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { useApi } from '../hooks/useApi';
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  last_modified: string;
-  slug?: string;
-}
-
-interface Repository {
-  id: string;
-  name: string;
-  url?: string;
-  local_path?: string;
-  branch?: string;
-  last_updated: string;
-}
+import { Project, Repository, ProjectRepository } from '../types';
+import { FaPlus, FaSync, FaTrash, FaEdit, FaGithub, FaFileExport, FaChartLine, FaCodeBranch } from 'react-icons/fa';
 
 const Container = styled.div`
   padding: 1.5rem;
@@ -284,10 +269,17 @@ const ProjectDetail = () => {
     }
   };
   
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
+    
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
   
   if (projectState.loading) {

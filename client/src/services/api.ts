@@ -1,19 +1,13 @@
 /**
- * Service API pour communiquer avec le backend
+ * API Service for communication with the backend
  */
 
 import axios from 'axios';
+import { ApiResponse } from '../types';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
-// Type pour les réponses API
-export interface ApiResponse<T = any> {
-  data?: T;
-  loading: boolean;
-  error?: string;
-}
-
-// Création d'une instance axios avec la configuration de base
+// Creation of an axios instance with basic configuration
 const axiosInstance = axios.create({
   baseURL: API_URL,
   headers: {
@@ -21,25 +15,25 @@ const axiosInstance = axios.create({
   },
 });
 
-// Interceptor pour traiter les erreurs
+// Interceptor to handle errors
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    const errorMessage = error.response?.data?.error || 'Une erreur est survenue';
+    const errorMessage = error.response?.data?.error || 'An error occurred';
     console.error('API Error:', errorMessage);
     return Promise.reject(errorMessage);
   }
 );
 
-// Fonction helper pour normaliser les ID/slugs
-// Si l'ID ressemble à un UUID, on le renvoie tel quel
-// Sinon on considère que c'est un slug et on le transmet tel quel
-// Le backend devra être adapté pour rechercher par ID ou par slug
+// Helper function to normalize IDs/slugs
+// If the ID looks like a UUID, return it as is
+// Otherwise consider it a slug and pass it as is
+// The backend must be adapted to search by ID or slug
 const normalizeIdOrSlug = (idOrSlug: string): string => {
   return idOrSlug;
 };
 
-// Service API pour les projets
+// API Service for projects
 export const projectsApi = {
   getAll: () => axiosInstance.get('/api/projects'),
   getById: (idOrSlug: string) => axiosInstance.get(`/api/projects/${normalizeIdOrSlug(idOrSlug)}`),
@@ -48,7 +42,7 @@ export const projectsApi = {
   delete: (idOrSlug: string) => axiosInstance.delete(`/api/projects/${normalizeIdOrSlug(idOrSlug)}`),
 };
 
-// Service API pour les dépôts
+// API Service for repositories
 export const repositoriesApi = {
   getAll: (projectId?: string) => {
     const url = projectId 
@@ -88,10 +82,7 @@ interface RenderOptions {
   quality: 'low' | 'medium' | 'high';
 }
 
-// Service API pour les fonctionnalités Gource (vide après suppression des fonctionnalités)
-export const gourceApi = {};
-
-// Service API pour les réglages
+// API Service for settings
 export const settingsApi = {
   checkGithubToken: () => axiosInstance.get('/api/settings/github/token'),
   saveGithubToken: (token: string) => axiosInstance.post('/api/settings/github/token', { token }),
@@ -99,17 +90,16 @@ export const settingsApi = {
   removeGithubToken: () => axiosInstance.delete('/api/settings/github/token')
 };
 
-// Méthodes HTTP génériques pour être compatibles avec l'ancien code
+// Generic HTTP methods for compatibility with older code
 const api = {
   get: (url: string, params?: any) => axiosInstance.get(`/api${url}`, { params }),
   post: (url: string, data?: any) => axiosInstance.post(`/api${url}`, data),
   put: (url: string, data?: any) => axiosInstance.put(`/api${url}`, data),
   delete: (url: string) => axiosInstance.delete(`/api${url}`),
   
-  // APIs spécifiques
+  // Specific APIs
   projects: projectsApi,
   repositories: repositoriesApi,
-  gource: gourceApi,
   settings: settingsApi
 };
 

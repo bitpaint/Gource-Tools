@@ -1,88 +1,68 @@
-# Roadmap du Projet Gource-Tools
+# GOURCE-TOOLS - ROADMAP
 
-Cette roadmap détaille les étapes de développement du projet Gource-Tools.
+Cette feuille de route présente les fonctionnalités actuellement implémentées et celles prévues pour les prochaines versions.
 
-## Phase 1: Fondation (Configuration Initiale)
+## 🚀 Fonctionnalités implémentées
 
-### Semaine 1-2: Mise en place de l'environnement
-- [x] Créer le README et la roadmap initiale
-- [x] Initialiser la structure du projet (client/server)
-- [x] Mettre en place l'environnement de développement React/TypeScript
-- [x] Configurer le serveur Node.js/Express
-- [x] Établir la base de données SQLite
-- [x] Configurer les outils de build et de développement
+### Phase 1: Infrastructure de base
+- ✅ Configuration du projet React/TypeScript avec styled-components
+- ✅ Mise en place du serveur Express.js
+- ✅ Configuration de la base de données SQLite
+- ✅ Structure de base de l'interface utilisateur (Layout, Navigation)
+- ✅ Système de notification
 
-### Semaine 3-4: Fonctionnalités de base
-- [x] Développer la navigation principale et le layout de l'application
-- [x] Créer les modèles de données fondamentaux (Projet, Dépôt, Configuration)
-- [x] Implémenter l'API REST de base
-- [x] Développer le dashboard principal
-- [x] Mettre en place l'intégration Git basique
+### Phase 2: Gestion des dépôts
+- ✅ Ajout et téléchargement de dépôts Git (clone)
+- ✅ Liste et recherche de dépôts
+- ✅ Synchronisation des dépôts (pull)
+- ✅ Édition des informations des dépôts
+- ✅ Suppression de dépôts
+- ✅ Importation en masse de dépôts
 
-## Phase 2: Fonctionnalités Gource et Gestion des Dépôts
+### Phase 3: Gestion des projets
+- ✅ Création de projets
+- ✅ Gestion des projets (liste, édition, suppression)
+- ✅ Association de dépôts à des projets
+- ✅ Vue détaillée des projets
 
-### Semaine 5-6: Gestion des dépôts
-- [x] Développer la fonctionnalité d'import de dépôts locaux
-- [x] Implémenter le clonage de dépôts distants (GitHub, GitLab)
-- [x] Créer l'interface de gestion des dépôts
-- [x] Ajouter la fonctionnalité de filtrage et d'organisation des projets
+### Phase 4: Architecture et refactoring
+- ✅ Centralisation des interfaces TypeScript
+- ✅ Suppression des composants redondants
+- ✅ Harmonisation des noms de composants
+- ✅ Traduction des commentaires en anglais
+- ✅ Suppression des fonctionnalités non implémentées de l'UI
 
-### Semaine 7-8: Intégration Gource
-- [x] Développer l'intégration avec Gource (génération de logs)
-- [x] Créer l'interface de configuration des paramètres Gource
-- [ ] Ajouter la fonctionnalité de filtrage et d'organisation des profiles - crer un profile par défaut qui existe déja et qui est modifiable. Et un manager de profiles gource.
-- [ ] Implémenter la gestion des avatars (GitHub, Gravatar)
+## 📅 Prochaines étapes
 
+### Phase 5: Fonctionnalités Gource
+- ⬜ Interface de création de rendu Gource
+- ⬜ Configuration avancée des rendus
+- ⬜ File d'attente de rendu
+- ⬜ Visualisation des rendus terminés
 
+### Phase 6: Profils d'utilisateurs
+- ⬜ Création et gestion de profils d'avatars
+- ⬜ Mappage des utilisateurs aux avatars
+- ⬜ Personnalisation des avatars
 
-## Phase 3: Système de Rendu et Prévisualisation
+### Phase 7: Optimisations et améliorations
+- ⬜ Finalisation du mode sombre
+- ⬜ Système de configuration globale
+- ⬜ Localisation (i18n) - Support multilingue
+- ⬜ Optimisation des performances
 
+### Phase 8: Distribution et déploiement
+- ⬜ Packaging en application Electron
+- ⬜ Configuration auto-update
+- ⬜ Documentation complète
 
+## 🐛 Corrections de bugs et améliorations techniques
+- ⬜ Vérifier toutes les interfaces et types
+- ⬜ Standardiser les conventions de nommage
+- ⬜ Améliorer la gestion des erreurs
+- ⬜ Ajouter des tests unitaires et d'intégration
 
-### Semaine 9-10: Export et Rendu
-- [ ] Intégrer FFmpeg pour l'export vidéo
-- [ ] Développer la file d'attente des rendus
-- [ ] Implémenter les différentes options d'export (MP4, WebM, GIF)
-- [ ] Créer l'interface de personnalisation des rendus
+## 📝 Notes de développement
+Cette roadmap est sujette à modifications en fonction des priorités et des retours d'utilisation.
 
-### Semaine 11-12: Prévisualisation
-- [ ] Intégrer un système de prévisualisation WebGL
-- [ ] Développer l'affichage en temps réel des modifications
-- [ ] Créer l'interface de prévisualisation interactive
-- [ ] Optimiser pour différentes tailles de dépôts
-
-## Phase 4: UI/UX Avancée et Intégrations
-
-### Semaine 13-14: UI/UX avancée
-- [ ] Affiner l'interface utilisateur (thèmes, responsive)
-- [ ] Développer des composants interactifs avancés
-- [ ] Améliorer l'expérience utilisateur (tutoriels, aide contextuelle)
-- [ ] Implémenter des animations et transitions
-
-### Semaine 15-16: Intégrations sociales
-- [ ] Développer l'intégration avec YouTube pour l'upload
-- [ ] Ajouter le partage sur Twitter, TikTok, Instagram
-- [ ] Implémenter des fonctionnalités d'édition légère
-- [ ] Créer l'interface de partage
-
-## Phase 5: Packaging et Déploiement
-
-### Semaine 17-18: Électronification
-- [ ] Configurer Electron pour l'application desktop
-- [ ] Adapter l'UI/UX pour desktop
-- [ ] Gérer les permissions et l'accès aux fichiers système
-- [ ] Ajouter les mises à jour automatiques
-
-### Semaine 19-20: Finalisation
-- [ ] Conteneuriser avec Docker
-- [ ] Créer la documentation utilisateur complète
-- [ ] Procéder aux tests complets
-- [ ] Préparer la release 1.0
-
-## Suivi des Progrès
-
-### Progression actuelle
-- Phase: 2
-- Tâches complétées: 13/28
-- État: Correction du problème de structure de base de données pour la récupération des dépôts GitHub
-- Prochaine étape: Implémentation de le telechargement des avatars.
+Dernière mise à jour: 08/04/2024

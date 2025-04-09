@@ -47,7 +47,7 @@ export const getProjectById = async (req: Request, res: Response) => {
       // Recherche par ID
       db.get('SELECT * FROM projects WHERE id = ?', [id], (err, row) => {
         if (err) {
-          console.error('Erreur lors de la récupération du projet par ID:', err.message);
+          console.error('Erreur lors de la récupération du projet:', err.message);
           return res.status(500).json({ error: 'Erreur lors de la récupération du projet' });
         }
         
@@ -61,7 +61,12 @@ export const getProjectById = async (req: Request, res: Response) => {
       // Recherche par slug (considérant le slug comme le nom formaté)
       // Note: Cette approche est simple mais peut poser des problèmes si deux projets ont le même slug
       // Une meilleure solution serait d'ajouter un champ slug dans la table projets
-      db.get('SELECT * FROM projects WHERE LOWER(REPLACE(REPLACE(REPLACE(name, " ", "-"), ".", ""), "_", "-")) = LOWER(?)', [id], (err, row) => {
+      const query = "SELECT * FROM projects WHERE LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '.', ''), '_', '-')) = LOWER(?)";
+      
+      console.log('Recherche par slug, requête:', query);
+      console.log('Paramètres:', [id]);
+      
+      db.get(query, [id], (err, row) => {
         if (err) {
           console.error('Erreur lors de la récupération du projet par slug:', err.message);
           return res.status(500).json({ error: 'Erreur lors de la récupération du projet' });

@@ -1,88 +1,85 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ApiResponse } from '../services/api';
+import { ApiResponse } from '../types';
 
 /**
- * Hook personnalisé pour gérer les appels API avec gestion d'état
+ * Custom hook for managing API calls with state handling
+ * @param apiFunc - Function that makes the API call
+ * @param immediate - Whether to call the API immediately
+ * @returns [state, fetchData, setData] - Current state, fetch function, and setter
  */
-export function useApi<T>(
-  apiFunction: () => Promise<any>,
-  immediate: boolean = true,
-  dependencies: any[] = []
-): [ApiResponse<T>, () => Promise<any>, boolean] {
+export const useApi = <T>(
+  apiFunc: () => Promise<{ data: T }>,
+  immediate = false
+): [
+  ApiResponse<T>,
+  () => Promise<T | undefined>,
+  (data: T) => void
+] => {
   const [state, setState] = useState<ApiResponse<T>>({
     data: undefined,
-    loading: immediate,
-    error: undefined,
+    loading: false,
+    error: undefined
   });
   
-  // Utiliser useRef pour conserver une référence stable à la fonction API
-  // et pour suivre si le hook est monté
-  const apiFunctionRef = useRef(apiFunction);
   const isMountedRef = useRef(true);
-  const hasInitialFetchOccurredRef = useRef(false);
   
-  // Mettre à jour la référence uniquement si la fonction change
+  // Clean up mounted ref on unmount
   useEffect(() => {
-    apiFunctionRef.current = apiFunction;
-  }, [apiFunction]);
-  
-  // Nettoyer la référence de montage lorsque le composant est démonté
-  useEffect(() => {
-    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
   }, []);
-
-  const execute = useCallback(async (): Promise<any> => {
+  
+  // Create a stable fetch function
+  const fetchData = useCallback(async () => {
     try {
       if (isMountedRef.current) {
-        setState(prevState => ({ ...prevState, loading: true, error: undefined }));
+        setState((prevState: ApiResponse<T>) => ({ ...prevState, loading: true, error: undefined }));
       }
       
-      // Utiliser la référence stable à la fonction API
-      console.log('Exécution d\'un appel API');
-      const response = await apiFunctionRef.current();
+      // Use the stable reference to the API function
+      const result = await apiFunc();
       
       if (isMountedRef.current) {
-        setState({ data: response.data, loading: false, error: undefined });
-        console.log('Appel API réussi:', response.data);
+        setState({
+          data: result.data,
+          loading: false,
+          error: undefined
+        });
       }
       
-      return response;
+      return result.data;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-      
       if (isMountedRef.current) {
-        setState({ data: undefined, loading: false, error: errorMessage });
-        console.error('Erreur dans l\'appel API:', errorMessage);
+        setState({
+          data: undefined,
+          loading: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
-      
-      throw error;
+      return undefined;
+    }
+  }, [apiFunc]);
+  
+  // Create a setter function to update data manually
+  const setData = useCallback((data: T) => {
+    if (isMountedRef.current) {
+      setState({
+        data,
+        loading: false,
+        error: undefined
+      });
     }
   }, []);
-
+  
+  // Call the API immediately if requested
   useEffect(() => {
-    // Exécuter l'appel API uniquement si:
-    // 1. Le chargement immédiat est demandé
-    // 2. Ce n'est pas le premier rendu ou les dépendances ont changé
-    // 3. Le composant est monté
-    if (immediate && isMountedRef.current) {
-      // Si c'est le premier chargement ou si les dépendances ont changé
-      if (!hasInitialFetchOccurredRef.current || dependencies.length > 0) {
-        console.log('Exécution automatique de l\'appel API');
-        execute().catch(error => {
-          console.error('Erreur dans le hook useApi:', error);
-        });
-        
-        // Marquer que le premier fetch a eu lieu
-        hasInitialFetchOccurredRef.current = true;
-      }
+    if (immediate) {
+      fetchData();
     }
-  }, [execute, immediate, ...dependencies]);
-
-  // Retourner l'état, la fonction d'exécution, et un drapeau indiquant si c'est le premier chargement
-  return [state, execute, hasInitialFetchOccurredRef.current];
-}
+  }, [immediate, fetchData]);
+  
+  return [state, fetchData, setData];
+};
 
 export default useApi; 

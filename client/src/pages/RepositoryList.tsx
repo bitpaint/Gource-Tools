@@ -5,20 +5,9 @@ import { FaGithub, FaPlus, FaSync, FaTrash, FaEdit, FaCopy, FaCalendarAlt, FaFol
 import api from '../services/api';
 import { useNotification } from '../components/ui/NotificationContext';
 import { useGitHubToken } from '../components/ui/GitHubTokenContext';
+import { Repository } from '../types';
 
-interface Repository {
-  id: string;
-  name: string;
-  username: string | null;
-  url: string | null;
-  local_path: string | null;
-  branch_default: string;
-  tags: string | null;
-  last_updated: string;
-  slug?: string;
-}
-
-// Type pour les dépôts groupés par nom d'utilisateur
+// Remove the local interface declarations
 interface GroupedRepositories {
   [username: string]: Repository[];
 }
@@ -677,7 +666,9 @@ const BatchActionButton = styled.button`
 `;
 
 // Modification de la fonction pour afficher les dates au format "1d ago", "2w ago", etc.
-const getRelativeTimeString = (date: string) => {
+const getRelativeTimeString = (date: string | undefined) => {
+  if (!date) return 'Unknown';
+  
   const now = new Date();
   const then = new Date(date);
   const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
@@ -723,8 +714,19 @@ const RepositoryList: React.FC = () => {
     }
 
     try {
+      // On récupère aussi les noms des dépôts pour les afficher
+      const repoNames = reposToAdd.map(id => {
+        const repo = repositories.find(r => r.id === id);
+        return repo ? repo.name : '';
+      }).filter(Boolean);
+      
       // Naviguer vers la page de sélection de projet avec les dépôts sélectionnés
-      navigate('/projects', { state: { repositories: reposToAdd } });
+      navigate('/repositories/select-project', { 
+        state: { 
+          repositories: reposToAdd,
+          repositoryNames: repoNames 
+        }
+      });
     } catch (error) {
       console.error('Error navigating to project selection:', error);
       addNotification({

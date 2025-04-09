@@ -1,121 +1,126 @@
-# Gource-Tools Moderne
+# Gource-Tools
 
-Application web moderne pour visualiser l'historique Git à travers Gource.
+![Version](https://img.shields.io/badge/version-0.3.0-blue.svg?cacheSeconds=2592000)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-## 🌟 Vision du Projet
+> A modern UI for creating and customizing Gource visualizations
 
-Transformer les scripts bash originaux de Gource-Tools en une application web intuitive qui permet la gestion, la configuration et le rendu de visualisations Gource pour les dépôts Git.
+## 🚀 Overview
 
-## 🛠️ Technologies
+**Gource-Tools** is a comprehensive application designed to simplify the creation of Gource visualizations for Git repositories. It provides a user-friendly interface to manage repositories, configure visualization parameters, and export high-quality video renderings.
 
-- **Frontend**: React avec TypeScript
-- **Backend**: Node.js/Express
-- **Base de données**: SQLite
-- **Packaging**: Electron pour application desktop
-- **Conteneurisation**: Docker
+![Screenshot](./docs/screenshot.png)
 
-## 📋 Fonctionnalités Principales
+## ✨ Features
 
-- Gestion complète des dépôts Git
-- Génération et personnalisation des visualisations Gource
-- Gestion automatisée des avatars
-- Prévisualisation en temps réel et export en différents formats
-- Interface utilisateur intuitive et responsive
+- **Repository Management**
+  - Clone and manage multiple Git repositories
+  - Group repositories into projects
+  - Sync repositories with remote sources
+  - Organize with tags and search functionality
 
-## 🚀 Structure du Projet
+- **Project Organization**
+  - Create projects with multiple repositories
+  - Configure project-specific visualization settings
+  - Manage repository relationships
 
-```
-gource-tools/
-├── client/                  # Frontend React
-│   ├── src/
-│   │   ├── components/      # Composants réutilisables
-│   │   ├── pages/           # Pages de l'application
-│   │   ├── services/        # Services API
-│   │   ├── hooks/           # Hooks personnalisés
-│   │   ├── styles/          # Styles globaux
-│   │   └── routes/          # Configuration des routes
-├── server/                  # Backend Node.js
-│   ├── src/
-│   │   ├── controllers/     # Contrôleurs API
-│   │   ├── services/        # Services métier
-│   │   ├── models/          # Modèles de données
-│   │   └── api/             # Routes API
-├── data/                    # Stockage des données
-│   ├── repositories/        # Dépôts Git clonés
-│   └── gource/              # Configurations et rendus Gource
-├── electron/                # Configuration Electron
-├── shared/                  # Code partagé
-├── docs/                    # Documentation
-└── scripts/                 # Scripts utilitaires
-```
+- **Modern Architecture**
+  - React + TypeScript frontend with styled-components
+  - Node.js + Express backend
+  - SQLite database for data persistence
+  - Clean separation of concerns
 
-## 📝 Roadmap
+- **Developer-friendly**
+  - Comprehensive documentation
+  - Well-structured codebase
+  - Consistent naming conventions
+  - Centralized type definitions
 
-1. **Phase 1**: ✅ Configuration du projet et fondations
-2. **Phase 2**: 🔄 Fonctionnalités de base Gource et dépôts (En cours)
-3. **Phase 3**: Système de rendu et prévisualisation
-4. **Phase 4**: UI/UX avancée et intégrations
-5. **Phase 5**: Packaging et déploiement
+## 🔧 Installation
 
-## 📜 Règles du Projet (Pour l'Assistant IA)
+### Prerequisites
 
-- Répondre en français, coder en anglais
-- Maintenir la documentation du projet à jour (README, ROADMAP)
-- Structurer le code de manière modulaire et maintenable
-- Fournir des instructions claires pour les prochaines étapes
+- Node.js 16+
+- Git installed on your system
+- Gource installed (for rendering)
 
-## 💻 Installation & Démarrage
-
-### Prérequis
-
-- Node.js v14+
-- Git
-- Gource (pour le rendu des visualisations)
-- FFmpeg (pour l'export des vidéos)
-
-### Installation
+### Setup
 
 ```bash
-# Cloner le dépôt
+# Clone the repository
 git clone https://github.com/yourusername/gource-tools.git
 cd gource-tools
 
-# Installer les dépendances
+# Install dependencies
 npm install
 
-# Installer les dépendances du frontend et du backend
-cd client && npm install
-cd ../server && npm install
-cd ..
-```
-
-### Démarrage en développement
-
-```bash
-# Démarrer le frontend et le backend en parallèle
+# Start development servers
 npm run dev
 ```
 
-### Build de production
+This will start both the frontend and backend servers in development mode.
 
-```bash
-# Construire le frontend et le backend
-npm run build
+## 📦 Project Structure
+
+```
+gource-tools/
+├── client/                # Frontend React application
+│   ├── src/
+│   │   ├── components/    # Reusable UI components
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── pages/         # Application pages/routes
+│   │   ├── routes/        # Routing configuration
+│   │   ├── services/      # API services
+│   │   ├── styles/        # Global styles and themes
+│   │   └── types/         # TypeScript type definitions
+│   └── public/            # Static assets
+├── server/                # Backend Express application
+│   ├── src/
+│   │   ├── controllers/   # API route handlers
+│   │   ├── models/        # Database models
+│   │   ├── routes/        # API routes
+│   │   ├── services/      # Business logic
+│   │   └── utils/         # Helper utilities
+├── shared/                # Shared code between client and server
+│   └── types/             # Shared TypeScript interfaces
+├── scripts/               # Build and utility scripts
+└── docs/                  # Documentation
 ```
 
-## 🤝 Contribution
+## 🧩 Key Components
 
-Ce projet est développé en collaboration avec une assistance IA.
+### Frontend
+- **Repository Management**: Browse, search, and manage Git repositories
+- **Project Management**: Create and configure projects with multiple repositories
+- **Settings**: Configure global application settings
 
-## 📄 Licence
+### Backend
+- **Git Integration**: Clone, pull, and analyze Git repositories
+- **Data Management**: Store and retrieve project and repository data
+- **Gource Integration**: Generate and customize Gource visualizations
 
-MIT 
+## 🔄 Development Workflow
 
-## 📱 Fonctionnalités implémentées
+For the full development roadmap, see [ROADMAP.md](./ROADMAP.md).
 
-- ✅ Création et gestion de projets
-- ✅ Import et clonage de dépôts Git
-- ✅ Configuration des paramètres Gource
-- ✅ Génération de logs Git pour Gource
-- ✅ Interface utilisateur réactive et moderne
-- ✅ API RESTful complète 
+### Current Status
+- Completed repository and project management functionality
+- Refactored architecture for better maintainability
+- Centralized type system
+
+### Next Steps
+- Implement Gource visualization configuration
+- Add user avatar management
+- Create render queue system
+
+## 🤝 Contributing
+
+Contributions, issues and feature requests are welcome!
+
+## 📝 License
+
+This project is [MIT](./LICENSE) licensed.
+
+---
+
+_Made with ❤️ for the Git visualization community_ 

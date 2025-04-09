@@ -164,9 +164,12 @@ export const getRepositoryById = async (req: Request, res: Response) => {
         params.push(id);
       } else {
         // Recherche par slug (nom formaté)
-        query += 'LOWER(REPLACE(REPLACE(REPLACE(name, " ", "-"), ".", ""), "_", "-")) = LOWER(?)';
+        query += "LOWER(REPLACE(REPLACE(REPLACE(name, ' ', '-'), '.', ''), '_', '-')) = LOWER(?)";
         params.push(id);
       }
+      
+      console.log('Recherche par slug, requête:', query);
+      console.log('Paramètres:', params);
       
       db.get(query, params, (err, row) => {
         if (err) {
