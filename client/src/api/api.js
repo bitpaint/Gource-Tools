@@ -9,6 +9,60 @@ const api = axios.create({
   },
 });
 
+// Utilities for date formatting
+export const dateUtils = {
+  /**
+   * Format a date as a relative time (e.g. "5 minutes ago", "3 days ago")
+   * @param {string|Date} dateString - The date to format
+   * @returns {string} The formatted relative date
+   */
+  formatRelativeTime: (dateString) => {
+    if (!dateString) return 'Never';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    
+    // Différence en millisecondes
+    const diffMs = now - date;
+    
+    // Conversion en secondes, minutes, heures, jours
+    const diffSec = Math.round(diffMs / 1000);
+    const diffMin = Math.round(diffSec / 60);
+    const diffHours = Math.round(diffMin / 60);
+    const diffDays = Math.round(diffHours / 24);
+    const diffWeeks = Math.round(diffDays / 7);
+    const diffMonths = Math.round(diffDays / 30);
+    const diffYears = Math.round(diffDays / 365);
+    
+    // Formater en fonction de la différence
+    if (diffSec < 60) {
+      return 'Just now';
+    } else if (diffMin < 60) {
+      return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+    } else if (diffHours < 24) {
+      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    } else if (diffDays < 7) {
+      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    } else if (diffWeeks < 4) {
+      return diffWeeks === 1 ? '1 week ago' : `${diffWeeks} weeks ago`;
+    } else if (diffMonths < 12) {
+      return diffMonths === 1 ? '1 month ago' : `${diffMonths} months ago`;
+    } else {
+      return diffYears === 1 ? '1 year ago' : `${diffYears} years ago`;
+    }
+  },
+  
+  /**
+   * Format a date in localized format
+   * @param {string|Date} dateString - The date to format
+   * @returns {string} The formatted date
+   */
+  formatLocaleDate: (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleString();
+  }
+};
+
 // Repositories API
 export const repositoriesApi = {
   getAll: () => api.get('/repositories'),

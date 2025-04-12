@@ -33,7 +33,8 @@ import {
   Chip,
   Divider,
   Tabs,
-  Tab
+  Tab,
+  Tooltip
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -50,7 +51,7 @@ import {
   CloudSync as CloudSyncIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { repositoriesApi } from '../api/api';
+import { repositoriesApi, dateUtils } from '../api/api';
 
 const RepositoriesPage = () => {
   const [repositories, setRepositories] = useState([]);
@@ -190,7 +191,7 @@ const RepositoriesPage = () => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [cloneId, addingRepo, cloneSteps]);
+  }, [cloneId, addingRepo, cloneSteps, fetchRepositories]);
   
   // Polling for bulk import status
   useEffect(() => {
@@ -327,12 +328,19 @@ const RepositoriesPage = () => {
       repo.updating = true;
       setRepositories([...repositories]);
 
-      await repositoriesApi.update(id);
+      const response = await repositoriesApi.update(id);
       
       // Refresh the entire list to ensure everything is up to date
       await fetchRepositories();
       
-      toast.success('Repository updated successfully');
+      // Check if there were warnings or errors in the log generation
+      if (response.data.logStatus === 'warning') {
+        toast.warning(`Repository updated but with warnings: ${response.data.logMessage}`);
+      } else if (response.data.logStatus === 'error') {
+        toast.warning(`Repository updated but log generation failed: ${response.data.logMessage}`);
+      } else {
+        toast.success('Repository updated successfully');
+      }
     } catch (err) {
       console.error('Error updating repository:', err);
       
@@ -343,7 +351,11 @@ const RepositoriesPage = () => {
         setRepositories(updatedRepos);
       }
       
-      toast.error('Failed to update repository');
+      // Display a more descriptive error message
+      const errorMessage = err.response?.data?.error 
+        ? `Failed to update repository: ${err.response.data.error}`
+        : 'Failed to update repository';
+      toast.error(errorMessage);
     }
   };
 
@@ -407,8 +419,7 @@ const RepositoriesPage = () => {
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+    return dateUtils.formatRelativeTime(dateString);
   };
   
   // Filter repositories based on search query
@@ -544,18 +555,28 @@ const RepositoriesPage = () => {
                           <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {repo.url}
                           </TableCell>
-                          <TableCell>{formatDate(repo.dateAdded)}</TableCell>
-                          <TableCell>{formatDate(repo.lastUpdated)}</TableCell>
+                          <TableCell>
+                            <Tooltip title={dateUtils.formatLocaleDate(repo.dateAdded)}>
+                              <span>{formatDate(repo.dateAdded)}</span>
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell>
+                            <Tooltip title={dateUtils.formatLocaleDate(repo.lastUpdated)}>
+                              <span>{formatDate(repo.lastUpdated)}</span>
+                            </Tooltip>
+                          </TableCell>
                           <TableCell align="right">
                             <IconButton 
-                              color="primary" 
+                              size="small" 
+                              color="primary"
                               onClick={() => handleUpdateRepository(repo.id)}
                               disabled={repo.updating}
                             >
                               {repo.updating ? <CircularProgress size={24} /> : <RefreshIcon />}
                             </IconButton>
                             <IconButton 
-                              color="error" 
+                              size="small" 
+                              color="error"
                               onClick={() => handleOpenDeleteDialog(repo)}
                             >
                               <DeleteIcon />

@@ -20,7 +20,8 @@ import {
   ListItemText,
   Divider,
   LinearProgress,
-  Chip
+  Chip,
+  Tooltip
 } from '@mui/material';
 import { 
   PlayArrow as PlayIcon, 
@@ -29,7 +30,7 @@ import {
   Error as ErrorIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { projectsApi, renderProfilesApi, rendersApi } from '../api/api';
+import { projectsApi, renderProfilesApi, rendersApi, dateUtils } from '../api/api';
 
 const RenderPage = () => {
   const [projects, setProjects] = useState([]);
@@ -148,7 +149,7 @@ const RenderPage = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+    return dateUtils.formatRelativeTime(dateString);
   };
 
   const getStatusChip = (status) => {
@@ -302,13 +303,19 @@ const RenderPage = () => {
                             </Box>
                             <Box sx={{ mb: 0.5 }}>
                               <Typography component="span" variant="body2" color="text.secondary">
-                                Started: {formatDate(render.startTime)}
+                                Started: {' '}
+                                <Tooltip title={dateUtils.formatLocaleDate(render.startTime)}>
+                                  <span>{formatDate(render.startTime)}</span>
+                                </Tooltip>
                               </Typography>
                             </Box>
                             {render.endTime && (
                               <Box sx={{ mb: 0.5 }}>
                                 <Typography component="span" variant="body2" color="text.secondary">
-                                  Finished: {formatDate(render.endTime)}
+                                  Finished: {' '}
+                                  <Tooltip title={dateUtils.formatLocaleDate(render.endTime)}>
+                                    <span>{formatDate(render.endTime)}</span>
+                                  </Tooltip>
                                 </Typography>
                               </Box>
                             )}

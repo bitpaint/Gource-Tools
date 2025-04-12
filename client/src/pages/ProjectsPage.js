@@ -1,14 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Container,
   Typography,
   Button,
   Paper,
   Box,
-  Grid,
-  Card,
-  CardContent,
-  CardActions,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Chip,
   Dialog,
   DialogActions,
@@ -26,7 +28,12 @@ import {
   Checkbox,
   IconButton,
   InputAdornment,
-  Collapse
+  Collapse,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  Tooltip
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -35,7 +42,8 @@ import {
   RotateRight as RefreshIcon, 
   Search as SearchIcon,
   KeyboardArrowDown as ExpandMoreIcon,
-  KeyboardArrowUp as ExpandLessIcon
+  KeyboardArrowUp as ExpandLessIcon,
+  RotateRight
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { projectsApi, repositoriesApi, renderProfilesApi } from '../api/api';
@@ -45,7 +53,9 @@ const ProjectsPage = () => {
   const [repositories, setRepositories] = useState([]);
   const [groupedRepositories, setGroupedRepositories] = useState({});
   const [expandedOwners, setExpandedOwners] = useState({});
+  const [expandedProjects, setExpandedProjects] = useState({});
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [renderProfiles, setRenderProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -56,7 +66,6 @@ const ProjectsPage = () => {
   const [currentProject, setCurrentProject] = useState({
     id: null,
     name: '',
-    description: '',
     repositories: [],
     renderProfileId: ''
   });
@@ -67,7 +76,13 @@ const ProjectsPage = () => {
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deletingProject, setDeletingProject] = useState(false);
 
-  // Initialize expand state for repository groups
+  // Remove repository from project dialog state
+  const [openRemoveRepoDialog, setOpenRemoveRepoDialog] = useState(false);
+  const [repoToRemove, setRepoToRemove] = useState(null);
+  const [projectToModify, setProjectToModify] = useState(null);
+  const [removingRepo, setRemovingRepo] = useState(false);
+
+  // Initialize expand state for repository groups in dialog
   useEffect(() => {
     const initialExpandedState = {};
     Object.keys(groupedRepositories).forEach(owner => {
@@ -76,12 +91,21 @@ const ProjectsPage = () => {
     setExpandedOwners(initialExpandedState);
   }, [groupedRepositories]);
 
+  // Initialize expand state for projects
+  useEffect(() => {
+    const initialExpandedState = {};
+    projects.forEach(project => {
+      initialExpandedState[project.id] = false;
+    });
+    setExpandedProjects(initialExpandedState);
+  }, [projects]);
+
   // Load data on component mount
   useEffect(() => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -115,7 +139,7 @@ const ProjectsPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Project handlers
   const handleOpenProjectDialog = (project = null) => {
@@ -129,7 +153,6 @@ const ProjectsPage = () => {
         setCurrentProject({
           id: project.id,
           name: project.name,
-          description: project.description || '',
           repositories: project.repositories || [],
           renderProfileId: project.renderProfileId || ''
         });
@@ -138,7 +161,6 @@ const ProjectsPage = () => {
         setCurrentProject({
           id: null,
           name: '',
-          description: '',
           repositories: [],
           renderProfileId: ''
         });
@@ -222,6 +244,52 @@ const ProjectsPage = () => {
     }
   };
 
+  // Remove repository from project handlers
+  const handleOpenRemoveRepoDialog = (project, repoId) => {
+    const repo = repositories.find(r => r.id === repoId);
+    if (repo) {
+      setRepoToRemove(repo);
+      setProjectToModify(project);
+      setOpenRemoveRepoDialog(true);
+    }
+  };
+
+  const handleCloseRemoveRepoDialog = () => {
+    setOpenRemoveRepoDialog(false);
+    setRepoToRemove(null);
+    setProjectToModify(null);
+  };
+
+  const handleRemoveRepositoryFromProject = async () => {
+    if (!projectToModify || !repoToRemove) return;
+    
+    try {
+      setRemovingRepo(true);
+      
+      // Create updated project with repository removed
+      const updatedProject = {
+        ...projectToModify,
+        repositories: projectToModify.repositories.filter(id => id !== repoToRemove.id)
+      };
+      
+      // Update project in backend
+      const response = await projectsApi.update(projectToModify.id, updatedProject);
+      
+      // Update projects array in state
+      setProjects(projects.map(project => 
+        project.id === projectToModify.id ? response.data : project
+      ));
+      
+      toast.success(`Repository "${repoToRemove.name}" removed from project "${projectToModify.name}"`);
+      handleCloseRemoveRepoDialog();
+    } catch (err) {
+      console.error('Error removing repository from project:', err);
+      toast.error('Failed to remove repository from project');
+    } finally {
+      setRemovingRepo(false);
+    }
+  };
+
   // Function to handle regenerating Gource logs for a project
   const handleRegenerateGourceLogs = async (projectId) => {
     try {
@@ -260,25 +328,76 @@ const ProjectsPage = () => {
     }
   };
 
-  // Helper functions
+  // Toggle project expand state
+  const toggleProjectExpanded = (projectId) => {
+    setExpandedProjects(prev => ({
+      ...prev,
+      [projectId]: !prev[projectId]
+    }));
+  };
+
   const getRepositoryNames = (repoIds) => {
-    if (!repoIds || repoIds.length === 0) return 'No repositories';
+    if (!repoIds || repoIds.length === 0) {
+      return 'No repositories';
+    }
     
-    return repoIds.map(id => {
-      const repo = repositories.find(r => r.id === id);
-      return repo ? repo.name : 'Unknown';
-    }).join(', ');
+    const repos = repositories.filter(repo => repoIds.includes(repo.id));
+    const repoNames = repos.map(repo => repo.name).join(', ');
+    
+    return repoNames || 'No repositories found';
+  };
+
+  const getRepositoriesForProject = (repoIds) => {
+    if (!repoIds || repoIds.length === 0) {
+      return [];
+    }
+    
+    return repositories.filter(repo => repoIds.includes(repo.id));
   };
 
   const getProfileName = (profileId) => {
-    if (!profileId) return 'None';
+    if (!profileId) {
+      return 'Default';
+    }
+    
     const profile = renderProfiles.find(p => p.id === profileId);
-    return profile ? profile.name : 'Unknown';
+    return profile ? profile.name : 'Default';
   };
 
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+    if (!dateString) return 'Never';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    
+    // Différence en millisecondes
+    const diffMs = now - date;
+    
+    // Conversion en secondes, minutes, heures, jours
+    const diffSec = Math.round(diffMs / 1000);
+    const diffMin = Math.round(diffSec / 60);
+    const diffHours = Math.round(diffMin / 60);
+    const diffDays = Math.round(diffHours / 24);
+    const diffWeeks = Math.round(diffDays / 7);
+    const diffMonths = Math.round(diffDays / 30);
+    const diffYears = Math.round(diffDays / 365);
+    
+    // Formater en fonction de la différence
+    if (diffSec < 60) {
+      return 'Just now';
+    } else if (diffMin < 60) {
+      return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
+    } else if (diffHours < 24) {
+      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    } else if (diffDays < 7) {
+      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    } else if (diffWeeks < 4) {
+      return diffWeeks === 1 ? '1 week ago' : `${diffWeeks} weeks ago`;
+    } else if (diffMonths < 12) {
+      return diffMonths === 1 ? '1 month ago' : `${diffMonths} months ago`;
+    } else {
+      return diffYears === 1 ? '1 year ago' : `${diffYears} years ago`;
+    }
   };
 
   const toggleOwnerExpanded = (owner) => {
@@ -287,10 +406,57 @@ const ProjectsPage = () => {
       [owner]: !prev[owner]
     }));
   };
+
+  // Fonction pour sélectionner/désélectionner tous les dépôts d'un propriétaire
+  const handleToggleAllOwnerRepos = (owner, e) => {
+    e.stopPropagation(); // Empêcher la propagation pour éviter de fermer/ouvrir le groupe
+    
+    const ownerRepos = groupedRepositories[owner] || [];
+    const currentRepos = [...(currentProject.repositories || [])];
+    
+    // Vérifier l'état actuel pour déterminer l'action
+    const allSelected = areAllOwnerReposSelected(owner);
+    
+    // Si tous sont déjà sélectionnés, désélectionner tous
+    // Sinon, sélectionner tous ceux qui ne sont pas encore sélectionnés
+    if (allSelected) {
+      // Supprimer tous les repos de ce propriétaire de la sélection
+      const updatedRepos = currentRepos.filter(repoId => 
+        !ownerRepos.some(repo => String(repo.id) === repoId)
+      );
+      setCurrentProject({...currentProject, repositories: updatedRepos});
+    } else {
+      // Ajouter tous les repos de ce propriétaire à la sélection
+      const repoIdsToAdd = ownerRepos
+        .filter(repo => !currentRepos.includes(String(repo.id)))
+        .map(repo => String(repo.id));
+      
+      setCurrentProject({
+        ...currentProject, 
+        repositories: [...currentRepos, ...repoIdsToAdd]
+      });
+    }
+  };
   
-  // Filtrer les dépôts en fonction de la recherche
+  // Fonction pour vérifier si tous les dépôts d'un propriétaire sont sélectionnés
+  const areAllOwnerReposSelected = (owner) => {
+    const ownerRepos = groupedRepositories[owner] || [];
+    return ownerRepos.every(repo => 
+      (currentProject.repositories || []).includes(String(repo.id))
+    );
+  };
+  
+  // Fonction pour vérifier si certains dépôts d'un propriétaire sont sélectionnés
+  const areSomeOwnerReposSelected = (owner) => {
+    const ownerRepos = groupedRepositories[owner] || [];
+    return ownerRepos.some(repo => 
+      (currentProject.repositories || []).includes(String(repo.id))
+    ) && !areAllOwnerReposSelected(owner);
+  };
+
+  // Filter repositories based on search query (for dialog)
   const filteredRepositories = Object.entries(groupedRepositories).reduce((acc, [owner, repos]) => {
-    if (!repoSearchQuery) {
+    if (repoSearchQuery.trim() === '') {
       acc[owner] = repos;
       return acc;
     }
@@ -307,6 +473,68 @@ const ProjectsPage = () => {
     
     return acc;
   }, {});
+
+  // Filter projects based on search query
+  const filteredProjects = projects.filter(project => 
+    projectSearchQuery.trim() === '' ||
+    project.name.toLowerCase().includes(projectSearchQuery.toLowerCase())
+  );
+
+  // Function to handle updating all projects
+  const handleUpdateAllProjects = async () => {
+    try {
+      setLoading(true);
+      toast.info('Updating all projects...');
+      
+      // Pour chaque projet, mettre à jour tous ses dépôts
+      const promises = [];
+      for (const project of projects) {
+        if (project.repositories && project.repositories.length > 0) {
+          // Pour chaque dépôt dans le projet
+          const repoPromises = project.repositories.map(repoId => 
+            repositoriesApi.update(repoId)
+          );
+          promises.push(...repoPromises);
+        }
+      }
+      
+      await Promise.all(promises);
+      
+      // Actualiser les données
+      await fetchData();
+      
+      toast.success('All projects updated successfully');
+    } catch (err) {
+      console.error('Error updating all projects:', err);
+      toast.error('Failed to update all projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to handle rendering a project
+  const handleRenderProject = async (projectId) => {
+    try {
+      setLoading(true);
+      const project = projects.find(p => p.id === projectId);
+      
+      if (!project || !project.repositories || project.repositories.length === 0) {
+        toast.error('Project has no repositories to render');
+        setLoading(false);
+        return;
+      }
+      
+      toast.info(`Starting render for project "${project.name}"...`);
+      
+      // Navigate to render page with the project
+      window.location.href = `/render?projectId=${projectId}`;
+      
+    } catch (error) {
+      console.error('Error navigating to render page:', error);
+      toast.error('Failed to start render');
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -327,14 +555,39 @@ const ProjectsPage = () => {
         </Typography>
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenProjectDialog()}
-        >
-          Create Project
-        </Button>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <TextField
+          placeholder="Search projects..."
+          size="small"
+          variant="outlined"
+          value={projectSearchQuery}
+          onChange={(e) => setProjectSearchQuery(e.target.value)}
+          sx={{ width: '300px' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Box>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => handleUpdateAllProjects()}
+            sx={{ mr: 1 }}
+          >
+            Update All Projects
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenProjectDialog()}
+          >
+            Create Project
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -343,82 +596,149 @@ const ProjectsPage = () => {
         </Alert>
       )}
 
-      <Grid container spacing={3}>
-        {projects.length === 0 ? (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                No projects found. Create one to get started.
-              </Typography>
-            </Paper>
-          </Grid>
-        ) : (
-          projects.map((project) => (
-            <Grid item xs={12} md={6} lg={4} key={project.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h5" component="div" gutterBottom>
-                    {project.name}
-                  </Typography>
-                  
-                  {project.description && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {project.description}
-                    </Typography>
-                  )}
-                  
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Repositories:
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {getRepositoryNames(project.repositories)}
-                  </Typography>
-                  
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Gource Config File:
-                  </Typography>
-                  <Chip 
-                    label={getProfileName(project.renderProfileId)} 
-                    size="small" 
-                    color={project.renderProfileId ? 'primary' : 'default'}
-                    sx={{ mb: 2 }}
-                  />
-                  
-                  <Typography variant="body2" color="text.secondary">
-                    Last modified: {formatDate(project.lastModified)}
-                  </Typography>
-                </CardContent>
-                <CardActions>
-                  <IconButton
-                    color="primary"
-                    onClick={() => handleEditProject(project.id)}
-                    size="small"
-                    title="Edit Project"
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell />
+              <TableCell>Name</TableCell>
+              <TableCell>Repos</TableCell>
+              <TableCell>Gource Config</TableCell>
+              <TableCell>Last Update</TableCell>
+              <TableCell>Last Render</TableCell>
+              <TableCell>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredProjects.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  No projects found. Create one to get started.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredProjects.map((project) => (
+                <React.Fragment key={project.id}>
+                  <TableRow 
+                    sx={{ 
+                      '& > *': { borderBottom: 'unset' },
+                      cursor: 'pointer' 
+                    }}
+                    onClick={() => toggleProjectExpanded(project.id)}
                   >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    color="secondary"
-                    onClick={() => handleRegenerateGourceLogs(project.id)}
-                    size="small"
-                    title="Regenerate Gource Logs"
-                  >
-                    <RefreshIcon />
-                  </IconButton>
-                  <IconButton
-                    color="error"
-                    onClick={() => handleOpenDeleteDialog(project)}
-                    size="small"
-                    title="Delete Project"
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))
-        )}
-      </Grid>
+                    <TableCell>
+                      <IconButton size="small">
+                        {expandedProjects[project.id] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell component="th" scope="row">
+                      {project.name}
+                    </TableCell>
+                    <TableCell>{project.repositories?.length || 0}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={getProfileName(project.renderProfileId)} 
+                        size="small" 
+                        color={project.renderProfileId ? 'primary' : 'default'}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={project.lastModified ? new Date(project.lastModified).toLocaleString() : 'Never updated'}>
+                        <span>{formatDate(project.lastModified)}</span>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={project.lastRendered ? new Date(project.lastRendered).toLocaleString() : 'Never rendered'}>
+                        <span>{formatDate(project.lastRendered)}</span>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      <IconButton
+                        color="primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditProject(project.id);
+                        }}
+                        size="small"
+                        title="Edit Project"
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton
+                        color="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRegenerateGourceLogs(project.id);
+                        }}
+                        size="small"
+                        title="Update Project"
+                      >
+                        <RefreshIcon />
+                      </IconButton>
+                      <IconButton
+                        color="info"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenderProject(project.id);
+                        }}
+                        size="small"
+                        title="Render Project"
+                      >
+                        <RotateRight />
+                      </IconButton>
+                      <IconButton
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDeleteDialog(project);
+                        }}
+                        size="small"
+                        title="Delete Project"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+                      <Collapse in={expandedProjects[project.id]} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 2 }}>
+                          {getRepositoriesForProject(project.repositories).length === 0 ? (
+                            <Typography variant="body2" color="text.secondary">
+                              No repositories in this project.
+                            </Typography>
+                          ) : (
+                            <List>
+                              {getRepositoriesForProject(project.repositories).map((repo) => (
+                                <ListItem key={repo.id}>
+                                  <ListItemText
+                                    primary={repo.name}
+                                    secondary={repo.description || 'No description'}
+                                  />
+                                  <ListItemSecondaryAction>
+                                    <IconButton 
+                                      edge="end" 
+                                      color="error"
+                                      onClick={() => handleOpenRemoveRepoDialog(project, repo.id)}
+                                      title="Remove repository from project"
+                                    >
+                                      <DeleteIcon />
+                                    </IconButton>
+                                  </ListItemSecondaryAction>
+                                </ListItem>
+                              ))}
+                            </List>
+                          )}
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Project Dialog */}
       <Dialog 
@@ -447,24 +767,10 @@ const ProjectsPage = () => {
             value={currentProject.name}
             onChange={(e) => setCurrentProject({...currentProject, name: e.target.value})}
             required
-            sx={{ mb: 2, mt: 1 }}
+            sx={{ mb: 3, mt: 1 }}
           />
           
-          <TextField
-            margin="dense"
-            id="description"
-            label="Description (optional)"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={currentProject.description}
-            onChange={(e) => setCurrentProject({...currentProject, description: e.target.value})}
-            multiline
-            rows={2}
-            sx={{ mb: 2 }}
-          />
-          
-          <FormControl fullWidth sx={{ mb: 2 }}>
+          <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel id="repositories-label">Repositories</InputLabel>
             <OutlinedInput
               label="Repositories"
@@ -474,72 +780,179 @@ const ProjectsPage = () => {
                   <SearchIcon />
                 </InputAdornment>
               }
+              endAdornment={
+                repoSearchQuery ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={() => setRepoSearchQuery('')}
+                      edge="end"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null
+              }
               placeholder="Search repositories..."
               value={repoSearchQuery}
               onChange={(e) => setRepoSearchQuery(e.target.value)}
               sx={{ mb: 1 }}
             />
             
-            <Paper variant="outlined" sx={{ mt: 1, p: 1, maxHeight: 300, overflow: 'auto' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, mt: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {currentProject.repositories?.length || 0} repositories selected
+              </Typography>
+              {currentProject.repositories?.length > 0 && (
+                <Button 
+                  size="small" 
+                  onClick={() => setCurrentProject({...currentProject, repositories: []})}
+                  color="error"
+                  variant="text"
+                  startIcon={<DeleteIcon fontSize="small" />}
+                >
+                  Clear all
+                </Button>
+              )}
+            </Box>
+            
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 1.5, 
+                maxHeight: 400, 
+                overflow: 'auto',
+                bgcolor: 'background.paper',
+                borderRadius: 1
+              }}
+            >
               {Object.keys(filteredRepositories).length === 0 ? (
-                <Typography variant="body2" sx={{ p: 1, textAlign: 'center' }}>
-                  No repositories match your search
-                </Typography>
+                <Box sx={{ p: 2, textAlign: 'center' }}>
+                  <SearchIcon color="disabled" sx={{ fontSize: 40, mb: 1, opacity: 0.7 }} />
+                  <Typography variant="body2" color="text.secondary">
+                    {repoSearchQuery ? 'No repositories match your search' : 'Start typing to search repositories'}
+                  </Typography>
+                </Box>
               ) : (
-                Object.entries(filteredRepositories).map(([owner, repos]) => (
-                  <Box key={owner} sx={{ mb: 2 }}>
-                    <Box 
-                      sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        pb: 0.5,
-                        cursor: 'pointer' 
-                      }}
-                      onClick={() => toggleOwnerExpanded(owner)}
-                    >
-                      <IconButton size="small">
-                        {expandedOwners[owner] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                      </IconButton>
-                      <Typography variant="subtitle1" sx={{ ml: 1 }}>
-                        {owner} ({repos.length})
+                <>
+                  {Object.entries(filteredRepositories).length > 1 && (
+                    <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 'bold' }}>
+                        {Object.values(filteredRepositories).flat().length} repositories found
                       </Typography>
                     </Box>
-                    
-                    <Collapse in={expandedOwners[owner] || false} timeout="auto">
-                      {repos.map((repo) => (
-                        <Box key={repo.id} sx={{ pl: 4, py: 0.5 }}>
-                          <FormControl>
-                            <Checkbox 
-                              checked={(currentProject.repositories || []).indexOf(String(repo.id)) > -1}
-                              onChange={(e) => {
-                                const currentRepos = [...(currentProject.repositories || [])];
-                                if (e.target.checked) {
-                                  if (currentRepos.indexOf(String(repo.id)) === -1) {
-                                    currentRepos.push(String(repo.id));
-                                  }
-                                } else {
-                                  const index = currentRepos.indexOf(String(repo.id));
-                                  if (index !== -1) {
-                                    currentRepos.splice(index, 1);
-                                  }
+                  )}
+                  {Object.entries(filteredRepositories).map(([owner, repos]) => (
+                    <Box key={owner} sx={{ mb: 3 }}>
+                      <Box 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center',
+                          borderBottom: '1px solid',
+                          borderColor: 'divider',
+                          pb: 0.5,
+                          cursor: 'pointer',
+                          '&:hover': {
+                            bgcolor: 'rgba(0, 0, 0, 0.04)'
+                          }
+                        }}
+                      >
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleOwnerExpanded(owner);
+                          }}
+                        >
+                          {expandedOwners[owner] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                        </IconButton>
+                        <Tooltip title={areAllOwnerReposSelected(owner) ? "Désélectionner tous les dépôts" : "Sélectionner tous les dépôts"}>
+                          <Checkbox
+                            size="small"
+                            onClick={(e) => handleToggleAllOwnerRepos(owner, e)}
+                            checked={areAllOwnerReposSelected(owner)}
+                            indeterminate={areSomeOwnerReposSelected(owner)}
+                            sx={{ ml: 0.5, mr: 0.5 }}
+                          />
+                        </Tooltip>
+                        <Typography 
+                          variant="subtitle1" 
+                          sx={{ flex: 1 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleOwnerExpanded(owner);
+                          }}
+                        >
+                          {owner} ({repos.length})
+                        </Typography>
+                      </Box>
+                      
+                      <Collapse in={expandedOwners[owner] || false} timeout="auto">
+                        {repos.map((repo) => (
+                          <Box 
+                            key={repo.id} 
+                            sx={{ 
+                              pl: 4, 
+                              py: 0.8, 
+                              display: 'flex', 
+                              alignItems: 'center',
+                              '&:hover': {
+                                bgcolor: 'rgba(0, 0, 0, 0.04)'
+                              },
+                              cursor: 'pointer',
+                              borderRadius: 1
+                            }}
+                            onClick={() => {
+                              const currentRepos = [...(currentProject.repositories || [])];
+                              const isSelected = currentRepos.includes(String(repo.id));
+                              
+                              if (isSelected) {
+                                // Désélectionner
+                                const index = currentRepos.indexOf(String(repo.id));
+                                if (index !== -1) {
+                                  currentRepos.splice(index, 1);
                                 }
-                                setCurrentProject({...currentProject, repositories: currentRepos});
-                              }}
-                            />
-                          </FormControl>
-                          <Box sx={{ display: 'inline-block' }}>
-                            <Typography variant="body1">{repo.name}</Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                              {repo.description || 'No description'}
-                            </Typography>
+                              } else {
+                                // Sélectionner
+                                if (!currentRepos.includes(String(repo.id))) {
+                                  currentRepos.push(String(repo.id));
+                                }
+                              }
+                              
+                              setCurrentProject({...currentProject, repositories: currentRepos});
+                            }}
+                          >
+                            <FormControl onClick={(e) => e.stopPropagation()}>
+                              <Checkbox 
+                                checked={(currentProject.repositories || []).indexOf(String(repo.id)) > -1}
+                                onChange={(e) => {
+                                  const currentRepos = [...(currentProject.repositories || [])];
+                                  if (e.target.checked) {
+                                    if (currentRepos.indexOf(String(repo.id)) === -1) {
+                                      currentRepos.push(String(repo.id));
+                                    }
+                                  } else {
+                                    const index = currentRepos.indexOf(String(repo.id));
+                                    if (index !== -1) {
+                                      currentRepos.splice(index, 1);
+                                    }
+                                  }
+                                  setCurrentProject({...currentProject, repositories: currentRepos});
+                                }}
+                              />
+                            </FormControl>
+                            <Box sx={{ display: 'inline-block', ml: 1 }}>
+                              <Typography variant="body1">{repo.name}</Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                {repo.description || 'No description'}
+                              </Typography>
+                            </Box>
                           </Box>
-                        </Box>
-                      ))}
-                    </Collapse>
-                  </Box>
-                ))
+                        ))}
+                      </Collapse>
+                    </Box>
+                  ))}
+                </>
               )}
             </Paper>
           </FormControl>
@@ -597,6 +1010,29 @@ const ProjectsPage = () => {
             startIcon={deletingProject && <CircularProgress size={16} color="inherit" />}
           >
             {deletingProject ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Remove Repository from Project Dialog */}
+      <Dialog open={openRemoveRepoDialog} onClose={handleCloseRemoveRepoDialog}>
+        <DialogTitle>Remove Repository from Project</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to remove the repository "{repoToRemove?.name}" from project "{projectToModify?.name}"?
+            This will not delete the repository itself.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseRemoveRepoDialog} disabled={removingRepo}>Cancel</Button>
+          <Button 
+            onClick={handleRemoveRepositoryFromProject} 
+            color="error" 
+            variant="contained" 
+            disabled={removingRepo}
+            startIcon={removingRepo && <CircularProgress size={16} color="inherit" />}
+          >
+            {removingRepo ? 'Removing...' : 'Remove'}
           </Button>
         </DialogActions>
       </Dialog>

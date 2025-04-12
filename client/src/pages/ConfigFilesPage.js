@@ -31,7 +31,8 @@ import {
   Slider,
   Tabs,
   Tab,
-  Chip
+  Chip,
+  Tooltip
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -40,7 +41,7 @@ import {
   ExpandMore as ExpandMoreIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { renderProfilesApi } from '../api/api';
+import { renderProfilesApi, dateUtils } from '../api/api';
 
 // Config file tabs
 function TabPanel(props) {
@@ -256,7 +257,7 @@ const ConfigFilesPage = () => {
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+    return dateUtils.formatRelativeTime(dateString);
   };
 
   if (loading) {
@@ -361,7 +362,10 @@ const ConfigFilesPage = () => {
                   </Accordion>
                   
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Last modified: {formatDate(profile.lastModified)}
+                    Last modified: {' '}
+                    <Tooltip title={dateUtils.formatLocaleDate(profile.lastModified)}>
+                      <span>{formatDate(profile.lastModified)}</span>
+                    </Tooltip>
                   </Typography>
                 </CardContent>
                 <CardActions>

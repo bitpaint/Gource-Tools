@@ -670,9 +670,49 @@ router.put('/:id/update', async (req, res) => {
       return res.status(404).json({ error: 'Repository not found' });
     }
 
+    // Vérifier que le répertoire existe
+    if (!fs.existsSync(repo.path)) {
+      console.error(`Repository directory does not exist: ${repo.path}`);
+      
+      // Mettre à jour la base de données pour marquer que le dépôt a été vérifié
+      db.get('repositories')
+        .find({ id: req.params.id })
+        .assign({ 
+          lastUpdated: new Date().toISOString(),
+          status: 'error',
+          statusMessage: 'Repository directory does not exist on disk'
+        })
+        .write();
+        
+      return res.status(400).json({ 
+        error: 'Repository directory does not exist on disk', 
+        repository: repo 
+      });
+    }
+
     // Pull latest changes
-    const git = simpleGit(repo.path);
-    await git.pull();
+    try {
+      const git = simpleGit(repo.path);
+      await git.pull();
+    } catch (gitError) {
+      console.error(`Error pulling latest changes for repository ${repo.name}:`, gitError.message);
+      
+      // Mettre à jour la base de données pour marquer que le dépôt a été vérifié
+      db.get('repositories')
+        .find({ id: req.params.id })
+        .assign({ 
+          lastUpdated: new Date().toISOString(),
+          status: 'error',
+          statusMessage: `Git error: ${gitError.message}`
+        })
+        .write();
+        
+      return res.status(500).json({ 
+        error: 'Failed to pull latest changes', 
+        details: gitError.message,
+        repository: repo 
+      });
+    }
 
     // Regénérer le log Gource
     const logsDir = path.join(__dirname, '../../logs');
@@ -681,6 +721,8 @@ router.put('/:id/update', async (req, res) => {
     }
     
     const logFilePath = path.join(logsDir, `${repo.id}.log`);
+    let logGenerationStatus = 'success';
+    let logGenerationMessage = '';
 
     try {
       console.log(`Regenerating Gource log for updated repository: ${repo.name}`);
@@ -737,11 +779,17 @@ router.put('/:id/update', async (req, res) => {
       
       if (validLines > 0) {
         console.log(`Gource log regenerated and saved to ${logFilePath} (${validLines} valid lines)`);
+        logGenerationStatus = 'success';
+        logGenerationMessage = `Generated ${validLines} valid lines`;
       } else {
         console.error(`Warning: Generated log file for ${repo.name} contains no valid entries. This might cause rendering issues.`);
+        logGenerationStatus = 'warning';
+        logGenerationMessage = 'Log file contains no valid entries';
       }
     } catch (logError) {
       console.error(`Warning: Could not regenerate Gource log for repository ${repo.name}:`, logError.message);
+      logGenerationStatus = 'error';
+      logGenerationMessage = logError.message;
       // Continue without generating log
     }
 
@@ -750,11 +798,23 @@ router.put('/:id/update', async (req, res) => {
       .find({ id: req.params.id })
       .assign({ 
         lastUpdated: new Date().toISOString(),
-        logPath: logFilePath
+        logPath: logFilePath,
+        status: logGenerationStatus,
+        statusMessage: logGenerationMessage
       })
       .write();
 
-    res.json({ message: 'Repository updated successfully', repository: repo });
+    // Récupérer le dépôt mis à jour
+    const updatedRepo = db.get('repositories')
+      .find({ id: req.params.id })
+      .value();
+
+    res.json({ 
+      message: 'Repository updated successfully', 
+      repository: updatedRepo,
+      logStatus: logGenerationStatus,
+      logMessage: logGenerationMessage
+    });
   } catch (error) {
     console.error('Error updating repository:', error);
     res.status(500).json({ error: 'Failed to update repository', details: error.message });
