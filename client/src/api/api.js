@@ -9,6 +9,29 @@ const api = axios.create({
   },
 });
 
+// Intercepteur pour masquer les tokens d'API dans les logs
+api.interceptors.request.use(request => {
+  // Créer une copie pour les logs qui masque les tokens
+  const sanitizedRequest = { ...request };
+  
+  // Si l'URL contient un token GitHub (pour les clones)
+  if (sanitizedRequest.url && typeof sanitizedRequest.url === 'string') {
+    // Masquer le token dans l'URL pour les logs
+    sanitizedRequest.url = sanitizedRequest.url.replace(
+      /(https?:\/\/)[^:@]+:[^@]+@/gi, 
+      '$1[CREDENTIALS_HIDDEN]@'
+    );
+    
+    // Journaliser la demande nettoyée au lieu de l'originale
+    console.log('Making request to:', sanitizedRequest.url);
+  }
+  
+  // Remarque: on retourne la requête originale, pas la version nettoyée
+  return request;
+}, error => {
+  return Promise.reject(error);
+});
+
 // Utilities for date formatting
 export const dateUtils = {
   /**

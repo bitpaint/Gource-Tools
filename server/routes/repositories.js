@@ -662,11 +662,31 @@ router.post('/', async (req, res) => {
 // Update a repository (pull latest changes)
 router.put('/:id/update', async (req, res) => {
   try {
-    const repo = db.get('repositories')
+    console.log(`Updating repository with ID: ${req.params.id}`);
+    
+    // Vérifier à la fois dans la base de données normale et fraîche
+    let repo = db.get('repositories')
       .find({ id: req.params.id })
       .value();
+      
+    if (!repo) {
+      console.log(`Repository not found in main DB, checking freshDb for ID: ${req.params.id}`);
+      const freshDb = reloadDatabase();
+      repo = freshDb.get('repositories')
+        .find({ id: req.params.id })
+        .value();
+        
+      if (repo) {
+        console.log(`Repository found in freshDb, adding to main DB: ${repo.name}`);
+        // Synchroniser les bases de données
+        db.get('repositories')
+          .push(repo)
+          .write();
+      }
+    }
 
     if (!repo) {
+      console.error(`Repository not found in any database with ID: ${req.params.id}`);
       return res.status(404).json({ error: 'Repository not found' });
     }
 
@@ -690,21 +710,25 @@ router.put('/:id/update', async (req, res) => {
       });
     }
 
+    // Déclarer les variables en dehors du bloc try/catch
+    let oldHead = '';
+    let newHead = '';
+    let newCommitsCount = 0;
+
     // Pull latest changes
     try {
       const git = simpleGit(repo.path);
       
       // Get current commit hash before pull
-      const oldHead = await git.revparse(['HEAD']);
+      oldHead = await git.revparse(['HEAD']);
       
       // Pull latest changes
       await git.pull();
       
       // Get new commit hash after pull
-      const newHead = await git.revparse(['HEAD']);
+      newHead = await git.revparse(['HEAD']);
       
       // Get number of commits between old and new head
-      let newCommitsCount = 0;
       if (oldHead !== newHead) {
         const logResult = await git.log({ from: oldHead, to: newHead });
         newCommitsCount = logResult.total;
@@ -816,7 +840,7 @@ router.put('/:id/update', async (req, res) => {
         logPath: logFilePath,
         status: logGenerationStatus,
         statusMessage: logGenerationMessage,
-        lastCommitHash: newHead,
+        lastCommitHash: newHead || repo.lastCommitHash || '',
         newCommitsCount: newCommitsCount
       })
       .write();
@@ -879,37 +903,73 @@ router.delete('/:id', (req, res) => {
 // Bulk import repositories from GitHub organization or user
 router.post('/bulk-import', async (req, res) => {
   try {
-    const { githubUrl } = req.body;
+    const { githubUrl, projectCreationMode, projectNameTemplate } = req.body;
     
     // Validate input
     if (!githubUrl) {
-      return res.status(400).json({ error: 'GitHub URL is required' });
+      return res.status(400).json({ error: 'GitHub URL or username is required' });
+    }
+    
+    // Validate project creation mode
+    const validModes = ['none', 'single', 'per_owner'];
+    const mode = projectCreationMode || 'none';
+    if (!validModes.includes(mode)) {
+      return res.status(400).json({ 
+        error: 'Invalid project creation mode', 
+        details: 'Valid modes are: none, single, per_owner' 
+      });
     }
     
     // Reload database
     const freshDb = reloadDatabase();
     
-    // Parse the GitHub URL
-    let ownerName = '';
-    try {
-      // Support both formats: 'https://github.com/bitcoin/' or '@https://github.com/bitcoin/'
-      const cleanUrl = githubUrl.startsWith('@') ? githubUrl.substring(1) : githubUrl;
-      const urlObj = new URL(cleanUrl);
-      
-      if (!urlObj.hostname.includes('github.com')) {
-        return res.status(400).json({ error: 'Only GitHub URLs are supported for bulk import' });
+    // Process the input to extract owner names
+    // Support multiple formats: 
+    // - Full URLs: 'https://github.com/username/' 
+    // - Simple usernames: 'username'
+    // - Multiple usernames: 'user1, user2' or 'user1 user2'
+    const ownersInput = githubUrl.trim();
+    let ownerNames = [];
+    
+    // Check if input contains commas or spaces (multiple owners)
+    if (ownersInput.includes(',') || /\s/.test(ownersInput)) {
+      // Split by commas and/or spaces
+      ownerNames = ownersInput.split(/[\s,]+/).filter(name => name.length > 0);
+    } else {
+      // Single owner (URL or username)
+      try {
+        // Check if it's a URL
+        if (ownersInput.includes('github.com') || ownersInput.includes('http')) {
+          // Support both formats: 'https://github.com/username/' or '@https://github.com/username/'
+          const cleanUrl = ownersInput.startsWith('@') ? ownersInput.substring(1) : ownersInput;
+          const urlObj = new URL(cleanUrl);
+          
+          if (!urlObj.hostname.includes('github.com')) {
+            return res.status(400).json({ error: 'Only GitHub URLs are supported for bulk import' });
+          }
+          
+          const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
+          if (pathParts.length === 0) {
+            return res.status(400).json({ error: 'Invalid GitHub URL: no username or organization found' });
+          }
+          
+          ownerNames.push(pathParts[0]);
+        } else {
+          // It's a simple username
+          ownerNames.push(ownersInput);
+        }
+      } catch (error) {
+        // If URL parsing fails, treat as a username
+        ownerNames.push(ownersInput);
       }
-      
-      const pathParts = urlObj.pathname.split('/').filter(part => part.length > 0);
-      if (pathParts.length === 0) {
-        return res.status(400).json({ error: 'Invalid GitHub URL: no username or organization found' });
-      }
-      
-      ownerName = pathParts[0];
-    } catch (error) {
-      console.error('Error parsing GitHub URL:', error);
-      return res.status(400).json({ error: 'Invalid GitHub URL', details: error.message });
     }
+    
+    // Validate that we have at least one owner
+    if (ownerNames.length === 0) {
+      return res.status(400).json({ error: 'No valid GitHub usernames or organizations found' });
+    }
+    
+    console.log(`[BULK IMPORT] Processing ${ownerNames.length} GitHub users/orgs:`, ownerNames);
     
     // Generate a unique bulk import ID
     const bulkImportId = 'bulk_' + Date.now().toString();
@@ -921,11 +981,14 @@ router.post('/bulk-import', async (req, res) => {
       step: 0,
       error: null,
       timeStarted: new Date().toISOString(),
-      owner: ownerName,
+      owners: ownerNames,
       repositories: [],
       completedRepos: 0,
       totalRepos: 0,
-      failedRepos: 0
+      failedRepos: 0,
+      projectCreationMode: mode,
+      projectNameTemplate: projectNameTemplate || `GitHub Import ${new Date().toLocaleDateString()}`,
+      createdProjects: []
     };
     
     cloneStatuses.set(bulkImportId, initialStatus);
@@ -933,18 +996,18 @@ router.post('/bulk-import', async (req, res) => {
     // Respond immediately to the client with bulk import ID
     res.status(202).json({ 
       bulkImportId, 
-      message: `Starting bulk import for GitHub ${ownerName}`
+      message: `Starting bulk import for GitHub users/orgs: ${ownerNames.join(', ')}`
     });
     
     // Continue the bulk import process in background
     (async () => {
       try {
-        console.log(`[BULK IMPORT] Starting bulk import for GitHub user/org: ${ownerName}`);
+        console.log(`[BULK IMPORT] Starting bulk import for GitHub users/orgs: ${ownerNames.join(', ')}`);
         
         // Use updateCloneStatus function to update status
         updateCloneStatus(bulkImportId, {
           status: 'fetching_repos',
-          message: `Fetching repositories for ${ownerName}...`,
+          message: `Fetching repositories for ${ownerNames.length} users/orgs...`,
           progress: 5
         });
         
@@ -958,89 +1021,135 @@ router.post('/bulk-import', async (req, res) => {
           return;
         }
         
-        // Fetch repositories from GitHub API
-        let repositories = [];
-        try {
-          // Check if it's an organization or a user
-          let isOrg = false;
-          try {
-            await octokit.rest.orgs.get({ org: ownerName });
-            isOrg = true;
-            console.log(`[BULK IMPORT] Detected ${ownerName} as an organization`);
-          } catch (error) {
-            // Not an organization, must be a user
-            isOrg = false;
-            console.log(`[BULK IMPORT] Detected ${ownerName} as a user`);
-          }
+        // Fetch repositories for all owners
+        let allRepositories = [];
+        let failedOwners = [];
+        
+        // Store repositories by owner for per_owner project creation mode
+        const repositoriesByOwner = {};
+        
+        // Process each owner sequentially
+        for (let i = 0; i < ownerNames.length; i++) {
+          const ownerName = ownerNames[i];
           
-          // Fetch all repositories (paginated)
-          let page = 1;
-          let hasMorePages = true;
-          
-          while (hasMorePages) {
-            console.log(`[BULK IMPORT] Fetching repositories page ${page}`);
-            let response;
-            if (isOrg) {
-              response = await octokit.rest.repos.listForOrg({
-                org: ownerName,
-                per_page: 100,
-                page: page
-              });
-            } else {
-              response = await octokit.rest.repos.listForUser({
-                username: ownerName,
-                per_page: 100,
-                page: page
-              });
-            }
-            
-            repositories = [...repositories, ...response.data];
-            console.log(`[BULK IMPORT] Found ${response.data.length} repositories on page ${page}`);
-            
-            if (response.data.length < 100) {
-              hasMorePages = false;
-            } else {
-              page++;
-            }
-          }
-        } catch (error) {
-          console.error('[BULK IMPORT] Error fetching repositories from GitHub API:', error);
           updateCloneStatus(bulkImportId, {
-            status: 'failed',
-            error: `Failed to fetch repositories: ${error.message}`
+            message: `Fetching repositories for ${ownerName} (${i+1}/${ownerNames.length})...`,
+            progress: 5 + (i / ownerNames.length * 5)
           });
-          return;
+          
+          try {
+            // Fetch repositories from GitHub API
+            let repositories = [];
+            
+            // Check if it's an organization or a user
+            let isOrg = false;
+            try {
+              await octokit.rest.orgs.get({ org: ownerName });
+              isOrg = true;
+              console.log(`[BULK IMPORT] Detected ${ownerName} as an organization`);
+            } catch (error) {
+              // Not an organization, must be a user
+              isOrg = false;
+              console.log(`[BULK IMPORT] Detected ${ownerName} as a user`);
+              
+              // Verify the user exists
+              try {
+                await octokit.rest.users.getByUsername({ username: ownerName });
+              } catch (userError) {
+                console.error(`[BULK IMPORT] User ${ownerName} does not exist:`, userError.message);
+                failedOwners.push({ name: ownerName, error: 'User not found' });
+                continue; // Skip to next owner
+              }
+            }
+            
+            // Fetch all repositories (paginated)
+            let page = 1;
+            let hasMorePages = true;
+            
+            while (hasMorePages) {
+              console.log(`[BULK IMPORT] Fetching repositories page ${page} for ${ownerName}`);
+              let response;
+              if (isOrg) {
+                response = await octokit.rest.repos.listForOrg({
+                  org: ownerName,
+                  per_page: 100,
+                  page: page
+                });
+              } else {
+                response = await octokit.rest.repos.listForUser({
+                  username: ownerName,
+                  per_page: 100,
+                  page: page
+                });
+              }
+              
+              repositories = [...repositories, ...response.data];
+              console.log(`[BULK IMPORT] Found ${response.data.length} repositories on page ${page} for ${ownerName}`);
+              
+              if (response.data.length < 100) {
+                hasMorePages = false;
+              } else {
+                page++;
+              }
+            }
+            
+            console.log(`[BULK IMPORT] Total repositories found for ${ownerName}: ${repositories.length}`);
+            
+            // Add owner information to each repository
+            repositories = repositories.map(repo => ({
+              ...repo,
+              ownerName: ownerName
+            }));
+            
+            // Store repositories by owner for potential per_owner project creation
+            repositoriesByOwner[ownerName] = {
+              repositories: repositories.map(repo => ({
+                name: repo.name,
+                url: repo.clone_url,
+                description: repo.description || '',
+                id: null  // Will be populated after cloning
+              }))
+            };
+            
+            allRepositories = [...allRepositories, ...repositories];
+          } catch (error) {
+            console.error(`[BULK IMPORT] Error fetching repositories for ${ownerName}:`, error.message);
+            failedOwners.push({ name: ownerName, error: error.message });
+          }
         }
         
-        if (repositories.length === 0) {
-          console.log(`[BULK IMPORT] No repositories found for ${ownerName}`);
+        if (allRepositories.length === 0) {
+          console.log(`[BULK IMPORT] No repositories found for any of the specified users/orgs`);
           updateCloneStatus(bulkImportId, {
             status: 'completed',
-            message: `No repositories found for ${ownerName}`,
-            progress: 100
+            message: `No repositories found for any of the specified users/orgs`,
+            progress: 100,
+            failedOwners: failedOwners
           });
           return;
         }
         
         // Filter out forks if needed - uncomment to enable
-        // repositories = repositories.filter(repo => !repo.fork);
+        // allRepositories = allRepositories.filter(repo => !repo.fork);
         
-        console.log(`[BULK IMPORT] Total repositories found: ${repositories.length}`);
+        console.log(`[BULK IMPORT] Total repositories found across all users/orgs: ${allRepositories.length}`);
         
         // Update status with found repositories
         updateCloneStatus(bulkImportId, {
           status: 'preparing',
-          message: `Found ${repositories.length} repositories for ${ownerName}`,
+          message: `Found ${allRepositories.length} repositories across ${ownerNames.length} users/orgs`,
           progress: 10,
-          repositories: repositories.map(repo => ({
+          repositories: allRepositories.map(repo => ({
             name: repo.name,
             url: repo.clone_url,
             status: 'pending',
             description: repo.description || '',
             stars: repo.stargazers_count,
-            forks: repo.forks_count
+            forks: repo.forks_count,
+            owner: repo.ownerName
           })),
-          totalRepos: repositories.length
+          totalRepos: allRepositories.length,
+          failedOwners: failedOwners.length > 0 ? failedOwners : undefined
         });
         
         // Create necessary directories
@@ -1058,13 +1167,23 @@ router.post('/bulk-import', async (req, res) => {
         const MAX_CONCURRENT_CLONES = 3; // Adjust based on your server capacity
         console.log(`[BULK IMPORT] Starting parallel cloning with max ${MAX_CONCURRENT_CLONES} concurrent operations`);
         
+        // Store successful repository IDs for project creation
+        const successfulRepoIds = [];
+        
+        // Store successful repository IDs by owner for per_owner project creation
+        const successfulRepoIdsByOwner = {};
+        ownerNames.forEach(owner => {
+          successfulRepoIdsByOwner[owner] = [];
+        });
+        
         // Helper function to process a repository
         const processRepository = async (repo, index) => {
           const repoName = repo.name;
           const repoUrl = repo.clone_url;
           const repoDescription = repo.description || '';
+          const ownerName = repo.ownerName;
           
-          console.log(`[BULK IMPORT] Processing repository ${index + 1}/${repositories.length}: ${repoName}`);
+          console.log(`[BULK IMPORT] Processing repository ${index + 1}/${allRepositories.length}: ${repoName} (owner: ${ownerName})`);
           
           // Skip repositories that already exist in the database
           const existingRepo = freshDb.get('repositories')
@@ -1076,31 +1195,52 @@ router.post('/bulk-import', async (req, res) => {
             // Update status for this repo
             const currentStatus = cloneStatuses.get(bulkImportId);
             const updatedRepos = currentStatus.repositories.map(r => 
-              r.name === repoName ? { ...r, status: 'skipped', message: 'Repository already exists' } : r
+              r.name === repoName && r.owner === ownerName ? 
+                { ...r, status: 'skipped', message: 'Repository already exists', id: existingRepo.id } : r
             );
             
             updateCloneStatus(bulkImportId, {
               repositories: updatedRepos,
               completedRepos: currentStatus.completedRepos + 1,
-              progress: Math.min(10 + Math.floor((currentStatus.completedRepos + 1) / repositories.length * 90), 99)
+              progress: Math.min(10 + Math.floor((currentStatus.completedRepos + 1) / allRepositories.length * 80), 90)
             });
+            
+            // Add existing repo ID for project creation
+            if (mode !== 'none') {
+              successfulRepoIds.push(existingRepo.id);
+              
+              // Also add to per-owner list
+              if (successfulRepoIdsByOwner[ownerName]) {
+                successfulRepoIdsByOwner[ownerName].push(existingRepo.id);
+              }
+              
+              // Update repo ID in the repositoriesByOwner structure
+              if (repositoriesByOwner[ownerName]) {
+                const repoIndex = repositoriesByOwner[ownerName].repositories.findIndex(r => r.url === repoUrl);
+                if (repoIndex !== -1) {
+                  repositoriesByOwner[ownerName].repositories[repoIndex].id = existingRepo.id;
+                }
+              }
+            }
             
             return {
               success: false,
               skipped: true,
-              message: 'Repository already exists'
+              message: 'Repository already exists',
+              id: existingRepo.id
             };
           }
           
           // Update status to show which repository is being processed
           const currentStatus = cloneStatuses.get(bulkImportId);
           const updatedRepos = currentStatus.repositories.map(r => 
-            r.name === repoName ? { ...r, status: 'cloning', message: 'Cloning repository...' } : r
+            r.name === repoName && r.owner === ownerName ? 
+              { ...r, status: 'cloning', message: 'Cloning repository...' } : r
           );
           
           updateCloneStatus(bulkImportId, {
             repositories: updatedRepos,
-            message: `Cloning repository ${index + 1}/${repositories.length}: ${repoName}`
+            message: `Cloning repository ${index + 1}/${allRepositories.length}: ${repoName} (owner: ${ownerName})`
           });
           
           try {
@@ -1110,126 +1250,303 @@ router.post('/bulk-import', async (req, res) => {
             // Skip if the folder already exists
             if (fs.existsSync(repoPath)) {
               console.log(`[BULK IMPORT] Repository folder for ${repoName} already exists, skipping clone`);
-              const currentStatus = cloneStatuses.get(bulkImportId);
-              const updatedRepos = currentStatus.repositories.map(r => 
-                r.name === repoName ? { ...r, status: 'skipped', message: 'Repository folder already exists' } : r
+              
+              // Check if we should still add it to the database
+              const existingRepoInDb = freshDb.get('repositories')
+                .find({ path: repoPath })
+                .value();
+              
+              if (existingRepoInDb) {
+                // The repository is already in the database, use its ID
+                console.log(`[BULK IMPORT] Repository ${repoName} already exists in database with path ${repoPath}`);
+                
+                const currentStatus = cloneStatuses.get(bulkImportId);
+                const updatedRepos = currentStatus.repositories.map(r => 
+                  r.name === repoName && r.owner === ownerName ? 
+                    { ...r, status: 'skipped', message: 'Repository already exists', id: existingRepoInDb.id } : r
+                );
+                
+                updateCloneStatus(bulkImportId, {
+                  repositories: updatedRepos,
+                  completedRepos: currentStatus.completedRepos + 1
+                });
+                
+                // Add existing repo ID for project creation
+                if (mode !== 'none') {
+                  successfulRepoIds.push(existingRepoInDb.id);
+                  
+                  // Also add to per-owner list
+                  if (successfulRepoIdsByOwner[ownerName]) {
+                    successfulRepoIdsByOwner[ownerName].push(existingRepoInDb.id);
+                  }
+                }
+                
+                return {
+                  success: false,
+                  skipped: true,
+                  message: 'Repository folder already exists and is in database',
+                  id: existingRepoInDb.id
+                };
+              } else {
+                // The folder exists but the repository is not in the database
+                // We should try to add it to the database with the existing folder
+                console.log(`[BULK IMPORT] Repository folder ${repoName} exists but not in database, adding it`);
+                
+                try {
+                  // Generate an ID for this repo
+                  const id = Date.now().toString() + Math.floor(Math.random() * 1000);
+                  
+                  // Try to generate a Gource log for this existing repository
+                  const logFilePath = path.join(logsDir, `${id}.log`);
+                  let gourceLog = '';
+                  
+                  try {
+                    gourceLog = execSync(
+                      `gource --output-custom-log - "${repoPath}"`,
+                      { 
+                        encoding: 'utf-8',
+                        maxBuffer: 200 * 1024 * 1024
+                      }
+                    );
+                  } catch (execError) {
+                    console.error(`[BULK IMPORT] Error generating Gource log for ${repoName}, trying alternate method:`, execError.message);
+                    
+                    // Alternative method
+                    const tempLogFile = path.join(logsDir, `${id}_temp.log`);
+                    execSync(
+                      `gource --output-custom-log "${tempLogFile}" "${repoPath}"`,
+                      { 
+                        stdio: 'ignore',
+                        maxBuffer: 200 * 1024 * 1024
+                      }
+                    );
+                    
+                    if (fs.existsSync(tempLogFile)) {
+                      gourceLog = fs.readFileSync(tempLogFile, 'utf-8');
+                      fs.unlinkSync(tempLogFile);
+                    }
+                  }
+                  
+                  if (gourceLog) {
+                    fs.writeFileSync(logFilePath, gourceLog);
+                  }
+                  
+                  // Get the remote URL if possible
+                  const git = simpleGit(repoPath);
+                  const remotes = await git.getRemotes(true);
+                  const remoteUrl = remotes && remotes.length > 0 ? 
+                    (remotes[0].refs.fetch || remotes[0].refs.push) : repoUrl;
+                  
+                  // Add to database
+                  const newRepo = {
+                    id,
+                    url: remoteUrl,
+                    name: repoName,
+                    owner: ownerName,
+                    description: repoDescription || `Repository added from bulk import of ${ownerName}`,
+                    path: repoPath,
+                    logPath: logFilePath,
+                    dateAdded: new Date().toISOString(),
+                    lastUpdated: new Date().toISOString()
+                  };
+                  
+                  freshDb.get('repositories')
+                    .push(newRepo)
+                    .write();
+                    
+                  console.log(`[BULK IMPORT] Added ${repoName} to database with ID: ${id} for existing folder`);
+                  
+                  // Add to list of successful repos for project creation
+                  if (mode !== 'none') {
+                    successfulRepoIds.push(id);
+                    
+                    // Also add to per-owner list
+                    if (successfulRepoIdsByOwner[ownerName]) {
+                      successfulRepoIdsByOwner[ownerName].push(id);
+                    }
+                  }
+                  
+                  // Update status
+                  const updatedStatus = cloneStatuses.get(bulkImportId);
+                  const newUpdatedRepos = updatedStatus.repositories.map(r => 
+                    r.name === repoName && r.owner === ownerName ? 
+                      { ...r, status: 'completed', message: 'Repository imported from existing folder', id } : r
+                  );
+                  
+                  updateCloneStatus(bulkImportId, {
+                    repositories: newUpdatedRepos,
+                    completedRepos: updatedStatus.completedRepos + 1
+                  });
+                  
+                  return {
+                    success: true,
+                    id
+                  };
+                } catch (folderError) {
+                  console.error(`[BULK IMPORT] Error adding existing repository folder ${repoName}:`, folderError);
+                  
+                  const currentStatus = cloneStatuses.get(bulkImportId);
+                  const updatedRepos = currentStatus.repositories.map(r => 
+                    r.name === repoName && r.owner === ownerName ? 
+                      { ...r, status: 'skipped', message: `Failed to add from existing folder: ${folderError.message}` } : r
+                  );
+                  
+                  updateCloneStatus(bulkImportId, {
+                    repositories: updatedRepos,
+                    completedRepos: currentStatus.completedRepos + 1
+                  });
+                  
+                  return {
+                    success: false,
+                    skipped: true,
+                    message: `Failed to add existing folder: ${folderError.message}`
+                  };
+                }
+              }
+            }
+            
+            // If we get here, the folder doesn't exist, so clone the repository
+            try {
+              // Prepare the clone URL with token if needed
+              let cloneUrl = repoUrl;
+              if (process.env.GITHUB_TOKEN) {
+                cloneUrl = repoUrl.replace('https://', `https://${process.env.GITHUB_TOKEN}@`);
+              }
+              
+              // Clone the repository
+              console.log(`[BULK IMPORT] Cloning ${repoName} from ${repoUrl.replace(
+                process.env.GITHUB_TOKEN || '', '[TOKEN]'
+              )}`);
+              
+              await simpleGit().clone(cloneUrl, repoPath);
+              console.log(`[BULK IMPORT] Clone of ${repoName} completed successfully`);
+              
+              // Generate Gource log
+              const id = Date.now().toString() + Math.floor(Math.random() * 1000);
+              const logFilePath = path.join(logsDir, `${id}.log`);
+              
+              console.log(`[BULK IMPORT] Generating Gource log for ${repoName}`);
+              let gourceLog = '';
+              try {
+                gourceLog = execSync(
+                  `gource --output-custom-log - "${repoPath}"`,
+                  { 
+                    encoding: 'utf-8',
+                    maxBuffer: 200 * 1024 * 1024 // 200MB buffer (increased for large repos)
+                  }
+                );
+                console.log(`[BULK IMPORT] Successfully generated Gource log for ${repoName}`);
+              } catch (execError) {
+                console.error(`[BULK IMPORT] Error generating Gource log for ${repoName}, trying alternate method:`, execError.message);
+                
+                // Alternative method with temporary log file
+                const tempLogFile = path.join(logsDir, `${id}_temp.log`);
+                execSync(
+                  `gource --output-custom-log "${tempLogFile}" "${repoPath}"`,
+                  { 
+                    stdio: 'ignore',
+                    maxBuffer: 200 * 1024 * 1024
+                  }
+                );
+                
+                if (fs.existsSync(tempLogFile)) {
+                  gourceLog = fs.readFileSync(tempLogFile, 'utf-8');
+                  fs.unlinkSync(tempLogFile);
+                  console.log(`[BULK IMPORT] Successfully generated Gource log with alternative method for ${repoName}`);
+                } else {
+                  console.error(`[BULK IMPORT] Failed to generate Gource log with alternative method for ${repoName}`);
+                }
+              }
+              
+              if (gourceLog) {
+                fs.writeFileSync(logFilePath, gourceLog);
+                console.log(`[BULK IMPORT] Saved Gource log for ${repoName} to ${logFilePath}`);
+              } else {
+                console.warn(`[BULK IMPORT] No Gource log content generated for ${repoName}`);
+              }
+              
+              // Add the repository to the database
+              const newRepo = {
+                id,
+                url: repoUrl,
+                name: repoName,
+                owner: ownerName,
+                description: repoDescription,
+                path: repoPath,
+                logPath: logFilePath,
+                dateAdded: new Date().toISOString(),
+                lastUpdated: new Date().toISOString()
+              };
+              
+              freshDb.get('repositories')
+                .push(newRepo)
+                .write();
+                
+              console.log(`[BULK IMPORT] Added ${repoName} to database with ID: ${id}`);
+              
+              // Add to list of successful repos for project creation
+              if (mode !== 'none') {
+                successfulRepoIds.push(id);
+                
+                // Also add to per-owner list
+                if (successfulRepoIdsByOwner[ownerName]) {
+                  successfulRepoIdsByOwner[ownerName].push(id);
+                }
+                
+                // Update repo ID in the repositoriesByOwner structure
+                if (repositoriesByOwner[ownerName]) {
+                  const repoIndex = repositoriesByOwner[ownerName].repositories.findIndex(r => r.url === repoUrl);
+                  if (repoIndex !== -1) {
+                    repositoriesByOwner[ownerName].repositories[repoIndex].id = id;
+                  }
+                }
+              }
+                
+              // Update status for this repository
+              const updatedStatus = cloneStatuses.get(bulkImportId);
+              const newUpdatedRepos = updatedStatus.repositories.map(r => 
+                r.name === repoName && r.owner === ownerName ? 
+                  { ...r, status: 'completed', message: 'Repository imported successfully', id } : r
               );
               
               updateCloneStatus(bulkImportId, {
-                repositories: updatedRepos,
-                completedRepos: currentStatus.completedRepos + 1
+                repositories: newUpdatedRepos,
+                completedRepos: updatedStatus.completedRepos + 1
+              });
+              
+              return {
+                success: true,
+                id
+              };
+            } catch (error) {
+              console.error(`[BULK IMPORT] Error cloning repository ${repoName}:`, error);
+              
+              // Update status to show the error
+              const failedStatus = cloneStatuses.get(bulkImportId);
+              const failedRepos = failedStatus.repositories.map(r => 
+                r.name === repoName && r.owner === ownerName ? 
+                  { ...r, status: 'failed', message: `Failed to import: ${error.message}` } : r
+              );
+              
+              updateCloneStatus(bulkImportId, {
+                repositories: failedRepos,
+                failedRepos: failedStatus.failedRepos + 1,
+                completedRepos: failedStatus.completedRepos + 1
               });
               
               return {
                 success: false,
-                skipped: true,
-                message: 'Repository folder already exists'
+                error: error.message
               };
             }
-            
-            // Prepare the clone URL with token if needed
-            let cloneUrl = repoUrl;
-            if (process.env.GITHUB_TOKEN) {
-              cloneUrl = repoUrl.replace('https://', `https://${process.env.GITHUB_TOKEN}@`);
-            }
-            
-            // Clone the repository
-            console.log(`[BULK IMPORT] Cloning ${repoName} from ${repoUrl.replace(
-              process.env.GITHUB_TOKEN || '', '[TOKEN]'
-            )}`);
-            
-            await simpleGit().clone(cloneUrl, repoPath);
-            console.log(`[BULK IMPORT] Clone of ${repoName} completed successfully`);
-            
-            // Generate Gource log
-            const id = Date.now().toString() + Math.floor(Math.random() * 1000);
-            const logFilePath = path.join(logsDir, `${id}.log`);
-            
-            console.log(`[BULK IMPORT] Generating Gource log for ${repoName}`);
-            let gourceLog = '';
-            try {
-              gourceLog = execSync(
-                `gource --output-custom-log - "${repoPath}"`,
-                { 
-                  encoding: 'utf-8',
-                  maxBuffer: 200 * 1024 * 1024 // 200MB buffer (increased for large repos)
-                }
-              );
-              console.log(`[BULK IMPORT] Successfully generated Gource log for ${repoName}`);
-            } catch (execError) {
-              console.error(`[BULK IMPORT] Error generating Gource log for ${repoName}, trying alternate method:`, execError.message);
-              
-              // Alternative method with temporary log file
-              const tempLogFile = path.join(logsDir, `${id}_temp.log`);
-              execSync(
-                `gource --output-custom-log "${tempLogFile}" "${repoPath}"`,
-                { 
-                  stdio: 'ignore',
-                  maxBuffer: 200 * 1024 * 1024
-                }
-              );
-              
-              if (fs.existsSync(tempLogFile)) {
-                gourceLog = fs.readFileSync(tempLogFile, 'utf-8');
-                fs.unlinkSync(tempLogFile);
-                console.log(`[BULK IMPORT] Successfully generated Gource log with alternative method for ${repoName}`);
-              } else {
-                console.error(`[BULK IMPORT] Failed to generate Gource log with alternative method for ${repoName}`);
-              }
-            }
-            
-            if (gourceLog) {
-              fs.writeFileSync(logFilePath, gourceLog);
-              console.log(`[BULK IMPORT] Saved Gource log for ${repoName} to ${logFilePath}`);
-            } else {
-              console.warn(`[BULK IMPORT] No Gource log content generated for ${repoName}`);
-            }
-            
-            // Add the repository to the database
-            const newRepo = {
-              id,
-              url: repoUrl,
-              name: repoName,
-              owner: ownerName,
-              description: repoDescription,
-              path: repoPath,
-              logPath: logFilePath,
-              dateAdded: new Date().toISOString(),
-              lastUpdated: new Date().toISOString()
-            };
-            
-            freshDb.get('repositories')
-              .push(newRepo)
-              .write();
-              
-            console.log(`[BULK IMPORT] Added ${repoName} to database`);
-              
-            // Update status for this repository
-            const updatedStatus = cloneStatuses.get(bulkImportId);
-            const newUpdatedRepos = updatedStatus.repositories.map(r => 
-              r.name === repoName ? { ...r, status: 'completed', message: 'Repository imported successfully' } : r
-            );
-            
-            updateCloneStatus(bulkImportId, {
-              repositories: newUpdatedRepos,
-              completedRepos: updatedStatus.completedRepos + 1
-            });
-            
-            return {
-              success: true,
-              id
-            };
           } catch (error) {
             console.error(`[BULK IMPORT] Error cloning repository ${repoName}:`, error);
             
             // Update status to show the error
             const failedStatus = cloneStatuses.get(bulkImportId);
             const failedRepos = failedStatus.repositories.map(r => 
-              r.name === repoName ? { 
-                ...r, 
-                status: 'failed', 
-                message: `Failed to import: ${error.message}` 
-              } : r
+              r.name === repoName && r.owner === ownerName ? 
+                { ...r, status: 'failed', message: `Failed to import: ${error.message}` } : r
             );
             
             updateCloneStatus(bulkImportId, {
@@ -1250,8 +1567,8 @@ router.post('/bulk-import', async (req, res) => {
         const chunks = [];
         
         // Divide repositories into chunks for parallel processing
-        for (let i = 0; i < repositories.length; i += MAX_CONCURRENT_CLONES) {
-          chunks.push(repositories.slice(i, i + MAX_CONCURRENT_CLONES));
+        for (let i = 0; i < allRepositories.length; i += MAX_CONCURRENT_CLONES) {
+          chunks.push(allRepositories.slice(i, i + MAX_CONCURRENT_CLONES));
         }
         
         // Process each chunk in sequence, but repositories within a chunk in parallel
@@ -1268,21 +1585,120 @@ router.post('/bulk-import', async (req, res) => {
           const results = await Promise.all(promises);
           completed += results.length;
           
-          console.log(`[BULK IMPORT] Completed ${completed}/${repositories.length} repositories`);
+          console.log(`[BULK IMPORT] Completed ${completed}/${allRepositories.length} repositories`);
           
           // Update overall progress
           const currentStatus = cloneStatuses.get(bulkImportId);
           updateCloneStatus(bulkImportId, {
-            progress: 10 + Math.floor(completed / repositories.length * 90)
+            progress: 10 + Math.floor(completed / allRepositories.length * 80)
           });
         }
         
-        // All repositories processed
-        console.log(`[BULK IMPORT] All ${repositories.length} repositories processed`);
+        // Create projects based on the specified mode
         const finalStatus = cloneStatuses.get(bulkImportId);
+        const createdProjects = [];
+        
+        if (mode !== 'none' && successfulRepoIds.length > 0) {
+          try {
+            if (mode === 'single') {
+              // Create a single project with all repositories
+              updateCloneStatus(bulkImportId, {
+                progress: 90,
+                message: `Creating project with ${successfulRepoIds.length} repositories...`
+              });
+              
+              const projectName = finalStatus.projectNameTemplate.replace('{owner}', 'All');
+              console.log(`[BULK IMPORT] Creating single project "${projectName}" with ${successfulRepoIds.length} repositories`);
+              
+              // Generate a unique project ID
+              const projectId = 'proj_' + Date.now().toString();
+              
+              // Create the project in the database
+              const newProject = {
+                id: projectId,
+                name: projectName,
+                description: `Automatically created from bulk import of ${ownerNames.join(', ')}`,
+                repositories: successfulRepoIds,
+                dateCreated: new Date().toISOString(),
+                lastUpdated: new Date().toISOString()
+              };
+              
+              freshDb.get('projects')
+                .push(newProject)
+                .write();
+                
+              console.log(`[BULK IMPORT] Created project "${projectName}" with ID: ${projectId}`);
+              
+              createdProjects.push({
+                id: projectId,
+                name: projectName,
+                repoCount: successfulRepoIds.length
+              });
+            } else if (mode === 'per_owner') {
+              // Create one project per owner
+              updateCloneStatus(bulkImportId, {
+                progress: 90,
+                message: `Creating projects for each owner...`
+              });
+              
+              let projectsCreated = 0;
+              
+              for (const ownerName of Object.keys(successfulRepoIdsByOwner)) {
+                const ownerRepoIds = successfulRepoIdsByOwner[ownerName];
+                
+                if (ownerRepoIds.length > 0) {
+                  const projectName = finalStatus.projectNameTemplate.replace('{owner}', ownerName);
+                  console.log(`[BULK IMPORT] Creating project "${projectName}" for owner ${ownerName} with ${ownerRepoIds.length} repositories`);
+                  
+                  // Generate a unique project ID
+                  const projectId = 'proj_' + Date.now().toString() + projectsCreated;
+                  
+                  // Create the project in the database
+                  const newProject = {
+                    id: projectId,
+                    name: projectName,
+                    description: `Automatically created from bulk import of ${ownerName}`,
+                    repositories: ownerRepoIds,
+                    dateCreated: new Date().toISOString(),
+                    lastUpdated: new Date().toISOString()
+                  };
+                  
+                  freshDb.get('projects')
+                    .push(newProject)
+                    .write();
+                    
+                  console.log(`[BULK IMPORT] Created project "${projectName}" with ID: ${projectId}`);
+                  
+                  createdProjects.push({
+                    id: projectId,
+                    name: projectName,
+                    owner: ownerName,
+                    repoCount: ownerRepoIds.length
+                  });
+                  
+                  projectsCreated++;
+                }
+              }
+              
+              console.log(`[BULK IMPORT] Created ${projectsCreated} projects for ${Object.keys(successfulRepoIdsByOwner).length} owners`);
+            }
+            
+            updateCloneStatus(bulkImportId, {
+              createdProjects: createdProjects
+            });
+          } catch (projectError) {
+            console.error('[BULK IMPORT] Error creating projects:', projectError);
+            updateCloneStatus(bulkImportId, {
+              projectError: `Failed to create projects: ${projectError.message}`
+            });
+          }
+        }
+        
+        // All repositories processed
+        console.log(`[BULK IMPORT] All ${allRepositories.length} repositories processed`);
         updateCloneStatus(bulkImportId, {
           status: 'completed',
-          message: `Bulk import completed. Imported ${finalStatus.completedRepos - finalStatus.failedRepos}/${finalStatus.totalRepos} repositories.`,
+          message: `Bulk import completed. Imported ${finalStatus.completedRepos - finalStatus.failedRepos}/${finalStatus.totalRepos} repositories. Created ${createdProjects.length} projects.`,
           progress: 100
         });
         

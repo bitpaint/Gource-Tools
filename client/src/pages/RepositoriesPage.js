@@ -34,7 +34,11 @@ import {
   Divider,
   Tabs,
   Tab,
-  Tooltip
+  Tooltip,
+  FormControl,
+  FormControlLabel,
+  RadioGroup,
+  Radio
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -90,6 +94,10 @@ const RepositoriesPage = () => {
   const [repoToDelete, setRepoToDelete] = useState(null);
   const [deletingRepo, setDeletingRepo] = useState(false);
 
+  // Project creation options
+  const [projectCreationMode, setProjectCreationMode] = useState('none');
+  const [projectNameTemplate, setProjectNameTemplate] = useState('GitHub Import - {owner}');
+  
   // Memoize fetchRepositories to avoid recreation on each render
   const fetchRepositories = useCallback(async () => {
     try {
@@ -210,7 +218,14 @@ const RepositoriesPage = () => {
               // Refresh repository list
               await fetchRepositories();
               
-              toast.success(`Bulk import completed. Imported ${response.data.completedRepos - response.data.failedRepos}/${response.data.totalRepos} repositories.`);
+              let successMessage = `Bulk import completed. Imported ${response.data.completedRepos - response.data.failedRepos}/${response.data.totalRepos} repositories.`;
+              
+              // Add project creation info to success message
+              if (response.data.createdProjects && response.data.createdProjects.length > 0) {
+                successMessage += ` Created ${response.data.createdProjects.length} project(s).`;
+              }
+              
+              toast.success(successMessage);
               
               // Wait a short time to show the completed status before closing
               setTimeout(() => {
@@ -299,7 +314,9 @@ const RepositoriesPage = () => {
       });
       
       const response = await repositoriesApi.bulkImport({
-        githubUrl: bulkImportUrl
+        githubUrl: bulkImportUrl,
+        projectCreationMode: projectCreationMode || 'none',
+        projectNameTemplate: projectNameTemplate || 'GitHub Import - {owner}'
       });
       
       if (response.data && response.data.bulkImportId) {
@@ -322,43 +339,59 @@ const RepositoriesPage = () => {
   const handleUpdateRepository = async (id) => {
     try {
       const repoIndex = repositories.findIndex(repo => repo.id === id);
-      if (repoIndex === -1) return;
+      if (repoIndex === -1) {
+        toast.error(`Repository with ID ${id} not found in local state`);
+        await fetchRepositories();
+        return;
+      }
 
       const repo = repositories[repoIndex];
       repo.updating = true;
       setRepositories([...repositories]);
 
-      const response = await repositoriesApi.update(id);
-      
-      // Refresh the entire list to ensure everything is up to date
-      await fetchRepositories();
-      
-      // Check if there were warnings or errors in the log generation
-      if (response.data.logStatus === 'warning') {
-        toast.warning(`Repository updated but with warnings: ${response.data.logMessage}`);
-      } else if (response.data.logStatus === 'error') {
-        toast.warning(`Repository updated but log generation failed: ${response.data.logMessage}`);
-      } else {
-        const newCommitsMessage = response.data.newCommitsCount > 0 
-          ? ` (${response.data.newCommitsCount} new commits found)`
-          : '';
-        toast.success(`Repository updated successfully${newCommitsMessage}`);
+      try {
+        const response = await repositoriesApi.update(id);
+        
+        // Refresh the entire list to ensure everything is up to date
+        await fetchRepositories();
+        
+        // Check if there were warnings or errors in the log generation
+        if (response.data.logStatus === 'warning') {
+          toast.warning(`Repository updated but with warnings: ${response.data.logMessage}`);
+        } else if (response.data.logStatus === 'error') {
+          toast.warning(`Repository updated but log generation failed: ${response.data.logMessage}`);
+        } else {
+          const newCommitsMessage = response.data.newCommitsCount > 0 
+            ? ` (${response.data.newCommitsCount} new commits found)`
+            : '';
+          toast.success(`Repository updated successfully${newCommitsMessage}`);
+        }
+      } catch (err) {
+        console.error('Error updating repository:', err);
+        
+        // Si l'erreur est 404, on recharge la liste complète pour synchro
+        if (err.response?.status === 404) {
+          toast.error(`Repository with ID ${id} not found on server. Refreshing list...`);
+          await fetchRepositories();
+        } else {
+          // Display a more descriptive error message
+          const errorMessage = err.response?.data?.error 
+            ? `Failed to update repository: ${err.response.data.error}`
+            : 'Failed to update repository';
+          toast.error(errorMessage);
+          
+          // Update UI to show repo is no longer updating
+          const updatedRepos = [...repositories];
+          const repoIndex = updatedRepos.findIndex(repo => repo.id === id);
+          if (repoIndex !== -1) {
+            updatedRepos[repoIndex].updating = false;
+            setRepositories(updatedRepos);
+          }
+        }
       }
     } catch (err) {
-      console.error('Error updating repository:', err);
-      
-      const updatedRepos = [...repositories];
-      const repoIndex = updatedRepos.findIndex(repo => repo.id === id);
-      if (repoIndex !== -1) {
-        updatedRepos[repoIndex].updating = false;
-        setRepositories(updatedRepos);
-      }
-      
-      // Display a more descriptive error message
-      const errorMessage = err.response?.data?.error 
-        ? `Failed to update repository: ${err.response.data.error}`
-        : 'Failed to update repository';
-      toast.error(errorMessage);
+      console.error('Unexpected error in handleUpdateRepository:', err);
+      toast.error('An unexpected error occurred');
     }
   };
 
@@ -389,6 +422,8 @@ const RepositoriesPage = () => {
     setBulkImportUrl('');
     setBulkImportId(null);
     setBulkImportStatus(null);
+    setProjectCreationMode('none');
+    setProjectNameTemplate('GitHub Import - {owner}');
     setOpenAddDialog(true);
   };
 
@@ -685,6 +720,52 @@ const RepositoriesPage = () => {
                   ),
                 }}
               />
+              
+              {/* Project Creation Options */}
+              <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
+                Project Creation Options
+              </Typography>
+              <Box sx={{ ml: 1 }}>
+                <FormControl component="fieldset">
+                  <RadioGroup
+                    name="projectCreationMode"
+                    value={projectCreationMode || 'none'}
+                    onChange={(e) => setProjectCreationMode(e.target.value)}
+                  >
+                    <FormControlLabel 
+                      value="none" 
+                      control={<Radio />} 
+                      label="Do not create any projects"
+                    />
+                    <FormControlLabel 
+                      value="single" 
+                      control={<Radio />} 
+                      label="Create a single project with all repositories" 
+                    />
+                    <FormControlLabel 
+                      value="per_owner" 
+                      control={<Radio />} 
+                      label="Create one project per username/organization" 
+                    />
+                  </RadioGroup>
+                </FormControl>
+                
+                {(projectCreationMode === 'single' || projectCreationMode === 'per_owner') && (
+                  <TextField
+                    margin="dense"
+                    id="projectNameTemplate"
+                    label="Project Name Template"
+                    type="text"
+                    fullWidth
+                    variant="outlined"
+                    value={projectNameTemplate || 'GitHub Import - {owner}'}
+                    onChange={(e) => setProjectNameTemplate(e.target.value)}
+                    helperText="Use {owner} as placeholder for username/organization name"
+                    sx={{ mt: 1, mb: 2 }}
+                  />
+                )}
+              </Box>
+              
               <Alert severity="info" sx={{ mb: 2 }}>
                 This operation requires a GitHub API token to be set in the settings.
                 It will import all public repositories from the specified user or organization.
@@ -788,6 +869,33 @@ const RepositoriesPage = () => {
                     ))}
                   </List>
                 </Paper>
+              )}
+              
+              {/* Display created projects */}
+              {bulkImportStatus.createdProjects && bulkImportStatus.createdProjects.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Created Projects
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <List dense>
+                      {bulkImportStatus.createdProjects.map((project, index) => (
+                        <React.Fragment key={project.id}>
+                          <ListItem>
+                            <ListItemIcon>
+                              <CheckIcon color="success" />
+                            </ListItemIcon>
+                            <ListItemText 
+                              primary={project.name} 
+                              secondary={`${project.repoCount} repositories`}
+                            />
+                          </ListItem>
+                          {index < bulkImportStatus.createdProjects.length - 1 && <Divider />}
+                        </React.Fragment>
+                      ))}
+                    </List>
+                  </Paper>
+                </Box>
               )}
             </Box>
           )}
