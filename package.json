@@ -1,0 +1,14 @@
+{
+  "name": "gource-tools",
+  "version": "0.1.0",
+  "description": "Gource visualization tools for Git repositories",
+  "scripts": {
+    "server": "cd server && npm start",
+    "client": "cd client && npm start",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
