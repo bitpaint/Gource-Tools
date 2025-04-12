@@ -693,7 +693,22 @@ router.put('/:id/update', async (req, res) => {
     // Pull latest changes
     try {
       const git = simpleGit(repo.path);
+      
+      // Get current commit hash before pull
+      const oldHead = await git.revparse(['HEAD']);
+      
+      // Pull latest changes
       await git.pull();
+      
+      // Get new commit hash after pull
+      const newHead = await git.revparse(['HEAD']);
+      
+      // Get number of commits between old and new head
+      let newCommitsCount = 0;
+      if (oldHead !== newHead) {
+        const logResult = await git.log({ from: oldHead, to: newHead });
+        newCommitsCount = logResult.total;
+      }
     } catch (gitError) {
       console.error(`Error pulling latest changes for repository ${repo.name}:`, gitError.message);
       
@@ -800,7 +815,9 @@ router.put('/:id/update', async (req, res) => {
         lastUpdated: new Date().toISOString(),
         logPath: logFilePath,
         status: logGenerationStatus,
-        statusMessage: logGenerationMessage
+        statusMessage: logGenerationMessage,
+        lastCommitHash: newHead,
+        newCommitsCount: newCommitsCount
       })
       .write();
 
@@ -813,7 +830,8 @@ router.put('/:id/update', async (req, res) => {
       message: 'Repository updated successfully', 
       repository: updatedRepo,
       logStatus: logGenerationStatus,
-      logMessage: logGenerationMessage
+      logMessage: logGenerationMessage,
+      newCommitsCount: newCommitsCount
     });
   } catch (error) {
     console.error('Error updating repository:', error);

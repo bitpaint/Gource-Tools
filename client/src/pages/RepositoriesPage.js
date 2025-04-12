@@ -339,7 +339,10 @@ const RepositoriesPage = () => {
       } else if (response.data.logStatus === 'error') {
         toast.warning(`Repository updated but log generation failed: ${response.data.logMessage}`);
       } else {
-        toast.success('Repository updated successfully');
+        const newCommitsMessage = response.data.newCommitsCount > 0 
+          ? ` (${response.data.newCommitsCount} new commits found)`
+          : '';
+        toast.success(`Repository updated successfully${newCommitsMessage}`);
       }
     } catch (err) {
       console.error('Error updating repository:', err);
@@ -544,6 +547,7 @@ const RepositoriesPage = () => {
                         <TableCell>URL</TableCell>
                         <TableCell>Added</TableCell>
                         <TableCell>Last Updated</TableCell>
+                        <TableCell>New Commits</TableCell>
                         <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
@@ -564,6 +568,15 @@ const RepositoriesPage = () => {
                             <Tooltip title={dateUtils.formatLocaleDate(repo.lastUpdated)}>
                               <span>{formatDate(repo.lastUpdated)}</span>
                             </Tooltip>
+                          </TableCell>
+                          <TableCell>
+                            {repo.newCommitsCount > 0 && (
+                              <Chip 
+                                label={`${repo.newCommitsCount} new`}
+                                color="primary"
+                                size="small"
+                              />
+                            )}
                           </TableCell>
                           <TableCell align="right">
                             <IconButton 
