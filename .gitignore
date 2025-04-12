@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 /.pnp
+.yo
 .pnp.js
 package-lock.json
 yarn.lock
