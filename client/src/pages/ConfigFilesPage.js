@@ -21,28 +21,34 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  FormControlLabel,
-  Checkbox,
   InputAdornment,
   MenuItem,
   Select,
   FormControl,
   InputLabel,
-  Slider,
   Tabs,
   Tab,
   Chip,
-  Tooltip
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import { 
   Add as AddIcon, 
   Edit as EditIcon, 
   Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  HelpOutline
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils } from '../api/api';
-import { defaultSettings } from '../shared/defaultGourceConfig';
+import { defaultSettings, settingsDescriptions } from '../shared/defaultGourceConfig';
+import { convertToCamelCase, convertToKebabCase } from '../utils/gourceUtils';
+
+// Import custom components
+import ColorPickerField from '../components/ColorPickerField';
+import TooltipField from '../components/TooltipField';
+import TooltipSlider from '../components/TooltipSlider';
+import TooltipCheckbox from '../components/TooltipCheckbox';
 
 // Config file tabs
 function TabPanel(props) {
@@ -78,6 +84,9 @@ const commonResolutions = [
   '3840x2160'
 ];
 
+// Convertir les descriptions des paramètres en camelCase
+const descriptionsInCamelCase = convertToCamelCase(settingsDescriptions);
+
 const ConfigFilesPage = () => {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +99,7 @@ const ConfigFilesPage = () => {
     id: null,
     name: '',
     description: '',
-    settings: { ...defaultSettings }
+    settings: convertToCamelCase({ ...defaultSettings })
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [tabValue, setTabValue] = useState(0);
@@ -128,7 +137,7 @@ const ConfigFilesPage = () => {
         id: profile.id,
         name: profile.name,
         description: profile.description || '',
-        settings: { ...defaultSettings, ...profile.settings }
+        settings: convertToCamelCase({ ...defaultSettings, ...profile.settings })
       });
     } else {
       setIsEditing(false);
@@ -136,7 +145,7 @@ const ConfigFilesPage = () => {
         id: null,
         name: '',
         description: '',
-        settings: { ...defaultSettings }
+        settings: convertToCamelCase({ ...defaultSettings })
       });
     }
     setTabValue(0);
@@ -156,20 +165,26 @@ const ConfigFilesPage = () => {
     try {
       setSavingProfile(true);
       
+      // Convertir les paramètres en kebab-case pour la sauvegarde
+      const profileToSave = {
+        ...currentProfile,
+        settings: convertToKebabCase(currentProfile.settings)
+      };
+      
       if (isEditing) {
         // Update existing profile
-        const response = await renderProfilesApi.update(currentProfile.id, currentProfile);
+        const response = await renderProfilesApi.update(profileToSave.id, profileToSave);
         
         // Update profiles array
         const updatedProfiles = profiles.map(profile => 
-          profile.id === currentProfile.id ? response.data : profile
+          profile.id === profileToSave.id ? response.data : profile
         );
         setProfiles(updatedProfiles);
         
         toast.success('Config file updated successfully');
       } else {
         // Create new profile
-        const response = await renderProfilesApi.create(currentProfile);
+        const response = await renderProfilesApi.create(profileToSave);
         setProfiles([...profiles, response.data]);
         toast.success('Config file created successfully');
       }
@@ -248,6 +263,15 @@ const ConfigFilesPage = () => {
     );
   }
 
+  // Fonction utilitaire pour afficher les propriétés du profil avec tirets
+  const getProfileSetting = (profile, key) => {
+    // Pour les propriétés avec tirets, utiliser la notation entre crochets
+    if (key.includes('-')) {
+      return profile.settings[key];
+    }
+    return profile.settings[key];
+  };
+
   return (
     <Container maxWidth="xl">
       <Box sx={{ mb: 4 }}>
@@ -325,17 +349,27 @@ const ConfigFilesPage = () => {
                         <strong>Framerate:</strong> {profile.settings.framerate} fps
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Seconds per day:</strong> {profile.settings.secondsPerDay}
+                        <strong>Seconds per day:</strong> {getProfileSetting(profile, 'seconds-per-day')}
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Camera mode:</strong> {profile.settings.cameraMode}
+                        <strong>Camera mode:</strong> {getProfileSetting(profile, 'camera-mode')}
                       </Typography>
                       <Typography variant="body2" sx={{ mb: 1 }}>
                         <strong>Background:</strong> {profile.settings.background}
                       </Typography>
-                      {profile.settings.extraArgs && (
+                      {getProfileSetting(profile, 'title-text') && (
                         <Typography variant="body2" sx={{ mb: 1 }}>
-                          <strong>Extra args:</strong> {profile.settings.extraArgs}
+                          <strong>Custom Title:</strong> {getProfileSetting(profile, 'title-text')}
+                        </Typography>
+                      )}
+                      {profile.settings.elasticity !== undefined && (
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          <strong>Elasticity:</strong> {profile.settings.elasticity}
+                        </Typography>
+                      )}
+                      {getProfileSetting(profile, 'extra-args') && (
+                        <Typography variant="body2" sx={{ mb: 1 }}>
+                          <strong>Extra args:</strong> {getProfileSetting(profile, 'extra-args')}
                         </Typography>
                       )}
                     </AccordionDetails>
@@ -419,6 +453,8 @@ const ConfigFilesPage = () => {
             <Tabs value={tabValue} onChange={handleTabChange} aria-label="config settings tabs">
               <Tab label="Video" />
               <Tab label="Visualization" />
+              <Tab label="Appearance" />
+              <Tab label="Time" />
               <Tab label="Filtering" />
               <Tab label="Advanced" />
             </Tabs>
@@ -436,6 +472,15 @@ const ConfigFilesPage = () => {
                     value={currentProfile.settings.resolution}
                     onChange={(e) => handleSettingsChange('resolution', e.target.value)}
                     label="Resolution"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <Tooltip title={descriptionsInCamelCase.resolution}>
+                          <IconButton size="small" sx={{ mr: 2 }}>
+                            <HelpOutline fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    }
                   >
                     {commonResolutions.map((res) => (
                       <MenuItem key={res} value={res}>{res}</MenuItem>
@@ -444,49 +489,49 @@ const ConfigFilesPage = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
+                <TooltipField
                   label="Framerate"
                   type="number"
                   value={currentProfile.settings.framerate}
-                  onChange={(e) => handleSettingsChange('framerate', parseInt(e.target.value) || 30)}
+                  onChange={(value) => handleSettingsChange('framerate', parseInt(value) || 30)}
                   InputProps={{
                     endAdornment: <InputAdornment position="end">fps</InputAdornment>,
                   }}
                   inputProps={{ min: 24, max: 120 }}
-                  fullWidth
+                  tooltip={descriptionsInCamelCase.framerate}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <Typography gutterBottom>Seconds Per Day</Typography>
-                <Slider
-                  value={currentProfile.settings.secondsPerDay}
-                  onChange={(e, value) => handleSettingsChange('secondsPerDay', value)}
-                  valueLabelDisplay="auto"
-                  step={0.1}
-                  marks={[
-                    { value: 0.1, label: '0.1' },
-                    { value: 1, label: '1' },
-                    { value: 5, label: '5' },
-                    { value: 10, label: '10' }
-                  ]}
-                  min={0.1}
-                  max={10}
+                <TooltipCheckbox
+                  label="Show Title"
+                  checked={currentProfile.settings.title}
+                  onChange={(checked) => handleSettingsChange('title', checked)}
+                  tooltip={descriptionsInCamelCase.title}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <Typography gutterBottom>Auto Skip Seconds</Typography>
-                <Slider
-                  value={currentProfile.settings.autoSkipSeconds}
-                  onChange={(e, value) => handleSettingsChange('autoSkipSeconds', value)}
-                  valueLabelDisplay="auto"
-                  step={0.05}
-                  marks={[
-                    { value: 0, label: '0' },
-                    { value: 0.5, label: '0.5' },
-                    { value: 1, label: '1' }
-                  ]}
-                  min={0}
-                  max={1}
+                <TooltipCheckbox
+                  label="Show Key"
+                  checked={currentProfile.settings.key}
+                  onChange={(checked) => handleSettingsChange('key', checked)}
+                  tooltip={descriptionsInCamelCase.key}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TooltipField
+                  label="Custom Title Text"
+                  value={currentProfile.settings.titleText}
+                  onChange={(value) => handleSettingsChange('titleText', value)}
+                  tooltip={descriptionsInCamelCase.titleText}
+                  placeholder="Leave empty to use project name"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <ColorPickerField
+                  label="Background Color"
+                  value={currentProfile.settings.background}
+                  onChange={(value) => handleSettingsChange('background', value)}
+                  tooltip={descriptionsInCamelCase.background}
                 />
               </Grid>
             </Grid>
@@ -504,6 +549,15 @@ const ConfigFilesPage = () => {
                     value={currentProfile.settings.cameraMode}
                     onChange={(e) => handleSettingsChange('cameraMode', e.target.value)}
                     label="Camera Mode"
+                    endAdornment={
+                      <InputAdornment position="end">
+                        <Tooltip title={descriptionsInCamelCase.cameraMode}>
+                          <IconButton size="small" sx={{ mr: 2 }}>
+                            <HelpOutline fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    }
                   >
                     {cameraModes.map((mode) => (
                       <MenuItem key={mode.value} value={mode.value}>{mode.label}</MenuItem>
@@ -512,69 +566,11 @@ const ConfigFilesPage = () => {
                 </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
-                  label="Background Color"
-                  type="text"
-                  value={currentProfile.settings.background}
-                  onChange={(e) => handleSettingsChange('background', e.target.value)}
-                  fullWidth
-                  placeholder="#000000"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography gutterBottom>Font Scale</Typography>
-                <Slider
-                  value={currentProfile.settings.fontScale}
-                  onChange={(e, value) => handleSettingsChange('fontScale', value)}
-                  valueLabelDisplay="auto"
-                  step={0.1}
-                  marks={[
-                    { value: 0.5, label: '0.5x' },
-                    { value: 1, label: '1x' },
-                    { value: 2, label: '2x' }
-                  ]}
-                  min={0.5}
-                  max={2}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography gutterBottom>User Scale</Typography>
-                <Slider
-                  value={currentProfile.settings.userScale}
-                  onChange={(e, value) => handleSettingsChange('userScale', value)}
-                  valueLabelDisplay="auto"
-                  step={0.1}
-                  marks={[
-                    { value: 0.5, label: '0.5x' },
-                    { value: 1, label: '1x' },
-                    { value: 2, label: '2x' }
-                  ]}
-                  min={0.5}
-                  max={2}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography gutterBottom>Time Scale</Typography>
-                <Slider
-                  value={currentProfile.settings.timeScale}
-                  onChange={(e, value) => handleSettingsChange('timeScale', value)}
-                  valueLabelDisplay="auto"
-                  step={0.1}
-                  marks={[
-                    { value: 0.5, label: '0.5x' },
-                    { value: 1, label: '1x' },
-                    { value: 2, label: '2x' }
-                  ]}
-                  min={0.5}
-                  max={2}
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography gutterBottom>Elasticity</Typography>
-                <Slider
+                <TooltipSlider
+                  label="Elasticity"
                   value={currentProfile.settings.elasticity}
-                  onChange={(e, value) => handleSettingsChange('elasticity', value)}
-                  valueLabelDisplay="auto"
+                  onChange={(value) => handleSettingsChange('elasticity', value)}
+                  tooltip={descriptionsInCamelCase.elasticity}
                   step={0.1}
                   marks={[
                     { value: 0, label: '0' },
@@ -586,97 +582,339 @@ const ConfigFilesPage = () => {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={currentProfile.settings.title}
-                      onChange={(e) => handleSettingsChange('title', e.target.checked)}
-                    />
-                  }
-                  label="Show Title"
+                <TooltipCheckbox
+                  label="Show Lines"
+                  checked={currentProfile.settings.showLines}
+                  onChange={(checked) => handleSettingsChange('showLines', checked)}
+                  tooltip={descriptionsInCamelCase.showLines}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={currentProfile.settings.key}
-                      onChange={(e) => handleSettingsChange('key', e.target.checked)}
-                    />
-                  }
-                  label="Show Key"
+                <TooltipCheckbox
+                  label="Disable Auto Rotate"
+                  checked={currentProfile.settings.disableAutoRotate}
+                  onChange={(checked) => handleSettingsChange('disableAutoRotate', checked)}
+                  tooltip={descriptionsInCamelCase.disableAutoRotate}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipCheckbox
+                  label="Swap Title and Date"
+                  checked={currentProfile.settings.swapTitleDate}
+                  onChange={(checked) => handleSettingsChange('swapTitleDate', checked)}
+                  tooltip={descriptionsInCamelCase.swapTitleDate}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipCheckbox
+                  label="Show User Images"
+                  checked={currentProfile.settings.userImageDir}
+                  onChange={(checked) => handleSettingsChange('userImageDir', checked)}
+                  tooltip={descriptionsInCamelCase.userImageDir}
+                />
+              </Grid>
+            </Grid>
+          </TabPanel>
+          
+          {/* Appearance Tab */}
+          <TabPanel value={tabValue} index={2}>
+            <Typography variant="h6" gutterBottom>Scaling</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="Font Scale"
+                  value={currentProfile.settings.fontScale}
+                  onChange={(value) => handleSettingsChange('fontScale', value)}
+                  tooltip={descriptionsInCamelCase.fontScale}
+                  step={0.1}
+                  marks={[
+                    { value: 0.5, label: '0.5x' },
+                    { value: 1, label: '1x' },
+                    { value: 2, label: '2x' }
+                  ]}
+                  min={0.5}
+                  max={2}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="User Scale"
+                  value={currentProfile.settings.userScale}
+                  onChange={(value) => handleSettingsChange('userScale', value)}
+                  tooltip={descriptionsInCamelCase.userScale}
+                  step={0.1}
+                  marks={[
+                    { value: 0.5, label: '0.5x' },
+                    { value: 1, label: '1x' },
+                    { value: 2, label: '2x' }
+                  ]}
+                  min={0.5}
+                  max={2}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="File Scale"
+                  value={currentProfile.settings.fileScale}
+                  onChange={(value) => handleSettingsChange('fileScale', value)}
+                  tooltip={descriptionsInCamelCase.fileScale}
+                  step={0.1}
+                  marks={[
+                    { value: 0.5, label: '0.5x' },
+                    { value: 1, label: '1x' },
+                    { value: 2, label: '2x' }
+                  ]}
+                  min={0.5}
+                  max={2}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="Directory Size"
+                  value={currentProfile.settings.dirSize}
+                  onChange={(value) => handleSettingsChange('dirSize', value)}
+                  tooltip={descriptionsInCamelCase.dirSize}
+                  step={0.1}
+                  marks={[
+                    { value: 0.5, label: '0.5x' },
+                    { value: 1, label: '1x' },
+                    { value: 2, label: '2x' }
+                  ]}
+                  min={0.5}
+                  max={2}
+                />
+              </Grid>
+            </Grid>
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Font Sizes</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="Default Font Size"
+                  type="number"
+                  value={currentProfile.settings.fontSize}
+                  onChange={(value) => handleSettingsChange('fontSize', parseInt(value) || 16)}
+                  tooltip={descriptionsInCamelCase.fontSize}
+                  inputProps={{ min: 8, max: 32 }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="Filename Font Size"
+                  type="number"
+                  value={currentProfile.settings.filenameFontSize}
+                  onChange={(value) => handleSettingsChange('filenameFontSize', parseInt(value) || 14)}
+                  tooltip={descriptionsInCamelCase.filenameFontSize}
+                  inputProps={{ min: 8, max: 32 }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="Directory Name Font Size"
+                  type="number"
+                  value={currentProfile.settings.dirnameFontSize}
+                  onChange={(value) => handleSettingsChange('dirnameFontSize', parseInt(value) || 14)}
+                  tooltip={descriptionsInCamelCase.dirnameFontSize}
+                  inputProps={{ min: 8, max: 32 }}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="User Font Size"
+                  type="number"
+                  value={currentProfile.settings.userFontSize}
+                  onChange={(value) => handleSettingsChange('userFontSize', parseInt(value) || 14)}
+                  tooltip={descriptionsInCamelCase.userFontSize}
+                  inputProps={{ min: 8, max: 32 }}
+                />
+              </Grid>
+            </Grid>
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Colors</Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <ColorPickerField
+                  label="Font Color"
+                  value={currentProfile.settings.fontColor}
+                  onChange={(value) => handleSettingsChange('fontColor', value)}
+                  tooltip={descriptionsInCamelCase.fontColor}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <ColorPickerField
+                  label="Title Color"
+                  value={currentProfile.settings.titleColor}
+                  onChange={(value) => handleSettingsChange('titleColor', value)}
+                  tooltip={descriptionsInCamelCase.titleColor}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <ColorPickerField
+                  label="Directory Color"
+                  value={currentProfile.settings.dirColor}
+                  onChange={(value) => handleSettingsChange('dirColor', value)}
+                  tooltip={descriptionsInCamelCase.dirColor}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <ColorPickerField
+                  label="Highlight Color"
+                  value={currentProfile.settings.highlightColor}
+                  onChange={(value) => handleSettingsChange('highlightColor', value)}
+                  tooltip={descriptionsInCamelCase.highlightColor}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <ColorPickerField
+                  label="Selection Color"
+                  value={currentProfile.settings.selectionColor}
+                  onChange={(value) => handleSettingsChange('selectionColor', value)}
+                  tooltip={descriptionsInCamelCase.selectionColor}
+                />
+              </Grid>
+            </Grid>
+          </TabPanel>
+          
+          {/* Time Settings Tab */}
+          <TabPanel value={tabValue} index={3}>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="Seconds Per Day"
+                  value={currentProfile.settings.secondsPerDay}
+                  onChange={(value) => handleSettingsChange('secondsPerDay', value)}
+                  tooltip={descriptionsInCamelCase.secondsPerDay}
+                  step={0.1}
+                  marks={[
+                    { value: 0.1, label: '0.1' },
+                    { value: 1, label: '1' },
+                    { value: 5, label: '5' },
+                    { value: 10, label: '10' }
+                  ]}
+                  min={0.1}
+                  max={10}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="Auto Skip Seconds"
+                  value={currentProfile.settings.autoSkipSeconds}
+                  onChange={(value) => handleSettingsChange('autoSkipSeconds', value)}
+                  tooltip={descriptionsInCamelCase.autoSkipSeconds}
+                  step={0.05}
+                  marks={[
+                    { value: 0, label: '0' },
+                    { value: 0.5, label: '0.5' },
+                    { value: 1, label: '1' }
+                  ]}
+                  min={0}
+                  max={1}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipSlider
+                  label="Time Scale"
+                  value={currentProfile.settings.timeScale}
+                  onChange={(value) => handleSettingsChange('timeScale', value)}
+                  tooltip={descriptionsInCamelCase.timeScale}
+                  step={0.1}
+                  marks={[
+                    { value: 0.5, label: '0.5x' },
+                    { value: 1, label: '1x' },
+                    { value: 2, label: '2x' }
+                  ]}
+                  min={0.5}
+                  max={2}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="Date Format"
+                  value={currentProfile.settings.dateFormat}
+                  onChange={(value) => handleSettingsChange('dateFormat', value)}
+                  tooltip={descriptionsInCamelCase.dateFormat}
+                  placeholder="%Y-%m-%d %H:%M:%S"
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="Start Date (YYYY-MM-DD)"
+                  value={currentProfile.settings.startDate}
+                  onChange={(value) => handleSettingsChange('startDate', value)}
+                  tooltip={descriptionsInCamelCase.startDate}
+                  placeholder="Leave empty to start from beginning"
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TooltipField
+                  label="Stop Date (YYYY-MM-DD)"
+                  value={currentProfile.settings.stopDate}
+                  onChange={(value) => handleSettingsChange('stopDate', value)}
+                  tooltip={descriptionsInCamelCase.stopDate}
+                  placeholder="Leave empty to go until end"
                 />
               </Grid>
             </Grid>
           </TabPanel>
           
           {/* Filtering Tab */}
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={4}>
             <Grid container spacing={3}>
               <Grid item xs={12}>
-                <TextField
+                <TooltipField
                   label="Hide Users (comma separated)"
-                  type="text"
                   value={currentProfile.settings.hideUsers}
-                  onChange={(e) => handleSettingsChange('hideUsers', e.target.value)}
-                  fullWidth
+                  onChange={(value) => handleSettingsChange('hideUsers', value)}
+                  tooltip={descriptionsInCamelCase.hideUsers}
                   placeholder="user1,user2,user3"
                 />
               </Grid>
               <Grid item xs={12}>
-                <TextField
+                <TooltipField
                   label="Hide Files Regex"
-                  type="text"
                   value={currentProfile.settings.hideFilesRegex}
-                  onChange={(e) => handleSettingsChange('hideFilesRegex', e.target.value)}
-                  fullWidth
+                  onChange={(value) => handleSettingsChange('hideFilesRegex', value)}
+                  tooltip={descriptionsInCamelCase.hideFilesRegex}
                   placeholder="\\.(json|md)$"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <TextField
+                <TooltipField
                   label="Max User Count"
                   type="number"
                   value={currentProfile.settings.maxUserCount}
-                  onChange={(e) => handleSettingsChange('maxUserCount', parseInt(e.target.value) || 0)}
-                  fullWidth
+                  onChange={(value) => handleSettingsChange('maxUserCount', parseInt(value) || 0)}
+                  tooltip={descriptionsInCamelCase.maxUserCount}
                   helperText="0 for unlimited"
                   inputProps={{ min: 0 }}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={currentProfile.settings.hideRoot}
-                      onChange={(e) => handleSettingsChange('hideRoot', e.target.checked)}
-                    />
-                  }
+                <TooltipCheckbox
                   label="Hide Root Directory"
+                  checked={currentProfile.settings.hideRoot}
+                  onChange={(checked) => handleSettingsChange('hideRoot', checked)}
+                  tooltip={descriptionsInCamelCase.hideRoot}
                 />
               </Grid>
               <Grid item xs={12} md={6}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={currentProfile.settings.highlightUsers}
-                      onChange={(e) => handleSettingsChange('highlightUsers', e.target.checked)}
-                    />
-                  }
+                <TooltipCheckbox
                   label="Highlight Users"
+                  checked={currentProfile.settings.highlightUsers}
+                  onChange={(checked) => handleSettingsChange('highlightUsers', checked)}
+                  tooltip={descriptionsInCamelCase.highlightUsers}
                 />
               </Grid>
             </Grid>
           </TabPanel>
           
           {/* Advanced Tab */}
-          <TabPanel value={tabValue} index={3}>
-            <TextField
+          <TabPanel value={tabValue} index={5}>
+            <TooltipField
               label="Extra Arguments"
-              type="text"
               value={currentProfile.settings.extraArgs}
-              onChange={(e) => handleSettingsChange('extraArgs', e.target.value)}
-              fullWidth
+              onChange={(value) => handleSettingsChange('extraArgs', value)}
+              tooltip={descriptionsInCamelCase.extraArgs}
               multiline
               rows={3}
               placeholder="Additional Gource arguments"

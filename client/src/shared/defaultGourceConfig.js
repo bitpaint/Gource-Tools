@@ -11,56 +11,56 @@ const defaultSettings = {
   resolution: '1920x1080',
   framerate: 60,
   title: true,
-  titleText: '', // Custom title text (empty = use project name)
+  'title-text': '', // Custom title text (empty = use project name)
   key: true,
   background: '#000000',
   
   // Time settings
-  secondsPerDay: 1,
-  autoSkipSeconds: 0.1,
-  timeScale: 1.0,
-  startDate: '',
-  stopDate: '',
+  'seconds-per-day': 1,
+  'auto-skip-seconds': 0.1,
+  'time-scale': 1.0,
+  'start-date': '',
+  'stop-date': '',
   
   // Camera and movement
   elasticity: 0.0, // Reduced from 0.5 to 0.0
-  cameraMode: 'overview', // overview, track, follow
+  'camera-mode': 'overview', // overview, track, follow
   
   // Visual scaling
-  fontScale: 1.0,
-  userScale: 1.0,
-  fileScale: 1.0,
-  dirSize: 1.0,
+  'font-scale': 1.0,
+  'user-scale': 1.0,
+  'file-scale': 1.0,
+  'dir-size': 1.0,
   
   // Font settings
-  fontSize: 16,
-  filenameFontSize: 14,
-  dirnameFontSize: 14,
-  userFontSize: 14,
+  'font-size': 16,
+  'filename-font-size': 14,
+  'dirname-font-size': 14,
+  'user-font-size': 14,
   
   // Color settings
-  fontColor: '#ffffff',
-  titleColor: '#ffffff',
-  dirColor: '#ffffff',
-  highlightColor: '#ffffff',
-  selectionColor: '#ffffff',
+  'font-color': '#ffffff',
+  'title-color': '#ffffff',
+  'dir-color': '#ffffff',
+  'highlight-color': '#ffffff',
+  'selection-color': '#ffffff',
   
   // Users and files settings
-  highlightUsers: false,
-  hideUsers: '',
-  hideFilesRegex: '',
-  hideRoot: false,
-  maxUserCount: 0,
-  showUserImages: true,
-  dateFormat: '%Y-%m-%d %H:%M:%S',
+  'highlight-users': false,
+  'hide-users': '',
+  'hide-files-regex': '',
+  'hide-root': false,
+  'max-user-count': 0,
+  'user-image-dir': '', // Directory for user avatar images
+  'date-format': '%Y-%m-%d %H:%M:%S',
   
   // Special features
-  showLines: false, // Show connections between users and files
-  disableAutoRotate: false,
-  swapTitleAndDate: false,
+  'show-lines': false, // Show connections between users and files
+  'disable-auto-rotate': false,
+  'swap-title-date': false,
   
   // Advanced
-  extraArgs: ''
+  'extra-args': ''
 };
 
 // Description for each setting to display in UI tooltips
@@ -68,48 +68,48 @@ const settingsDescriptions = {
   resolution: "Video output resolution (width x height)",
   framerate: "Frames per second in output video",
   title: "Show title at the top of the visualization",
-  titleText: "Custom title text (if empty, project name is used)",
+  'title-text': "Custom title text (if empty, project name is used)",
   key: "Display file extension color reference",
   background: "Background color of the visualization",
   
-  secondsPerDay: "How many seconds represent one day in the visualization",
-  autoSkipSeconds: "Skip periods of inactivity longer than this value",
-  timeScale: "Speed multiplier for time progression",
-  startDate: "Start visualization from this date (YYYY-MM-DD format)",
-  stopDate: "End visualization at this date (YYYY-MM-DD format)",
+  'seconds-per-day': "How many seconds represent one day in the visualization",
+  'auto-skip-seconds': "Skip periods of inactivity longer than this value",
+  'time-scale': "Speed multiplier for time progression",
+  'start-date': "Start visualization from this date (YYYY-MM-DD format)",
+  'stop-date': "End visualization at this date (YYYY-MM-DD format)",
   
   elasticity: "Elasticity of connections between files and directories (0.0 = none)",
-  cameraMode: "Camera behavior: overview (entire tree), track (move to active area), follow (follow most active user)",
+  'camera-mode': "Camera behavior: overview (entire tree), track (move to active area), follow (follow most active user)",
   
-  fontScale: "Global font size scaling factor",
-  userScale: "Size of user avatars",
-  fileScale: "Size of file nodes",
-  dirSize: "Size of directory nodes",
+  'font-scale': "Global font size scaling factor",
+  'user-scale': "Size of user avatars",
+  'file-scale': "Size of file nodes",
+  'dir-size': "Size of directory nodes",
   
-  fontSize: "Default font size",
-  filenameFontSize: "Font size for file names",
-  dirnameFontSize: "Font size for directory names",
-  userFontSize: "Font size for user names",
+  'font-size': "Default font size",
+  'filename-font-size': "Font size for file names",
+  'dirname-font-size': "Font size for directory names",
+  'user-font-size': "Font size for user names",
   
-  fontColor: "Default text color",
-  titleColor: "Title text color",
-  dirColor: "Directory text and node color",
-  highlightColor: "Color used for highlighting active elements",
-  selectionColor: "Color used for selected elements",
+  'font-color': "Default text color",
+  'title-color': "Title text color",
+  'dir-color': "Directory text and node color",
+  'highlight-color': "Color used for highlighting active elements",
+  'selection-color': "Color used for selected elements",
   
-  highlightUsers: "Highlight specific users in the visualization",
-  hideUsers: "Comma-separated list of users to hide",
-  hideFilesRegex: "Regular expression for files to hide",
-  hideRoot: "Hide the root directory",
-  maxUserCount: "Maximum number of users to show (0 = no limit)",
-  showUserImages: "Show user avatar images",
-  dateFormat: "Format for displayed dates",
+  'highlight-users': "Highlight specific users in the visualization",
+  'hide-users': "Comma-separated list of users to hide",
+  'hide-files-regex': "Regular expression for files to hide",
+  'hide-root': "Hide the root directory",
+  'max-user-count': "Maximum number of users to show (0 = no limit)",
+  'user-image-dir': "Directory containing user avatar images",
+  'date-format': "Format for displayed dates",
   
-  showLines: "Show connections between users and files",
-  disableAutoRotate: "Disable automatic camera rotation",
-  swapTitleAndDate: "Swap positions of title and date in the visualization",
+  'show-lines': "Show connections between users and files",
+  'disable-auto-rotate': "Disable automatic camera rotation",
+  'swap-title-date': "Swap positions of title and date in the visualization",
   
-  extraArgs: "Additional command-line arguments to pass to Gource"
+  'extra-args': "Additional command-line arguments to pass to Gource"
 };
 
 // Default configuration profile
