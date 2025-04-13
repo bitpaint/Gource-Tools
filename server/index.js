@@ -7,6 +7,7 @@ const { execSync } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig } = require('./config/defaultGourceConfig');
+const initCustomRenderProfiles = require('./config/initRenderProfiles');
 
 // Initialize environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -41,6 +42,9 @@ if (!defaultProfileExists) {
     
   console.log('✅ Created default Gource config file');
 }
+
+// Initialize custom render profiles (Last Week, Last Month, Last Year)
+initCustomRenderProfiles();
 
 // Initialize API routes
 const repositoriesRouter = require('./routes/repositories');

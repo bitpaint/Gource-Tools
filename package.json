@@ -9,6 +9,11 @@
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },
   "dependencies": {
-    "concurrently": "^8.2.2"
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^7.0.2",
+    "@mui/material": "^7.0.2",
+    "concurrently": "^8.2.2",
+    "react-color": "^2.19.3"
   }
 }
