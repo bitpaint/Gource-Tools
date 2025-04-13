@@ -1,6 +1,6 @@
 /**
- * Utilitaires pour Gource
- * Fonctions de conversion et d'aide pour the parameters of Gource
+ * Gource Utilities
+ * Conversion and helper functions for Gource parameters
  */
 
 /**
@@ -82,9 +82,9 @@ const reverseMapping = Object.entries(paramMapping).reduce((acc, [camel, kebab])
 }, {});
 
 /**
- * Convertit des noms de paramètres de kebab-case à camelCase
- * @param {Object} obj - Objet avec des clés en kebab-case
- * @returns {Object} Objet avec des clés en camelCase
+ * Converts parameter names from kebab-case to camelCase
+ * @param {Object} obj - Object with kebab-case keys
+ * @returns {Object} Object with camelCase keys
  */
 export function convertToCamelCase(obj) {
   if (!obj || typeof obj !== 'object') return obj;
@@ -100,9 +100,9 @@ export function convertToCamelCase(obj) {
 }
 
 /**
- * Convertit des noms de paramètres de camelCase à kebab-case
- * @param {Object} obj - Objet avec des clés en camelCase
- * @returns {Object} Objet avec des clés en kebab-case
+ * Converts parameter names from camelCase to kebab-case
+ * @param {Object} obj - Object with camelCase keys
+ * @returns {Object} Object with kebab-case keys
  */
 export function convertToKebabCase(obj) {
   if (!obj || typeof obj !== 'object') return obj;
@@ -113,31 +113,31 @@ export function convertToKebabCase(obj) {
     // Use mapping if available, or fallback to automatic conversion
     const kebabKey = paramMapping[key] || key.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
     
-    // Traitement spécial pour secondsPerDay qui doit être un nombre valide ≥ 1
+    // Special handling for secondsPerDay which must be a valid number ≥ 1
     if (key === 'secondsPerDay') {
-      // S'assurer que la valeur est un nombre valide et au moins 1
+      // Ensure value is a valid number and at least 1
       const numValue = parseFloat(value);
       result[kebabKey] = isNaN(numValue) || numValue < 1 ? 1 : numValue;
       continue;
     }
     
-    // Ne pas inclure les valeurs vides, null ou undefined
+    // Don't include empty, null or undefined values
     if (value === undefined || value === null || value === '') {
-      // Pour les valeurs numériques strictes qui sont devenues undefined, on les initialise à 0
+      // For strict numeric values that became undefined, initialize to 0
       if (['auto-skip-seconds', 'elasticity', 'font-scale', 
            'user-scale', 'time-scale', 'file-scale', 'dir-size', 
            'max-file-lag', 'bloom-intensity', 'bloom-multiplier'].includes(kebabKey)) {
-        // Pour les paramètres numériques, initialiser avec une valeur par défaut
+        // For numeric parameters, initialize with default value
         result[kebabKey] = 0;
       } else {
-        // Omettre les autres valeurs undefined/null/empty
+        // Omit other undefined/null/empty values
         continue;
       }
     } else if (typeof value === 'boolean') {
-      // Pour les booléens, utiliser le format texte que Gource accepte
+      // For booleans, use the text format that Gource accepts
       result[kebabKey] = value;
     } else {
-      // Pour les autres types, copier la valeur telle quelle
+      // For other types, copy value as is
       result[kebabKey] = value;
     }
   }
@@ -146,76 +146,76 @@ export function convertToKebabCase(obj) {
 }
 
 /**
- * Génère la commande Gource à partir des paramètres
- * @param {Object} settings - Paramètres Gource
- * @param {string} logPath - Chemin du fichier de log
- * @returns {string} Commande Gource complète
+ * Generates the Gource command from parameters
+ * @param {Object} settings - Gource parameters
+ * @param {string} logPath - Path to the log file
+ * @returns {string} Complete Gource command
  */
 export const generateGourceCommand = (settings, logPath) => {
   if (!settings || !logPath) return '';
   
-  // Convertir en kebab-case pour Gource
+  // Convert to kebab-case for Gource
   const kebabSettings = convertToKebabCase(settings);
   
   let command = 'gource';
   
-  // Traitement spécial pour certains paramètres qui nécessitent une conversion
+  // Special handling for certain parameters that require conversion
   const specialParams = {
     'show-lines': (value) => {
-      // Si showLines est false, ajouter --hide-edges
+      // If showLines is false, add --hide-edges
       if (value === false || value === 'false') return '--hide-edges';
-      return null; // Ne rien ajouter si true (comportement par défaut)
+      return null; // Don't add anything if true (default behavior)
     },
     'follow-users': (value) => {
-      // Si followUsers est true, ajouter --follow-users
+      // If followUsers is true, add --follow-users
       if (value === true || value === 'true') return '--follow-all-users';
       return null;
     }
   };
   
-  // Ajouter les paramètres
+  // Add parameters
   Object.entries(kebabSettings).forEach(([key, value]) => {
-    // Ignorer les paramètres vides
+    // Ignore empty parameters
     if (value === '' || value === null || value === undefined) return;
     
-    // Traitement spécial pour certains paramètres
+    // Special handling for certain parameters
     if (key in specialParams) {
       const specialArg = specialParams[key](value);
       if (specialArg) command += ` ${specialArg}`;
       return;
     }
     
-    // Traitement des booléens
+    // Handle booleans
     if (typeof value === 'boolean') {
       if (value === true) {
         command += ` --${key}`;
       } else if (key.startsWith('disable-') || key.startsWith('hide-')) {
-        // Si c'est un paramètre de désactivation à false, on l'ignore
+        // If it's a disable parameter set to false, ignore
         return;
       } else {
-        // Pour les autres booléens à false, on inverse si possible
-        // Par exemple, si key = "show-something" et value = false, 
-        // on ajoute "--hide-something"
+        // For other booleans set to false, invert if possible
+        // For example, if key = "show-something" and value = false, 
+        // add "--hide-something"
         if (key.startsWith('show-')) {
           const oppositeKey = key.replace('show-', 'hide-');
           command += ` --${oppositeKey}`;
         }
       }
     } else {
-      // Paramètres avec valeurs
+      // Parameters with values
       command += ` --${key} ${value}`;
     }
   });
   
-  // Ajouter le chemin du log
+  // Add log path
   command += ` "${logPath}"`;
   
   return command;
 };
 
 /**
- * Retourne la liste des résolutions communes
- * @returns {string[]} Liste des résolutions au format WIDTHxHEIGHT
+ * Returns the list of common resolutions
+ * @returns {string[]} List of resolutions in WIDTHxHEIGHT format
  */
 export function getCommonResolutions() {
   return [
@@ -247,39 +247,39 @@ export function getAllGourceParameters() {
 }
 
 /**
- * Utilitaires pour la conversion et manipulation des paramètres Gource
+ * Utilities for conversion and manipulation of Gource parameters
  */
 
 /**
- * Convertit les paramètres de l'interface utilisateur au format attendu par l'API
- * @param {Object} formData - Données du formulaire d'édition
- * @returns {Object} Paramètres formatés pour l'API
+ * Converts UI form parameters to the format expected by the API
+ * @param {Object} formData - Data from the edit form
+ * @returns {Object} Parameters formatted for the API
  */
 export function convertFormToApiParams(formData) {
-  // Faire une copie pour ne pas modifier l'original
+  // Make a copy to avoid modifying the original
   const apiParams = { ...formData };
   
-  // Table de conversion pour les paramètres spéciaux
+  // Conversion table for special parameters
   const mappings = {
-    background: 'background-colour', // La couleur est stockée dans background-colour pour l'API
+    background: 'background-colour', // Color is stored in background-colour for the API
   };
   
-  // Appliquer les mappings spéciaux
+  // Apply special mappings
   Object.entries(mappings).forEach(([formKey, apiKey]) => {
     if (apiParams[formKey] !== undefined) {
-      // Conserver à la fois le format camelCase et kebab-case pour assurer la compatibilité
+      // Keep both camelCase and kebab-case formats to ensure compatibility
       apiParams[apiKey] = apiParams[formKey];
       console.log(`Conversion: ${formKey} -> ${apiKey} = ${apiParams[formKey]}`);
     }
   });
   
-  // Traitement spécial des couleurs: s'assurer que le # est présent
+  // Special handling for colors: ensure # is present
   Object.keys(apiParams).forEach(key => {
     if (
       typeof apiParams[key] === 'string' && 
       (key.includes('color') || key.includes('colour') || key === 'background')
     ) {
-      // Si c'est une couleur et qu'elle n'a pas de #, l'ajouter
+      // If it's a color and doesn't have #, add it
       if (apiParams[key] && !apiParams[key].startsWith('#')) {
         apiParams[key] = `#${apiParams[key]}`;
       }
@@ -290,27 +290,27 @@ export function convertFormToApiParams(formData) {
 }
 
 /**
- * Convertit les paramètres de l'API au format d'affichage de l'interface utilisateur
- * @param {Object} apiParams - Paramètres de l'API
- * @returns {Object} Paramètres formatés pour l'interface utilisateur
+ * Converts API parameters to the format for display in the UI
+ * @param {Object} apiParams - API parameters
+ * @returns {Object} Parameters formatted for the UI
  */
 export function convertApiToFormParams(apiParams) {
-  // Faire une copie pour ne pas modifier l'original
+  // Make a copy to avoid modifying the original
   const formParams = { ...apiParams };
   
-  // Priorité à background-colour sur background
+  // Priority to background-colour over background
   if (apiParams['background-colour']) {
     formParams.background = apiParams['background-colour'];
-    console.log(`Priorité background-colour: ${apiParams['background-colour']}`);
+    console.log(`Priority background-colour: ${apiParams['background-colour']}`);
   }
   
-  // S'assurer que les couleurs ont le '#'
+  // Ensure colors have the '#'
   Object.keys(formParams).forEach(key => {
     if (
       typeof formParams[key] === 'string' && 
       (key.includes('color') || key.includes('colour') || key === 'background')
     ) {
-      // Si c'est une couleur et qu'elle n'a pas de #, l'ajouter
+      // If it's a color and doesn't have #, add it
       if (formParams[key] && !formParams[key].startsWith('#')) {
         formParams[key] = `#${formParams[key]}`;
       }

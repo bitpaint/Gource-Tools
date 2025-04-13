@@ -37,12 +37,12 @@ const FFmpegEditorPage = () => {
   const [processing, setProcessing] = useState(false);
   const [preview, setPreview] = useState(null);
   
-  // Filtres FFmpeg
+  // FFmpeg filters
   const [filters, setFilters] = useState({
     fade: {
       enabled: false,
-      durationIn: 3, // secondes pour le fade in
-      durationOut: 3 // secondes pour le fade out
+      durationIn: 3, // seconds for fade in
+      durationOut: 3 // seconds for fade out
     },
     music: {
       enabled: false,
@@ -52,7 +52,7 @@ const FFmpegEditorPage = () => {
     quality: 'high' // low, medium, high
   });
 
-  // Charger la liste des vidéos rendues
+  // Load rendered videos list
   useEffect(() => {
     const fetchVideos = async () => {
       try {

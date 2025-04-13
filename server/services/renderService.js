@@ -197,82 +197,57 @@ class RenderService {
   }
 
   /**
-   * Traite un rendu
-   * @param {Object} project - Le projet associé au rendu
-   * @param {Object} render - L'objet de rendu à traiter
-   * @param {Object} options - Options supplémentaires pour le rendu
-   * @returns {Object} - L'objet de rendu mis à jour
+   * Process a render job
+   * @param {Object} project - Project to render
+   * @param {Object} render - Render entry
+   * @param {Object} options - Options
+   * @returns {Promise<Object>} - Render entry
    */
   async processRender(project, render, options = {}) {
-    console.log(`Début du traitement du rendu ${render.id}`);
-    
-    // Mettre à jour le statut du rendu
-    render.status = 'processing';
-    await this.updateRenderStatus(render.id, 'processing', 'Traitement du rendu en cours...', 0);
-    
     try {
-      // Vérifier si le projet a des dépôts assignés
-      if (!project.repositoryDetails || project.repositoryDetails.length === 0) {
-        throw new Error('Aucun dépôt assigné au projet');
+      // Check if the project has assigned repositories
+      if (!project.repositories || project.repositories.length === 0) {
+        throw new Error('No repositories assigned to project');
       }
-      
-      // Créer les répertoires de sortie pour le rendu et les logs
-      const outputDir = path.join(this.exportsDir, render.id.toString());
-      const logsDir = path.join(this.logsDir, render.id.toString());
-      
-      if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
-      }
-      
-      if (!fs.existsSync(logsDir)) {
-        fs.mkdirSync(logsDir, { recursive: true });
-      }
-      
-      console.log(`Génération des logs combinés pour le rendu ${render.id}`);
-      await this.updateRenderStatus(render.id, 'generating_logs', 'Génération des logs Gource...', 10);
-      
-      // Générer les logs combinés
-      const logOptions = {
-        startDate: render.startDate,
-        endDate: render.endDate,
-        ...options
-      };
-      
-      const combinedLogPath = await this.generateCombinedLogs(project.repositoryDetails, logOptions);
-      render.logPath = combinedLogPath;
-      await this.updateRenderStatus(render.id, 'generating_logs', 'Logs Gource générés', 20);
-      
-      // Exécuter le rendu Gource
-      console.log(`Exécution du rendu Gource pour ${render.id}`);
-      await this.updateRenderStatus(render.id, 'rendering', 'Génération de la vidéo en cours...', 30);
-      
-      const outputPath = path.join(outputDir, 'output.mp4');
-      
-      // Obtenir le profil de rendu associé au projet
-      const db = this.getDatabase();
-      const renderProfileId = project.renderProfileId;
-      const renderProfile = renderProfileId 
-        ? db.get('renderProfiles').find({ id: renderProfileId }).value() 
-        : null;
-      
-      // Utiliser les paramètres du profil de rendu ou des paramètres par défaut
-      const renderSettings = renderProfile?.settings || {};
-      
-      await this.executeGourceRender(combinedLogPath, render, outputPath, renderSettings);
-      
-      // Mettre à jour le rendu avec le chemin de sortie
-      render.outputPath = outputPath;
-      render.status = 'completed';
-      render.completedAt = new Date();
-      await this.updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
-      
-      console.log(`Rendu ${render.id} terminé avec succès`);
+
+      // Get repositories for the project
+      const repositories = project.repositories.map(repoId => {
+        const repo = this.getDatabase().get('repositories').find({ id: repoId }).value();
+        return repo;
+      }).filter(Boolean);
+
+      console.log(`Generating combined logs for render ${render.id}`);
+      await this.updateRenderStatus(render.id, 'generating_logs', 'Generating Gource logs...', 10);
+
+      // Generate combined logs
+      const logFilePath = await this.generateCombinedLogs(repositories);
+
+      // Update status
+      await this.updateRenderStatus(render.id, 'generating_logs', 'Gource logs generated', 20);
+
+      // Prepare render
+      const outputDir = path.join(this.exportsDir, render.id);
+      await this.updateRenderStatus(render.id, 'rendering', 'Video generation in progress...', 30);
+
+      // Start the render process
+      await this.startGourceRender(render, logFilePath, outputDir);
+
+      // Update status when complete
+      await this.updateRenderStatus(
+        render.id, 
+        'completed', 
+        `Render completed: ${render.fileName}`, 
+        100, 
+        { filePath: render.filePath }
+      );
+
       return render;
     } catch (error) {
-      console.error(`Erreur lors du rendu ${render.id}:`, error);
-      render.status = 'failed';
-      render.error = error.message;
-      await this.updateRenderStatus(render.id, 'failed', error.message, 0);
+      console.error(`Error during render ${render.id}:`, error);
+      
+      // Update status when failed
+      await this.updateRenderStatus(render.id, 'failed', `Render failed: ${error.message}`, 0);
+      
       throw error;
     }
   }
@@ -598,17 +573,17 @@ class RenderService {
         }
       }
       
-      // Génération du script PowerShell pour le rendu vidéo
+      // Generating PowerShell script for video rendering
       const powerShellScriptPath = path.join(this.tempDir, `render_script_${render.id}.ps1`);
       
-      // Préparer les chemins avec double backslashes pour PowerShell
+      // Prepare paths with double backslashes for PowerShell
       const psLogFilePath = logFilePath.replace(/\\/g, '\\\\');
       const psOutputFilePath = outputFilePath.replace(/\\/g, '\\\\');
       const psTempPPM = path.join(this.tempDir, `temp_${render.id}.ppm`).replace(/\\/g, '\\\\');
       
-      // Générer le contenu du script ligne par ligne
+      // Generate script content line by line
       const scriptLines = [
-        '# Script simplifié de rendu Gource',
+        '# Simplified Gource rendering script',
         '$ErrorActionPreference = "Stop"',
         '',
         '# File paths',
@@ -643,30 +618,30 @@ class RenderService {
         'exit 0'
       ];
       
-      // Joindre les lignes avec des sauts de ligne
+      // Join lines with line breaks
       const scriptContent = scriptLines.join('\r\n');
       
-      // Écrire le script PowerShell
+      // Write PowerShell script
       fs.writeFileSync(powerShellScriptPath, scriptContent, 'utf8');
       
-      // Mettre à jour le statut
-      this.updateRenderStatus(render.id, 'rendering', 'Exécution du processus de rendu...', 40);
+      // Update status
+      this.updateRenderStatus(render.id, 'rendering', 'Running render process...', 40);
       
-      // Créer un flux de journalisation
+      // Create logging stream
       const renderLogPath = path.join(this.logsDir, `render_${render.id}.log`);
       const logOutputStream = fs.createWriteStream(renderLogPath);
       
-      // Lancer PowerShell avec le script
+      // Launch PowerShell with script
       const powershellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
       const psProcess = spawn(powershellPath, ['-ExecutionPolicy', 'Bypass', '-File', powerShellScriptPath], {
         stdio: 'pipe'
       });
       
-      // Rediriger les flux de sortie
+      // Redirect output streams
       psProcess.stdout.pipe(logOutputStream);
       psProcess.stderr.pipe(logOutputStream);
       
-      // Journaliser la sortie pour le débogage
+      // Log output for debugging
       psProcess.stdout.on('data', (data) => {
         console.log(`[Gource] ${data.toString().trim()}`);
       });
@@ -675,47 +650,47 @@ class RenderService {
         console.error(`[Gource Error] ${data.toString().trim()}`);
       });
 
-      // Mettre à jour périodiquement le statut du rendu
+      // Periodically update render status
       const statusUpdater = setInterval(() => {
         if (fs.existsSync(outputFilePath)) {
           try {
             const stats = fs.statSync(outputFilePath);
             if (stats.size > 0) {
-              // Calculer la progression en fonction du temps écoulé (estimation)
+              // Calculate progress based on elapsed time (estimate)
               const currentTime = new Date();
               const startTime = new Date(render.startTime || render.dateCreated);
               const elapsedSeconds = (currentTime - startTime) / 1000;
               
-              // Estimer la progression (maximum 95% jusqu'à ce que le rendu soit terminé)
+              // Estimate progress (maximum 95% until rendering is complete)
               const estimatedProgress = Math.min(40 + (elapsedSeconds / 3), 95);
               
-              this.updateRenderStatus(render.id, 'rendering', 'Rendu en cours...', estimatedProgress);
+              this.updateRenderStatus(render.id, 'rendering', 'Rendering in progress...', estimatedProgress);
             }
           } catch (error) {
-            console.error('Erreur lors de la vérification du fichier de sortie:', error);
+            console.error('Error checking output file:', error);
           }
         }
-      }, 5000); // Mise à jour toutes les 5 secondes
+      }, 5000); // Update every 5 seconds
       
-      // Attendre la fin du processus
+      // Wait for process to finish
       return new Promise((resolve, reject) => {
         psProcess.on('exit', (code) => {
           clearInterval(statusUpdater);
           
           if (code === 0) {
-            // Rendu réussi
-            this.updateRenderStatus(render.id, 'completed', 'Rendu terminé avec succès', 100);
-            console.log(`Rendu ${render.id} terminé avec succès, fichier: ${outputFilePath}`);
+            // Render successful
+            this.updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
+            console.log(`Render ${render.id} completed successfully, file: ${outputFilePath}`);
             resolve();
           } else {
-            // Erreur de rendu
-            const errorMsg = `Erreur de rendu (code ${code})`;
+            // Render error
+            const errorMsg = `Render error (code ${code})`;
             this.updateRenderStatus(render.id, 'failed', errorMsg, 0);
-            console.error(`Erreur lors du rendu ${render.id}, code: ${code}`);
+            console.error(`Error during render ${render.id}, code: ${code}`);
             reject(new Error(errorMsg));
           }
           
-          // Nettoyer les fichiers temporaires
+          // Clean up temporary files
           try {
             if (fs.existsSync(powerShellScriptPath)) {
               fs.unlinkSync(powerShellScriptPath);
@@ -724,15 +699,15 @@ class RenderService {
               fs.unlinkSync(tempConfigPath);
             }
           } catch (error) {
-            console.error('Erreur lors du nettoyage des fichiers temporaires:', error);
+            console.error('Error cleaning up temporary files:', error);
           }
         });
         
         psProcess.on('error', (error) => {
           clearInterval(statusUpdater);
-          const errorMsg = `Erreur lors du démarrage du processus: ${error.message}`;
+          const errorMsg = `Error starting process: ${error.message}`;
           this.updateRenderStatus(render.id, 'failed', errorMsg, 0);
-          console.error(`Erreur lors du démarrage du processus pour le rendu ${render.id}:`, error);
+          console.error(`Error starting process for render ${render.id}:`, error);
           reject(error);
         });
       });
