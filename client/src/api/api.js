@@ -9,24 +9,24 @@ const api = axios.create({
   },
 });
 
-// Intercepteur pour masquer les tokens d'API dans les logs
+// Interceptor to hide API tokens in logs
 api.interceptors.request.use(request => {
-  // Créer une copie pour les logs qui masque les tokens
+  // Create a copy for logs that masks tokens
   const sanitizedRequest = { ...request };
   
-  // Si l'URL contient un token GitHub (pour les clones)
+  // If the URL contains a GitHub token (for clones)
   if (sanitizedRequest.url && typeof sanitizedRequest.url === 'string') {
-    // Masquer le token dans l'URL pour les logs
+    // Mask the token in the URL for logs
     sanitizedRequest.url = sanitizedRequest.url.replace(
       /(https?:\/\/)[^:@]+:[^@]+@/gi, 
       '$1[CREDENTIALS_HIDDEN]@'
     );
     
-    // Journaliser la demande nettoyée au lieu de l'originale
+    // Log the cleaned request instead of the original
     console.log('Making request to:', sanitizedRequest.url);
   }
   
-  // Remarque: on retourne la requête originale, pas la version nettoyée
+  // Note: return the original request, not the cleaned version
   return request;
 }, error => {
   return Promise.reject(error);
@@ -45,10 +45,10 @@ export const dateUtils = {
     const date = new Date(dateString);
     const now = new Date();
     
-    // Différence en millisecondes
+    // Difference in milliseconds
     const diffMs = now - date;
     
-    // Conversion en secondes, minutes, heures, jours
+    // Convert to seconds, minutes, hours, days
     const diffSec = Math.round(diffMs / 1000);
     const diffMin = Math.round(diffSec / 60);
     const diffHours = Math.round(diffMin / 60);
@@ -57,7 +57,7 @@ export const dateUtils = {
     const diffMonths = Math.round(diffDays / 30);
     const diffYears = Math.round(diffDays / 365);
     
-    // Formater en fonction de la différence
+    // Format based on difference
     if (diffSec < 60) {
       return 'Just now';
     } else if (diffMin < 60) {
@@ -147,7 +147,7 @@ export const settingsApi = {
   update: (data) => api.post('/settings', data),
 };
 
-// Créez un objet pour l'exportation par défaut
+// Create an object for default export
 const apiExports = {
   repositories: repositoriesApi,
   projects: projectsApi,

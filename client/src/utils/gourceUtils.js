@@ -1,6 +1,6 @@
 /**
  * Utilitaires pour Gource
- * Fonctions de conversion et d'aide pour les paramètres de Gource
+ * Fonctions de conversion et d'aide pour the parameters of Gource
  */
 
 /**
@@ -227,8 +227,8 @@ export function getCommonResolutions() {
 }
 
 /**
- * Retourne la liste des modes de caméra
- * @returns {Object[]} Liste des modes de caméra avec valeur et libellé
+ * Returns the list of camera modes
+ * @returns {Object[]} List of camera modes with value and label
  */
 export function getCameraModes() {
   return [

@@ -51,43 +51,43 @@ const defaultGourceConfig = {
 
 // Descriptions for each setting with detailed explanations
 const settingsDescriptions = {
-  resolution: "Définit la résolution de la vidéo au format LARGEURxHAUTEUR (ex: 1920x1080)",
-  framerate: "Nombre d'images par seconde dans la vidéo exportée",
-  secondsPerDay: "Nombre de secondes à consacrer à chaque journée d'activité",
-  autoSkipSeconds: "Saute automatiquement les périodes d'inactivité supérieures à cette valeur (en secondes)",
-  elasticity: "Contrôle l'élasticité des connexions entre fichiers et utilisateurs (0.0-1.0)",
-  title: "Affiche le titre du projet en haut de la visualisation",
-  key: "Affiche la légende des types de fichiers",
-  background: "Couleur d'arrière-plan de la visualisation (format hexadécimal avec #)",
-  fontScale: "Taille relative des textes dans la visualisation",
-  cameraMode: "Mode de caméra: 'overview' (vue d'ensemble), 'track' (suit l'activité), 'follow' (suit les utilisateurs)",
-  userScale: "Taille relative des avatars utilisateurs",
-  timeScale: "Vitesse relative du temps dans la visualisation",
-  highlightUsers: "Met en évidence les utilisateurs durant leur activité",
-  hideUsers: "Masque certains utilisateurs (séparés par des virgules)",
-  hideFilesRegex: "Expression régulière pour masquer certains fichiers",
-  hideRoot: "Masque le répertoire racine dans la visualisation",
-  maxUserCount: "Limite le nombre maximal d'utilisateurs affichés (0 = pas de limite)",
-  titleText: "Texte personnalisé du titre (vide = utiliser le nom du projet)",
-  showDates: "Affiche les dates dans la visualisation",
-  disableProgress: "Désactive la barre de progression",
-  disableAutoRotate: "Désactive la rotation automatique de la caméra",
-  showLines: "Affiche les lignes reliant les fichiers aux utilisateurs",
-  followUsers: "La caméra suit les utilisateurs actifs",
-  maxFilelag: "Délai maximal avant que les fichiers n'apparaissent (en secondes)",
-  multiSampling: "Active l'anti-aliasing pour une meilleure qualité d'image",
-  bloom: "Ajoute un effet de luminosité (bloom) aux éléments brillants",
-  bloomIntensity: "Intensité de l'effet de bloom (0.0-1.0)",
-  bloomMultiplier: "Multiplicateur de l'effet de bloom (0.0-1.0)",
-  extraArgs: "Arguments supplémentaires à passer directement à Gource",
-  dateFormat: "Format d'affichage des dates",
-  highlightAllUsers: "Met en évidence tous les utilisateurs",
-  rangeDays: "Nombre de jours à visualiser à partir de la fin du projet"
+  resolution: "Sets the video resolution in WIDTHxHEIGHT format (e.g., 1920x1080)",
+  framerate: "Number of frames per second in the exported video",
+  secondsPerDay: "Number of seconds allocated to each day of activity",
+  autoSkipSeconds: "Automatically skips periods of inactivity longer than this value (in seconds)",
+  elasticity: "Controls the elasticity of connections between files and users (0.0-1.0)",
+  title: "Displays the project title at the top of the visualization",
+  key: "Displays the legend for file types",
+  background: "Background color of the visualization (hexadecimal format with #)",
+  fontScale: "Relative size of text in the visualization",
+  cameraMode: "Camera mode: 'overview', 'track' (follows activity), 'follow' (follows users)",
+  userScale: "Relative size of user avatars",
+  timeScale: "Relative speed of time in the visualization",
+  highlightUsers: "Highlights users during their activity",
+  hideUsers: "Hides specific users (comma-separated)",
+  hideFilesRegex: "Regular expression to hide certain files",
+  hideRoot: "Hides the root directory in the visualization",
+  maxUserCount: "Limits the maximum number of users displayed (0 = no limit)",
+  titleText: "Custom title text (empty = use project name)",
+  showDates: "Shows dates in the visualization",
+  disableProgress: "Disables the progress bar",
+  disableAutoRotate: "Disables automatic camera rotation",
+  showLines: "Shows lines connecting files to users",
+  followUsers: "Camera follows active users",
+  maxFilelag: "Maximum delay before files appear (in seconds)",
+  multiSampling: "Enables anti-aliasing for better image quality",
+  bloom: "Adds a bloom effect to bright elements",
+  bloomIntensity: "Intensity of the bloom effect (0.0-1.0)",
+  bloomMultiplier: "Multiplier for the bloom effect (0.0-1.0)",
+  extraArgs: "Additional arguments to pass directly to Gource",
+  dateFormat: "Date display format",
+  highlightAllUsers: "Highlights all users",
+  rangeDays: "Number of days to visualize from the end of the project"
 };
 
 /**
- * Convertit les paramètres de configuration en arguments pour la ligne de commande Gource
- * Pour utilisation côté client uniquement - existe pour compatibilité avec le code serveur
+ * Converts configuration parameters to arguments for the Gource command line
+ * For client-side use only - exists for compatibility with server code
  */
 function convertToGourceArgs(settings) {
   console.log("Client-side convertToGourceArgs called - this is just a stub");

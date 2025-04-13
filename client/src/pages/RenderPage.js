@@ -135,14 +135,14 @@ const RenderPage = () => {
   const getProfileName = (projectId) => {
     const project = projects.find(p => p.id === projectId);
     
-    // Si le projet n'a pas de profil assigné
+    // If the project has no assigned profile
     if (!project || !project.renderProfileId) {
-      // Recherche du profil par défaut
+      // Find the default profile
       const defaultProfile = renderProfiles.find(p => p.isDefault === true);
       return defaultProfile ? defaultProfile.name : 'Default settings';
     }
     
-    // Si le projet a un profil assigné
+    // If the project has an assigned profile
     const profile = renderProfiles.find(p => p.id === project.renderProfileId);
     return profile ? profile.name : 'Default settings';
   };

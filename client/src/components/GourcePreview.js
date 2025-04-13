@@ -15,11 +15,9 @@ import { generateGourceCommand } from '../utils/gourceUtils';
 import axios from 'axios';
 
 /**
- * Composant de prévisualisation en temps réel des configurations Gource
- * @param {Object} props - Les propriétés du composant
- * @param {Object} props.settings - Les paramètres de configuration Gource
- * @param {string} props.repositoryPath - Le chemin du dépôt à visualiser
- * @param {boolean} props.refreshTrigger - Déclencheur de rafraîchissement
+ * @param {Object} props.settings - Gource configuration settings
+ * @param {string} props.repositoryPath - Repository path to visualize
+ * @param {boolean} props.refreshTrigger - Refresh trigger
  */
 const GourcePreview = ({ settings, repositoryPath, refreshTrigger }) => {
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -27,7 +25,7 @@ const GourcePreview = ({ settings, repositoryPath, refreshTrigger }) => {
   const [error, setError] = useState(null);
   const [isLive, setIsLive] = useState(false);
 
-  // Générer un aperçu quand les paramètres changent ou le déclencheur est activé
+  // Generate preview when settings change or trigger is activated
   useEffect(() => {
     if (isLive && settings && repositoryPath) {
       generatePreview();
@@ -44,7 +42,7 @@ const GourcePreview = ({ settings, repositoryPath, refreshTrigger }) => {
       setIsGenerating(true);
       setError(null);
       
-      // Utiliser une API côté serveur pour générer un aperçu en image
+      // Use server-side API to generate an image preview
       const response = await axios.post('/api/renders/preview', {
         settings: settings,
         repositoryPath: repositoryPath

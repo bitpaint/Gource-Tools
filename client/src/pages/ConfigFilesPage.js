@@ -299,9 +299,9 @@ const ConfigFilesPage = () => {
     );
   }
 
-  // Fonction utilitaire pour afficher les propriétés du profil avec tirets
+  // Utility function to display profile properties with dashes
   const getProfileSetting = (profile, key) => {
-    // Pour les propriétés avec tirets, utiliser la notation entre crochets
+    // For properties with dashes, use bracket notation
     if (key.includes('-')) {
       return profile.settings[key];
     }

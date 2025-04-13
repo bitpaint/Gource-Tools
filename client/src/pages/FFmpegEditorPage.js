@@ -162,10 +162,10 @@ const FFmpegEditorPage = () => {
     <Container maxWidth="xl">
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Éditeur Vidéo FFmpeg
+          FFmpeg Video Editor
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          Appliquez des filtres simples à vos vidéos Gource sans perdre de qualité
+          Apply simple filters to your Gource videos without losing quality
         </Typography>
       </Box>
 
@@ -175,7 +175,7 @@ const FFmpegEditorPage = () => {
           <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               <VideoLibraryIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Vos Rendus
+              Your Renders
             </Typography>
             
             {loading ? (
@@ -184,7 +184,7 @@ const FFmpegEditorPage = () => {
               </Box>
             ) : videos.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                Aucune vidéo disponible. Rendez une visualisation Gource d'abord.
+                No videos available. Render a Gource visualization first.
               </Typography>
             ) : (
               <List sx={{ maxHeight: '70vh', overflow: 'auto' }}>
@@ -205,11 +205,11 @@ const FFmpegEditorPage = () => {
                         secondary={
                           <Box>
                             <Typography variant="body2" component="span" color="text.secondary">
-                              Projet: {video.projectName || 'N/A'}
+                              Project: {video.projectName || 'N/A'}
                             </Typography>
                             <br />
                             <Typography variant="caption" component="span" color="text.secondary">
-                              Rendu le: {video.endTime ? new Date(video.endTime).toLocaleString() : 'Date inconnue'}
+                              Rendered on: {video.endTime ? new Date(video.endTime).toLocaleString() : 'Date unknown'}
                             </Typography>
                           </Box>
                         }
@@ -228,17 +228,17 @@ const FFmpegEditorPage = () => {
             {!selectedVideo ? (
               <Box sx={{ textAlign: 'center', p: 5 }}>
                 <Typography variant="h6" color="text.secondary">
-                  Sélectionnez une vidéo pour commencer l'édition
+                  Select a video to start editing
                 </Typography>
               </Box>
             ) : (
               <>
                 <Typography variant="h6" gutterBottom>
-                  Édition: {selectedVideo.fileName || `Render ${selectedVideo.id}`}
+                  Edit: {selectedVideo.fileName || `Render ${selectedVideo.id}`}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  Projet: {selectedVideo.projectName || 'Non spécifié'} | 
-                  {selectedVideo.endTime ? ` Rendu le ${new Date(selectedVideo.endTime).toLocaleString()}` : ''}
+                  Project: {selectedVideo.projectName || 'Not specified'} | 
+                  {selectedVideo.endTime ? ` Rendered on ${new Date(selectedVideo.endTime).toLocaleString()}` : ''}
                 </Typography>
                 <Divider sx={{ mb: 3 }} />
 
@@ -253,7 +253,7 @@ const FFmpegEditorPage = () => {
                     }
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        Fondus vidéo et audio
+                        Video and audio fades
                       </Box>
                     }
                   />
@@ -261,7 +261,7 @@ const FFmpegEditorPage = () => {
                   {filters.fade.enabled && (
                     <Box sx={{ pl: 2 }}>
                       <Typography id="fade-in-duration-slider" gutterBottom>
-                        Durée du fondu d'ouverture: {filters.fade.durationIn} secondes
+                        Fade-in duration: {filters.fade.durationIn} seconds
                       </Typography>
                       <Slider
                         value={filters.fade.durationIn}
@@ -275,7 +275,7 @@ const FFmpegEditorPage = () => {
                       />
 
                       <Typography id="fade-out-duration-slider" gutterBottom sx={{ mt: 2 }}>
-                        Durée du fondu de fermeture: {filters.fade.durationOut} secondes
+                        Fade-out duration: {filters.fade.durationOut} seconds
                       </Typography>
                       <Slider
                         value={filters.fade.durationOut}
@@ -288,7 +288,7 @@ const FFmpegEditorPage = () => {
                         max={5}
                       />
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                        Le fondu s'appliquera à la vidéo et à l'audio si présent
+                        The fade will apply to both video and audio if present
                       </Typography>
                     </Box>
                   )}
@@ -306,7 +306,7 @@ const FFmpegEditorPage = () => {
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <MusicNoteIcon sx={{ mr: 1 }} />
-                        Ajouter une musique de fond
+                        Add background music
                       </Box>
                     }
                   />
@@ -318,7 +318,7 @@ const FFmpegEditorPage = () => {
                         component="label"
                         sx={{ mb: 2, mt: 1 }}
                       >
-                        {filters.music.file ? 'Changer de musique' : 'Télécharger une musique'}
+                        {filters.music.file ? 'Change music' : 'Upload music'}
                         <input
                           type="file"
                           accept="audio/*"
@@ -329,7 +329,7 @@ const FFmpegEditorPage = () => {
                       
                       {filters.music.file && (
                         <Typography variant="body2" sx={{ mb: 2 }}>
-                          Sélectionné: {filters.music.file.split('/').pop()}
+                          Selected: {filters.music.file.split('/').pop()}
                         </Typography>
                       )}
                       
@@ -353,17 +353,17 @@ const FFmpegEditorPage = () => {
                 {/* Quality Controls */}
                 <Box sx={{ mb: 4 }}>
                   <FormControl fullWidth>
-                    <InputLabel id="quality-select-label">Qualité de sortie</InputLabel>
+                    <InputLabel id="quality-select-label">Output quality</InputLabel>
                     <Select
                       labelId="quality-select-label"
                       id="quality-select"
                       value={filters.quality}
-                      label="Qualité de sortie"
+                      label="Output quality"
                       onChange={(e) => setFilters(prev => ({ ...prev, quality: e.target.value }))}
                     >
-                      <MenuItem value="low">Basse (Traitement plus rapide)</MenuItem>
-                      <MenuItem value="medium">Moyenne</MenuItem>
-                      <MenuItem value="high">Haute (Traitement plus lent)</MenuItem>
+                      <MenuItem value="low">Low (Faster processing)</MenuItem>
+                      <MenuItem value="medium">Medium</MenuItem>
+                      <MenuItem value="high">High (Slower processing)</MenuItem>
                     </Select>
                   </FormControl>
                 </Box>
@@ -375,7 +375,7 @@ const FFmpegEditorPage = () => {
                     onClick={generatePreview}
                     disabled={processing}
                   >
-                    Générer un aperçu
+                    Generate preview
                   </Button>
                   
                   <Button
@@ -385,7 +385,7 @@ const FFmpegEditorPage = () => {
                     onClick={applyFilters}
                     disabled={processing}
                   >
-                    Appliquer et enregistrer
+                    Apply and save
                   </Button>
                 </Box>
                 
@@ -403,12 +403,12 @@ const FFmpegEditorPage = () => {
         <Grid item xs={12} md={3}>
           <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
-              Aperçu
+              Preview
             </Typography>
             <Box sx={{ textAlign: 'center' }}>
               {!selectedVideo ? (
                 <Typography variant="body2" color="text.secondary">
-                  Sélectionnez une vidéo et générez un aperçu
+                  Select a video and generate a preview
                 </Typography>
               ) : preview ? (
                 <Box>
@@ -418,13 +418,10 @@ const FFmpegEditorPage = () => {
                     src={preview}
                     style={{ maxHeight: '70vh' }}
                   />
-                  <Typography variant="caption" color="text.secondary">
-                    Ceci est un aperçu en basse résolution. La sortie finale sera en qualité maximale.
-                  </Typography>
                 </Box>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Cliquez sur "Générer un aperçu" pour voir vos modifications
+                  Click "Generate preview" to see changes
                 </Typography>
               )}
             </Box>

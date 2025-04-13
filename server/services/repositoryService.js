@@ -1,7 +1,7 @@
 /**
- * Service de gestion des dépôts Git
- * Responsable de l'accès, validation et gestion des référentiels
- * Optimisé pour Windows 11 Pro
+ * Git Repository Management Service
+ * Responsible for access, validation and management of repositories
+ * Optimized for Windows 11 Pro
  */
 
 const path = require('path');
@@ -19,7 +19,7 @@ class RepositoryService {
   }
 
   /**
-   * Initialise la base de données et crée le dossier des dépôts si nécessaire
+   * Initialize the database and create repository folder if needed
    */
   init() {
     const dbDir = path.dirname(this.dbPath);
@@ -33,20 +33,20 @@ class RepositoryService {
     
     const db = this.getDatabase();
     
-    // Vérifier si la collection repositories existe
+    // Check if repositories collection exists
     if (!db.has('repositories').value()) {
       db.set('repositories', []).write();
     }
     
-    // Vérifier que le dossier des dépôts existe
+    // Check that the repository folder exists
     if (!fs.existsSync(this.baseRepoDir)) {
       fs.mkdirSync(this.baseRepoDir, { recursive: true });
     }
   }
 
   /**
-   * Récupère une instance fraîche de la base de données
-   * @returns {Object} Instance de la base de données
+   * Get a fresh instance of the database
+   * @returns {Object} Database instance
    */
   getDatabase() {
     const adapter = new FileSync(this.dbPath);
@@ -54,8 +54,8 @@ class RepositoryService {
   }
 
   /**
-   * Récupère tous les dépôts
-   * @returns {Array} Liste des dépôts
+   * Get all repositories
+   * @returns {Array} List of repositories
    */
   getAllRepositories() {
     const db = this.getDatabase();
@@ -63,9 +63,9 @@ class RepositoryService {
   }
 
   /**
-   * Récupère un dépôt par son ID
-   * @param {string} id - ID du dépôt à récupérer
-   * @returns {Object|null} Dépôt ou null si non trouvé
+   * Get a repository by its ID
+   * @param {string} id - ID of the repository to retrieve
+   * @returns {Object|null} Repository or null if not found
    */
   getRepositoryById(id) {
     if (!id) return null;
@@ -77,9 +77,9 @@ class RepositoryService {
   }
 
   /**
-   * Vérifie si un chemin contient un dépôt Git valide
-   * @param {string} repoPath - Chemin du dépôt à vérifier
-   * @returns {boolean} true si valide, false sinon
+   * Check if a path contains a valid Git repository
+   * @param {string} repoPath - Path of the repository to check
+   * @returns {boolean} true if valid, false otherwise
    */
   isValidGitRepository(repoPath) {
     try {
@@ -87,13 +87,13 @@ class RepositoryService {
         return false;
       }
       
-      // Vérifier si le dossier .git existe
+      // Check if .git folder exists
       const gitDir = path.join(repoPath, '.git');
       if (!fs.existsSync(gitDir)) {
         return false;
       }
 
-      // Sur Windows, utiliser PowerShell pour exécuter git status
+      // On Windows, use PowerShell to execute git status
       const gitStatus = execSync('git status', { 
         cwd: repoPath,
         shell: 'powershell.exe',
@@ -103,49 +103,49 @@ class RepositoryService {
       
       return true;
     } catch (error) {
-      console.error(`Erreur lors de la vérification du dépôt Git: ${repoPath}`, error.message);
+      console.error(`Error checking Git repository: ${repoPath}`, error.message);
       return false;
     }
   }
 
   /**
-   * Crée un nouveau dépôt dans la base de données
-   * @param {Object} repoData - Données du dépôt à créer
-   * @returns {Object} Dépôt créé
+   * Create a new repository in the database
+   * @param {Object} repoData - Repository data to create
+   * @returns {Object} Created repository
    */
   createRepository(repoData) {
     const db = this.getDatabase();
     
-    // Valider les données requises
+    // Validate required data
     if (!repoData.name) {
-      throw new Error('Le nom du dépôt est requis');
+      throw new Error('Repository name is required');
     }
     
     if (!repoData.path) {
-      throw new Error('Le chemin du dépôt est requis');
+      throw new Error('Repository path is required');
     }
     
-    // Normaliser le chemin pour Windows
+    // Normalize path for Windows
     const normalizedPath = repoData.path.replace(/[\/\\]+/g, path.sep);
     
-    // Vérifier que le dépôt est valide
+    // Check if repository is valid
     if (!this.isValidGitRepository(normalizedPath)) {
-      throw new Error(`Le chemin ${normalizedPath} ne contient pas un dépôt Git valide`);
+      throw new Error(`Path ${normalizedPath} does not contain a valid Git repository`);
     }
     
-    // Vérifier si un dépôt avec le même nom existe déjà
+    // Check if a repository with the same name already exists
     const existingRepo = db.get('repositories')
       .find({ name: repoData.name })
       .value();
     
     if (existingRepo) {
-      throw new Error(`Un dépôt avec le nom "${repoData.name}" existe déjà`);
+      throw new Error(`A repository with name "${repoData.name}" already exists`);
     }
     
-    // Générer un ID unique
+    // Generate a unique ID
     const id = Date.now().toString();
     
-    // Créer le dépôt
+    // Create the repository
     const newRepository = {
       id,
       name: repoData.name,
@@ -155,7 +155,7 @@ class RepositoryService {
       lastUpdated: new Date().toISOString()
     };
     
-    // Ajouter le dépôt à la base de données
+    // Add repository to database
     db.get('repositories')
       .push(newRepository)
       .write();
@@ -164,10 +164,10 @@ class RepositoryService {
   }
 
   /**
-   * Met à jour un dépôt existant
-   * @param {string} id - ID du dépôt à mettre à jour
-   * @param {Object} repoData - Nouvelles données du dépôt
-   * @returns {Object|null} Dépôt mis à jour ou null si non trouvé
+   * Update an existing repository
+   * @param {string} id - ID of the repository to update
+   * @param {Object} repoData - New repository data
+   * @returns {Object|null} Updated repository or null if not found
    */
   updateRepository(id, repoData) {
     if (!id) return null;
@@ -181,29 +181,29 @@ class RepositoryService {
     
     let updatedPath = repository.path;
     
-    // Si le chemin est modifié, le valider
+    // If path is modified, validate it
     if (repoData.path && repoData.path !== repository.path) {
-      // Normaliser le chemin pour Windows
+      // Normalize path for Windows
       updatedPath = repoData.path.replace(/[\/\\]+/g, path.sep);
       
-      // Vérifier que le dépôt est valide
+      // Check if repository is valid
       if (!this.isValidGitRepository(updatedPath)) {
-        throw new Error(`Le chemin ${updatedPath} ne contient pas un dépôt Git valide`);
+        throw new Error(`Path ${updatedPath} does not contain a valid Git repository`);
       }
     }
     
-    // Vérifier si un autre dépôt avec le même nom existe déjà
+    // Check if another repository with the same name already exists
     if (repoData.name && repoData.name !== repository.name) {
       const existingRepo = db.get('repositories')
         .find({ name: repoData.name })
         .value();
       
       if (existingRepo && existingRepo.id !== id) {
-        throw new Error(`Un dépôt avec le nom "${repoData.name}" existe déjà`);
+        throw new Error(`A repository with name "${repoData.name}" already exists`);
       }
     }
     
-    // Mettre à jour le dépôt
+    // Update the repository
     const updatedRepository = {
       ...repository,
       name: repoData.name || repository.name,
@@ -214,7 +214,7 @@ class RepositoryService {
       lastUpdated: new Date().toISOString()
     };
     
-    // Mettre à jour le dépôt dans la base de données
+    // Update the repository in the database
     db.get('repositories')
       .find({ id: id.toString() })
       .assign(updatedRepository)
@@ -224,33 +224,33 @@ class RepositoryService {
   }
 
   /**
-   * Supprime un dépôt
-   * @param {string} id - ID du dépôt à supprimer
-   * @returns {boolean} true si supprimé, false sinon
+   * Delete a repository
+   * @param {string} id - ID of the repository to delete
+   * @returns {boolean} true if deleted, false otherwise
    */
   deleteRepository(id) {
     if (!id) return false;
     
     const db = this.getDatabase();
     
-    // Vérifier si le dépôt existe
+    // Check if repository exists
     const repository = db.get('repositories')
       .find({ id: id.toString() })
       .value();
     
     if (!repository) return false;
     
-    // Avant de supprimer, vérifier si le dépôt est utilisé dans des projets
+    // Before deleting, check if repository is used in projects
     const projects = db.get('projects').value() || [];
     const usedInProjects = projects.filter(project => 
       project.repositories && project.repositories.includes(id.toString())
     );
     
     if (usedInProjects.length > 0) {
-      throw new Error(`Ce dépôt est utilisé dans ${usedInProjects.length} projet(s) et ne peut pas être supprimé.`);
+      throw new Error(`This repository is used in ${usedInProjects.length} project(s) and cannot be deleted.`);
     }
     
-    // Supprimer le dépôt de la base de données
+    // Delete the repository from the database
     db.get('repositories')
       .remove({ id: id.toString() })
       .write();
@@ -259,42 +259,42 @@ class RepositoryService {
   }
 
   /**
-   * Génère un fichier de log git pour un dépôt au format Gource
-   * @param {Object} repository - Objet dépôt
-   * @param {string} outputPath - Chemin du fichier de sortie
-   * @param {Object} options - Options de génération
-   * @returns {Promise<Object>} - Informations sur le log généré
+   * Generate a git log file for a repository in Gource format
+   * @param {Object} repository - Repository object
+   * @param {string} outputPath - Output file path
+   * @param {Object} options - Generation options
+   * @returns {Promise<Object>} - Generated log information
    */
   async generateGitLog(repository, outputPath, options = {}) {
     if (!repository) {
-      throw new Error('Dépôt invalide ou non spécifié');
+      throw new Error('Invalid repository or not specified');
     }
 
-    // Déterminer le chemin du dépôt (peut être dans path ou localPath selon la structure)
+    // Determine repository path (may be in path or localPath depending on structure)
     const repoPath = repository.path || repository.localPath;
     
     if (!repoPath) {
-      throw new Error('Chemin du dépôt non spécifié');
+      throw new Error('Repository path not specified');
     }
 
     if (!fs.existsSync(repoPath)) {
-      throw new Error(`Le chemin du dépôt n'existe pas: ${repoPath}`);
+      throw new Error(`Repository path does not exist: ${repoPath}`);
     }
 
-    // Créer le répertoire de sortie s'il n'existe pas
+    // Create output directory if it doesn't exist
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
     try {
-      // Utiliser git pour générer un fichier de log et le transformer au format Gource
-      // Format: timestamp|auteur|action|fichier
-      // Actions: A (ajout), M (modification), D (suppression)
+      // Use git to generate a log file and transform it to Gource format
+      // Format: timestamp|author|action|file
+      // Actions: A (addition), M (modification), D (deletion)
       const gitCommand = `cd "${repoPath}" && git log --pretty=format:"%at|%an|%s" --name-status --reverse`;
       const gitLogOutput = execSync(gitCommand, { encoding: 'utf8' });
       
-      // Transformer la sortie git en format Gource
+      // Transform git output to Gource format
       let currentCommit = null;
       let currentTime = null;
       let currentAuthor = null;
@@ -307,7 +307,7 @@ class RepositoryService {
         
         if (line === '') continue;
         
-        // Si la ligne contient des |, c'est une ligne de commit
+        // If line contains |, it's a commit line
         if (line.includes('|')) {
           const parts = line.split('|');
           if (parts.length >= 2) {
@@ -315,12 +315,12 @@ class RepositoryService {
             currentAuthor = parts[1];
           }
         } 
-        // Sinon, c'est une ligne de fichier avec son statut
+        // Otherwise, it's a file line with its status
         else if (currentTime && currentAuthor) {
-          // Format git: A/M/D     chemin/du/fichier
+          // Format git: A/M/D     path/to/file
           const fileMatch = line.match(/^([AMD])\s+(.+)$/);
           if (fileMatch) {
-            const action = fileMatch[1]; // A, M ou D
+            const action = fileMatch[1]; // A, M or D
             const filePath = fileMatch[2];
             
             // Format Gource: timestamp|username|action|filepath
@@ -329,12 +329,12 @@ class RepositoryService {
         }
       }
       
-      // Écrire le fichier au format Gource
+      // Write file to Gource format
       fs.writeFileSync(outputPath, gourceLines.join('\n'), 'utf8');
       
-      // Vérifier si le fichier a été créé et n'est pas vide
+      // Check if file was created and is not empty
       if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
-        console.warn(`Aucun log généré pour le dépôt ${repository.name}`);
+        console.warn(`No log generated for repository ${repository.name}`);
         return {
           path: outputPath,
           name: repository.name,
@@ -350,45 +350,45 @@ class RepositoryService {
         isEmpty: false
       };
     } catch (error) {
-      console.error(`Erreur lors de la génération du log pour ${repository.name}:`, error.message);
-      throw new Error(`Échec de la génération du log Gource: ${error.message}`);
+      console.error(`Error generating log for ${repository.name}:`, error.message);
+      throw new Error(`Gource log generation failed: ${error.message}`);
     }
   }
 
   /**
-   * Importe en masse des dépôts trouvés dans un répertoire
-   * @param {string} baseDirectoryPath - Chemin du répertoire contenant les dépôts
-   * @param {boolean} skipConfirmation - Si vrai, ignore les vérifications supplémentaires
-   * @returns {Promise<Object>} Résultats de l'importation
+   * Import multiple repositories found in a directory
+   * @param {string} baseDirectoryPath - Path of the directory containing repositories
+   * @param {boolean} skipConfirmation - If true, skip additional checks
+   * @returns {Promise<Object>} Import results
    */
   bulkImport(baseDirectoryPath, skipConfirmation = false) {
     return new Promise(async (resolve, reject) => {
       try {
         if (!baseDirectoryPath) {
-          throw new Error('Le chemin du répertoire est requis');
+          throw new Error('Repository directory path is required');
         }
 
-        // Normaliser le chemin pour Windows
+        // Normalize path for Windows
         const normalizedPath = baseDirectoryPath.replace(/[\/\\]+/g, path.sep);
         
-        // Vérifier que le répertoire existe
+        // Check if directory exists
         if (!fs.existsSync(normalizedPath)) {
-          throw new Error(`Le répertoire ${normalizedPath} n'existe pas`);
+          throw new Error(`Directory ${normalizedPath} does not exist`);
         }
         
-        // Vérifier que c'est un répertoire
+        // Check if it's a directory
         const stats = fs.statSync(normalizedPath);
         if (!stats.isDirectory()) {
-          throw new Error(`${normalizedPath} n'est pas un répertoire`);
+          throw new Error(`${normalizedPath} is not a directory`);
         }
         
         console.time('bulkImport');
         
-        // Lecture des sous-répertoires (gardée synchrone pour simplicité d'implémentation)
+        // Read subdirectories (kept synchronous for simplicity of implementation)
         const dirents = fs.readdirSync(normalizedPath, { withFileTypes: true })
           .filter(dirent => dirent.isDirectory());
           
-        // Vérification parallèle des dépôts Git valides
+        // Parallel check of valid Git repositories
         const dirs = await Promise.all(
           dirents.map(async dirent => {
             const dirPath = path.join(normalizedPath, dirent.name);
@@ -400,30 +400,30 @@ class RepositoryService {
           })
         );
         
-        // Filtrage des dépôts Git valides
+        // Filter valid Git repositories
         const validRepos = dirs.filter(dir => dir.isGitRepo);
         if (validRepos.length === 0) {
-          throw new Error('Aucun dépôt Git valide trouvé dans le répertoire spécifié');
+          throw new Error('No valid Git repositories found in the specified directory');
         }
         
-        // Récupérer les dépôts existants pour éviter les doublons
+        // Get existing repositories to avoid duplicates
         const existingRepos = this.getAllRepositories();
         
-        // Création de Set pour recherche O(1) au lieu de O(n)
+        // Create Set for O(1) search instead of O(n)
         const existingPathsSet = new Set(existingRepos.map(repo => repo.path.toLowerCase()));
         const existingNamesSet = new Set(existingRepos.map(repo => repo.name.toLowerCase()));
         
-        // Filtrer les dépôts déjà importés avec Set pour performance O(1)
+        // Filter already imported repositories with Set for O(1) performance
         const newRepos = validRepos.filter(repo => 
           !existingPathsSet.has(repo.path.toLowerCase()) && 
           !existingNamesSet.has(repo.name.toLowerCase())
         );
         
         if (newRepos.length === 0) {
-          throw new Error('Tous les dépôts Git valides ont déjà été importés');
+          throw new Error('All valid Git repositories have already been imported');
         }
         
-        // Liste des résultats
+        // List of results
         const results = {
           totalFound: validRepos.length,
           totalImported: 0,
@@ -432,13 +432,13 @@ class RepositoryService {
           errors: []
         };
         
-        // Importer en parallèle chaque nouveau dépôt
+        // Import repositories in parallel
         const importPromises = newRepos.map(repo => {
           return new Promise(resolve => {
             try {
               const newRepo = this.createRepository({
                 name: repo.name,
-                description: `Importé automatiquement depuis ${normalizedPath}`,
+                description: `Imported automatically from ${normalizedPath}`,
                 path: repo.path
               });
               
@@ -461,13 +461,13 @@ class RepositoryService {
           });
         });
         
-        // Attendre que tous les imports soient terminés
+        // Wait for all imports to complete
         await Promise.all(importPromises);
         
         console.timeEnd('bulkImport');
         resolve(results);
       } catch (error) {
-        console.error('Erreur lors de l\'importation en masse:', error);
+        console.error('Error during bulk import:', error);
         reject(error);
       }
     });

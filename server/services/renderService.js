@@ -317,33 +317,33 @@ class RenderService {
   }
 
   /**
-   * Génère un fichier log combiné à partir de plusieurs dépôts
-   * @param {Array} repositories - Liste des dépôts
-   * @param {Object} options - Options pour la génération du log
-   * @returns {string} - Chemin vers le fichier log combiné
+   * Generates a combined log file from multiple repositories
+   * @param {Array} repositories - List of repositories
+   * @param {Object} options - Options for log generation
+   * @returns {string} - Path to the combined log file
    */
   async generateCombinedLogs(repositories, options = {}) {
-    console.log(`Génération des logs combinés pour ${repositories.length} dépôts`);
+    console.log(`Generating combined logs for ${repositories.length} repositories`);
     
     if (!repositories || repositories.length === 0) {
-      throw new Error('Aucun dépôt fourni pour la génération de logs');
+      throw new Error('No repositories provided for log generation');
     }
 
-    // Charger RepositoryService si nécessaire pour éviter la dépendance circulaire
+    // Load RepositoryService if necessary to avoid circular dependency
     if (!RepositoryService) {
       RepositoryService = require('./repositoryService');
     }
 
-    // Créer un répertoire temporaire pour les logs individuels
+    // Create a temporary directory for individual logs
     const tempLogsDir = path.join(this.logsDir, 'temp', Date.now().toString());
     if (!fs.existsSync(tempLogsDir)) {
       fs.mkdirSync(tempLogsDir, { recursive: true });
     }
 
-    // Créer le chemin de sortie pour le log combiné
+    // Create output path for the combined log
     const outputPath = path.join(tempLogsDir, 'combined.log');
 
-    // Générer les logs individuels pour chaque dépôt
+    // Generate individual logs for each repository
     const logFiles = [];
     const failedRepos = [];
 
@@ -351,77 +351,77 @@ class RenderService {
       try {
         const logFilePath = path.join(tempLogsDir, `${repo.id || repo.name}.log`);
 
-        console.log(`Génération du log Gource pour ${repo.name || repo.id}`);
+        console.log(`Generating Gource log for ${repo.name || repo.id}`);
         
-        // Vérifier si le dépôt a un chemin local
+        // Check if the repository has a local path
         if (!repo.localPath && !repo.path) {
-          console.warn(`Le dépôt ${repo.name || repo.id} n'a pas de chemin local défini`);
+          console.warn(`Repository ${repo.name || repo.id} has no local path defined`);
           failedRepos.push(repo.name || repo.id);
           continue;
         }
         
-        // Utiliser generateGitLog de RepositoryService directement avec l'objet repo
+        // Use generateGitLog from RepositoryService directly with repo object
         const result = await RepositoryService.generateGitLog(repo, logFilePath, options);
         
         if (result && !result.isEmpty) {
           logFiles.push(result);
         } else {
-          console.warn(`Le fichier log pour ${repo.name || repo.id} est vide`);
+          console.warn(`Log file for ${repo.name || repo.id} is empty`);
           failedRepos.push(repo.name || repo.id);
         }
       } catch (error) {
-        console.error(`Erreur lors de la génération du log Gource pour ${repo.name || repo.id}:`, error.message);
+        console.error(`Error generating Gource log for ${repo.name || repo.id}:`, error.message);
         failedRepos.push(repo.name || repo.id);
       }
     }
 
     if (logFiles.length === 0) {
-      // Nettoyer le répertoire temporaire
+      // Clean up the temporary directory
       if (fs.existsSync(tempLogsDir)) {
         fs.rmSync(tempLogsDir, { recursive: true, force: true });
       }
-      throw new Error('Aucune entrée de log valide générée pour les dépôts');
+      throw new Error('No valid log entries generated for repositories');
     }
 
-    // Fusionner les logs individuels en un seul fichier
+    // Merge individual logs into a single file
     await this.mergeLogs(logFiles, outputPath);
 
-    console.log(`Logs combinés générés avec succès: ${outputPath}`);
+    console.log(`Combined logs successfully generated: ${outputPath}`);
     return outputPath;
   }
 
   /**
-   * Fusionne les fichiers de logs pour générer un fichier de log combiné
-   * @param {Array} logFiles - Tableau d'objets contenant les chemins des fichiers log
-   * @param {string} outputPath - Chemin du fichier de sortie
-   * @returns {Promise<string>} - Chemin du fichier de log combiné
+   * Merges log files to generate a combined log file
+   * @param {Array} logFiles - Array of objects containing log file paths
+   * @param {string} outputPath - Path to the output file
+   * @returns {Promise<string>} - Path to the combined log file
    */
   async mergeLogs(logFiles, outputPath) {
     if (!logFiles || logFiles.length === 0) {
-      throw new Error('Aucun fichier de log à fusionner');
+      throw new Error('No log files to merge');
     }
 
-    // Filtrer les fichiers vides
+    // Filter empty files
     const validLogFiles = logFiles.filter(log => !log.isEmpty);
     
     if (validLogFiles.length === 0) {
-      throw new Error('Tous les fichiers de log sont vides');
+      throw new Error('All log files are empty');
     }
 
-    // Créer le répertoire de sortie s'il n'existe pas
+    // Create output directory if it doesn't exist
     const outputDir = path.dirname(outputPath);
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
     try {
-      // Alternative: utiliser fs directement pour fusionner les fichiers
+      // Alternative: use fs directly to merge files
       let allLines = [];
       
-      // Lire tous les fichiers logs
+      // Read all log files
       for (const logFile of validLogFiles) {
         if (!fs.existsSync(logFile.path)) {
-          console.warn(`Le fichier ${logFile.path} n'existe pas, ignoré`);
+          console.warn(`File ${logFile.path} does not exist, ignored`);
           continue;
         }
         
@@ -430,18 +430,18 @@ class RenderService {
           const lines = content.split('\n').filter(line => line.trim() !== '');
           allLines = allLines.concat(lines);
         } catch (err) {
-          console.warn(`Erreur lors de la lecture du fichier ${logFile.path}: ${err.message}`);
+          console.warn(`Error reading file ${logFile.path}: ${err.message}`);
         }
       }
       
-      // Trier toutes les lignes numériquement par timestamp (premier champ)
+      // Sort all lines numerically by timestamp (first field)
       allLines.sort((a, b) => {
         const timestampA = parseInt(a.split('|')[0], 10);
         const timestampB = parseInt(b.split('|')[0], 10);
         return timestampA - timestampB;
       });
       
-      // Supprimer les lignes en double
+      // Remove duplicate lines
       const uniqueLines = [];
       for (let i = 0; i < allLines.length; i++) {
         if (i === 0 || allLines[i] !== allLines[i-1]) {
@@ -449,18 +449,18 @@ class RenderService {
         }
       }
       
-      // Écrire le fichier de sortie
+      // Write output file
       fs.writeFileSync(outputPath, uniqueLines.join('\n'), 'utf8');
 
-      // Vérifier si le fichier a été créé et n'est pas vide
+      // Check if file was created and is not empty
       if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
-        throw new Error('Échec de la fusion des logs: aucun résultat généré');
+        throw new Error('Failed to merge logs: no result generated');
       }
 
       return outputPath;
     } catch (error) {
-      console.error(`Erreur lors de la fusion des logs: ${error.message}`);
-      throw new Error(`Échec de la fusion des logs: ${error.message}`);
+      console.error(`Error merging logs: ${error.message}`);
+      throw new Error(`Failed to merge logs: ${error.message}`);
     }
   }
 

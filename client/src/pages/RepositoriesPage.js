@@ -576,12 +576,12 @@ const RepositoriesPage = () => {
       // Mise à jour finale de la liste
       await fetchRepositories();
       
-      const message = `${successCount} dépôts supprimés${errorCount > 0 ? `, ${errorCount} échecs` : ''}`;
+      const message = `${successCount} repositories deleted${errorCount > 0 ? `, ${errorCount} failures` : ''}`;
       toast.success(message);
       handleCloseDeleteUserDialog();
     } catch (err) {
       console.error('Error deleting user repositories:', err);
-      toast.error('Échec de la suppression des dépôts');
+      toast.error('Failed to delete repositories');
     } finally {
       setDeletingUserRepos(false);
     }
@@ -699,7 +699,7 @@ const RepositoriesPage = () => {
                 size="small" 
                 color="error"
                 onClick={() => handleOpenDeleteUserDialog(owner)}
-                title={`Supprimer tous les dépôts de ${owner}`}
+                title={`Delete all repositories from ${owner}`}
               >
                 <DeleteForeverIcon />
               </IconButton>
@@ -900,7 +900,7 @@ const RepositoriesPage = () => {
                 )}
               </Box>
               
-              {/* Affichage conditionnel du message concernant le token GitHub */}
+              {/* Conditional display of GitHub token message */}
               {!hasGithubToken && (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   This operation requires a GitHub API token to be set in the settings.
@@ -1094,16 +1094,16 @@ const RepositoriesPage = () => {
 
       {/* Delete User Repositories Dialog */}
       <Dialog open={openDeleteUserDialog} onClose={handleCloseDeleteUserDialog}>
-        <DialogTitle>Supprimer tous les dépôts</DialogTitle>
+        <DialogTitle>Delete All Repositories</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Êtes-vous sûr de vouloir supprimer tous les dépôts de "{userToDelete}" ?
-            Cette action supprimera {groupedRepositories[userToDelete]?.length || 0} dépôts et leurs fichiers locaux.
-            Cette action ne peut pas être annulée.
+            Are you sure you want to delete all repositories from "{userToDelete}"?
+            This will remove {groupedRepositories[userToDelete]?.length || 0} repositories and their local files.
+            This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDeleteUserDialog} disabled={deletingUserRepos}>Annuler</Button>
+          <Button onClick={handleCloseDeleteUserDialog} disabled={deletingUserRepos}>Cancel</Button>
           <Button 
             onClick={handleDeleteUserRepositories} 
             color="error" 
@@ -1111,7 +1111,7 @@ const RepositoriesPage = () => {
             disabled={deletingUserRepos}
             startIcon={deletingUserRepos && <CircularProgress size={16} color="inherit" />}
           >
-            {deletingUserRepos ? 'Suppression...' : 'Supprimer tous'}
+            {deletingUserRepos ? 'Deleting...' : 'Delete All'}
           </Button>
         </DialogActions>
       </Dialog>
