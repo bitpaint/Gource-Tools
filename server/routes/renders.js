@@ -5,6 +5,7 @@ const fs = require('fs');
 const { spawn, execSync } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const { defaultGourceConfig, defaultSettings } = require('../config/defaultGourceConfig');
 
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
@@ -102,29 +103,10 @@ router.post('/start', async (req, res) => {
         .find({ isDefault: true })
         .value();
       
-      // If no default config file exists, use basic default settings
+      // If no default config file exists, use the default settings from our central config
       if (!renderProfile) {
         renderProfile = {
-          settings: {
-            resolution: '1920x1080',
-            framerate: 60,
-            secondsPerDay: 1,
-            autoSkipSeconds: 0.1,
-            elasticity: 0.5,
-            title: true,
-            key: true,
-            background: '#000000',
-            fontScale: 1.0,
-            cameraMode: 'overview',
-            userScale: 1.0,
-            timeScale: 1.0,
-            highlightUsers: false,
-            hideUsers: '',
-            hideFilesRegex: '',
-            hideRoot: false,
-            maxUserCount: 0,
-            extraArgs: ''
-          }
+          settings: defaultSettings
         };
       }
     }

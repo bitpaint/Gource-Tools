@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require('path');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const { settings: defaultSettings } = require('../config/defaultGourceConfig');
 
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
@@ -61,28 +62,6 @@ router.post('/', (req, res) => {
 
     // Generate profile ID
     const id = Date.now().toString();
-
-    // Default settings for Gource
-    const defaultSettings = {
-      resolution: '1920x1080',
-      framerate: 60,
-      secondsPerDay: 1,
-      autoSkipSeconds: 0.1,
-      elasticity: 0.5,
-      title: true,
-      key: true,
-      background: '#000000',
-      fontScale: 1.0,
-      cameraMode: 'overview',
-      userScale: 1.0,
-      timeScale: 1.0,
-      highlightUsers: false,
-      hideUsers: '',
-      hideFilesRegex: '',
-      hideRoot: false,
-      maxUserCount: 0,
-      extraArgs: ''
-    };
 
     const newFile = {
       id,

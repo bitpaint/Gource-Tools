@@ -42,6 +42,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils } from '../api/api';
+import { defaultSettings } from '../shared/defaultGourceConfig';
 
 // Config file tabs
 function TabPanel(props) {
@@ -63,27 +64,6 @@ function TabPanel(props) {
     </div>
   );
 }
-
-const defaultSettings = {
-  resolution: '1920x1080',
-  framerate: 60,
-  secondsPerDay: 1,
-  autoSkipSeconds: 0.1,
-  elasticity: 0.5,
-  title: true,
-  key: true,
-  background: '#000000',
-  fontScale: 1.0,
-  cameraMode: 'overview',
-  userScale: 1.0,
-  timeScale: 1.0,
-  highlightUsers: false,
-  hideUsers: '',
-  hideFilesRegex: '',
-  hideRoot: false,
-  maxUserCount: 0,
-  extraArgs: ''
-};
 
 const cameraModes = [
   { value: 'overview', label: 'Overview' },

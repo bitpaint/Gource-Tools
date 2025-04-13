@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const { defaultGourceConfig } = require('../config/defaultGourceConfig');
 
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
@@ -73,6 +74,11 @@ router.post('/', (req, res) => {
       return res.status(400).json({ error: 'Project name is required' });
     }
 
+    // Verify repositories are provided and valid
+    if (!repositories || !Array.isArray(repositories) || repositories.length === 0) {
+      return res.status(400).json({ error: 'At least one repository is required' });
+    }
+
     // Check if project with same name already exists
     const existingProject = freshDb.get('projects')
       .find({ name })
@@ -100,6 +106,11 @@ router.post('/', (req, res) => {
       });
     }
     console.log('Repositories valides:', validRepos);
+
+    // Ensure at least one repository is valid
+    if (validRepos.length === 0) {
+      return res.status(400).json({ error: 'No valid repositories provided' });
+    }
 
     // Validate Gource config file if provided
     let finalRenderProfileId = renderProfileId;
@@ -185,6 +196,11 @@ router.put('/:id', (req, res) => {
       return res.status(400).json({ error: 'Project name cannot be empty' });
     }
 
+    // Verify repositories are provided and valid
+    if (!repositories || !Array.isArray(repositories) || repositories.length === 0) {
+      return res.status(400).json({ error: 'At least one repository is required' });
+    }
+
     // Check if the name is being changed and if it already exists
     if (name && name !== project.name) {
       const existingProject = freshDb.get('projects')
@@ -211,6 +227,11 @@ router.put('/:id', (req, res) => {
       }
     });
     console.log('Repositories valides (mise à jour):', validRepos);
+
+    // Ensure at least one repository is valid
+    if (validRepos.length === 0) {
+      return res.status(400).json({ error: 'No valid repositories provided' });
+    }
 
     // Validate Gource config file if provided
     let finalRenderProfileId = renderProfileId;

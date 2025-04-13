@@ -143,10 +143,19 @@ const ProjectsPage = () => {
 
   // Project handlers
   const handleOpenProjectDialog = (project = null) => {
-    // Refresh repositories to get latest data
+    // Rafraîchir les repositories lors de l'ouverture de la boîte de dialogue
     repositoriesApi.getAll().then(response => {
-      console.log('Repositories rafraîchis avant ouverture dialogue:', response.data);
       setRepositories(response.data);
+      
+      // Regrouper les dépôts par propriétaire
+      const grouped = response.data.reduce((acc, repo) => {
+        if (!acc[repo.owner]) {
+          acc[repo.owner] = [];
+        }
+        acc[repo.owner].push(repo);
+        return acc;
+      }, {});
+      setGroupedRepositories(grouped);
       
       if (project) {
         setIsEditing(true);
@@ -157,12 +166,16 @@ const ProjectsPage = () => {
           renderProfileId: project.renderProfileId || ''
         });
       } else {
+        // Trouver la configuration par défaut
+        const defaultProfile = renderProfiles.find(profile => profile.isDefault === true);
+        const defaultProfileId = defaultProfile ? defaultProfile.id : '';
+        
         setIsEditing(false);
         setCurrentProject({
           id: null,
           name: '',
           repositories: [],
-          renderProfileId: ''
+          renderProfileId: defaultProfileId
         });
       }
       setOpenProjectDialog(true);
@@ -179,6 +192,11 @@ const ProjectsPage = () => {
   const handleSaveProject = async () => {
     if (!currentProject.name) {
       toast.error('Project name is required');
+      return;
+    }
+    
+    if (!currentProject.repositories || currentProject.repositories.length === 0) {
+      toast.error('At least one repository is required');
       return;
     }
 
@@ -749,26 +767,39 @@ const ProjectsPage = () => {
       >
         <DialogTitle>{isEditing ? 'Edit Project' : 'Create Project'}</DialogTitle>
         <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            {isEditing 
-              ? 'Edit your project details below.'
-              : 'Create a new project by filling out the details below.'
-            }
-          </DialogContentText>
-          
-          <TextField
-            autoFocus
-            margin="dense"
-            id="name"
-            label="Project Name"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={currentProject.name}
-            onChange={(e) => setCurrentProject({...currentProject, name: e.target.value})}
-            required
-            sx={{ mb: 3, mt: 1 }}
-          />
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, mt: 2 }}>
+            <TextField
+              autoFocus
+              id="name"
+              label="Project Name"
+              type="text"
+              variant="outlined"
+              value={currentProject.name}
+              onChange={(e) => setCurrentProject({...currentProject, name: e.target.value})}
+              required
+              sx={{ flex: 1 }}
+            />
+            
+            <FormControl sx={{ minWidth: 250 }}>
+              <InputLabel id="render-profile-label">Gource Config File</InputLabel>
+              <Select
+                labelId="render-profile-label"
+                id="render-profile"
+                value={currentProject.renderProfileId}
+                onChange={(e) => setCurrentProject({...currentProject, renderProfileId: e.target.value})}
+                input={<OutlinedInput label="Gource Config File" />}
+              >
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {renderProfiles.map((profile) => (
+                  <MenuItem key={profile.id} value={profile.id}>
+                    {profile.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
           
           <FormControl fullWidth sx={{ mb: 3 }}>
             <InputLabel id="repositories-label">Repositories</InputLabel>
@@ -956,33 +987,13 @@ const ProjectsPage = () => {
               )}
             </Paper>
           </FormControl>
-          
-          <FormControl fullWidth>
-            <InputLabel id="render-profile-label">Gource Config File</InputLabel>
-            <Select
-              labelId="render-profile-label"
-              id="render-profile"
-              value={currentProject.renderProfileId}
-              onChange={(e) => setCurrentProject({...currentProject, renderProfileId: e.target.value})}
-              input={<OutlinedInput label="Gource Config File" />}
-            >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              {renderProfiles.map((profile) => (
-                <MenuItem key={profile.id} value={profile.id}>
-                  {profile.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseProjectDialog} disabled={savingProject}>Cancel</Button>
           <Button 
             onClick={handleSaveProject} 
             variant="contained" 
-            disabled={!currentProject.name || savingProject}
+            disabled={!currentProject.name || !currentProject.repositories?.length || savingProject}
             startIcon={savingProject && <CircularProgress size={16} color="inherit" />}
           >
             {savingProject ? 'Saving...' : 'Save'}

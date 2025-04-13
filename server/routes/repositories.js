@@ -903,7 +903,7 @@ router.delete('/:id', (req, res) => {
 // Bulk import repositories from GitHub organization or user
 router.post('/bulk-import', async (req, res) => {
   try {
-    const { githubUrl, projectCreationMode, projectNameTemplate } = req.body;
+    const { githubUrl, projectCreationMode, projectNameTemplate, maxConcurrentClones } = req.body;
     
     // Validate input
     if (!githubUrl) {
@@ -1164,7 +1164,7 @@ router.post('/bulk-import', async (req, res) => {
         }
         
         // Process repositories in parallel with a concurrency limit
-        const MAX_CONCURRENT_CLONES = 3; // Adjust based on your server capacity
+        const MAX_CONCURRENT_CLONES = maxConcurrentClones || 8; // Increased default from 3 to 8, user configurable
         console.log(`[BULK IMPORT] Starting parallel cloning with max ${MAX_CONCURRENT_CLONES} concurrent operations`);
         
         // Store successful repository IDs for project creation
@@ -1607,7 +1607,19 @@ router.post('/bulk-import', async (req, res) => {
                 message: `Creating project with ${successfulRepoIds.length} repositories...`
               });
               
-              const projectName = finalStatus.projectNameTemplate.replace('{owner}', 'All');
+              // Générer un nom de projet approprié en fonction du nombre de propriétaires
+              let projectName;
+              if (ownerNames.length === 1) {
+                // Si un seul propriétaire, utiliser le template avec le nom du propriétaire
+                projectName = finalStatus.projectNameTemplate.replace('{owner}', ownerNames[0]);
+              } else if (ownerNames.length === 2) {
+                // Si deux propriétaires, les joindre avec un tiret
+                projectName = `${ownerNames[0]} - ${ownerNames[1]}`;
+              } else {
+                // Si plus de deux propriétaires, utiliser les deux premiers et ajouter "et autres"
+                projectName = `${ownerNames[0]} - ${ownerNames[1]} et ${ownerNames.length - 2} autres`;
+              }
+              
               console.log(`[BULK IMPORT] Creating single project "${projectName}" with ${successfulRepoIds.length} repositories`);
               
               // Generate a unique project ID

@@ -55,7 +55,7 @@ import {
   CloudSync as CloudSyncIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { repositoriesApi, dateUtils } from '../api/api';
+import { repositoriesApi, dateUtils, settingsApi } from '../api/api';
 
 const RepositoriesPage = () => {
   const [repositories, setRepositories] = useState([]);
@@ -96,7 +96,24 @@ const RepositoriesPage = () => {
 
   // Project creation options
   const [projectCreationMode, setProjectCreationMode] = useState('none');
-  const [projectNameTemplate, setProjectNameTemplate] = useState('GitHub Import - {owner}');
+  const [projectNameTemplate, setProjectNameTemplate] = useState('{owner}');
+  
+  // Ajouter un état pour vérifier si un token GitHub est configuré
+  const [hasGithubToken, setHasGithubToken] = useState(false);
+  
+  // Ajouter l'effet pour vérifier si un token GitHub est configuré
+  useEffect(() => {
+    const checkGithubToken = async () => {
+      try {
+        const response = await settingsApi.get();
+        setHasGithubToken(response.data && response.data.githubToken && response.data.tokenStatus !== 'missing');
+      } catch (err) {
+        console.error('Error checking GitHub token:', err);
+      }
+    };
+    
+    checkGithubToken();
+  }, []);
   
   // Memoize fetchRepositories to avoid recreation on each render
   const fetchRepositories = useCallback(async () => {
@@ -313,10 +330,18 @@ const RepositoriesPage = () => {
         message: 'Starting bulk import...'
       });
       
+      // Préparer le template de nom pour les projets combinés
+      let finalTemplate = projectNameTemplate;
+      
+      // Pour les projets combinés, utiliser 'owner1 - owner2' si le mode est 'single'
+      if (projectCreationMode === 'single') {
+        finalTemplate = 'owner1 - owner2';
+      }
+      
       const response = await repositoriesApi.bulkImport({
         githubUrl: bulkImportUrl,
         projectCreationMode: projectCreationMode || 'none',
-        projectNameTemplate: projectNameTemplate || 'GitHub Import - {owner}'
+        projectNameTemplate: finalTemplate || '{owner}'
       });
       
       if (response.data && response.data.bulkImportId) {
@@ -423,7 +448,7 @@ const RepositoriesPage = () => {
     setBulkImportId(null);
     setBulkImportStatus(null);
     setProjectCreationMode('none');
-    setProjectNameTemplate('GitHub Import - {owner}');
+    setProjectNameTemplate('{owner}');
     setOpenAddDialog(true);
   };
 
@@ -766,10 +791,13 @@ const RepositoriesPage = () => {
                 )}
               </Box>
               
-              <Alert severity="info" sx={{ mb: 2 }}>
-                This operation requires a GitHub API token to be set in the settings.
-                It will import all public repositories from the specified user or organization.
-              </Alert>
+              {/* Affichage conditionnel du message concernant le token GitHub */}
+              {!hasGithubToken && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  This operation requires a GitHub API token to be set in the settings.
+                  It will import all public repositories from the specified user or organization.
+                </Alert>
+              )}
             </>
           )}
           

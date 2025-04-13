@@ -6,6 +6,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const { defaultGourceConfig } = require('./config/defaultGourceConfig');
 
 // Initialize environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -33,40 +34,9 @@ const defaultProfileExists = db.get('renderProfiles')
   .value();
 
 if (!defaultProfileExists) {
-  // Default settings for Gource
-  const defaultSettings = {
-    resolution: '1920x1080',
-    framerate: 60,
-    secondsPerDay: 1,
-    autoSkipSeconds: 0.1,
-    elasticity: 0.5,
-    title: true,
-    key: true,
-    background: '#000000',
-    fontScale: 1.0,
-    cameraMode: 'overview',
-    userScale: 1.0,
-    timeScale: 1.0,
-    highlightUsers: false,
-    hideUsers: '',
-    hideFilesRegex: '',
-    hideRoot: false,
-    maxUserCount: 0,
-    extraArgs: ''
-  };
-
-  const defaultProfile = {
-    id: 'default',
-    name: 'Default Gource Config File',
-    description: 'Default config file used for all projects that don\'t have a specific config file',
-    settings: defaultSettings,
-    isDefault: true,
-    dateCreated: new Date().toISOString(),
-    lastModified: new Date().toISOString()
-  };
-
+  // Importer la configuration par défaut depuis le fichier externe
   db.get('renderProfiles')
-    .push(defaultProfile)
+    .push(defaultGourceConfig)
     .write();
     
   console.log('✅ Created default Gource config file');
