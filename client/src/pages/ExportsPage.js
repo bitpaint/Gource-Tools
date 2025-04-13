@@ -15,12 +15,16 @@ import {
   Folder as FolderIcon,
   YouTube as YouTubeIcon,
   Twitter as TwitterIcon,
-  FileDownload as FileDownloadIcon
+  FileDownload as FileDownloadIcon,
+  VideoSettings as VideoSettingsIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { rendersApi } from '../api/api';
+import { useNavigate } from 'react-router-dom';
 
 const ExportsPage = () => {
+  const navigate = useNavigate();
+  
   const handleOpenExportsFolder = async () => {
     try {
       await rendersApi.openExportsFolder();
@@ -28,6 +32,10 @@ const ExportsPage = () => {
       console.error('Error opening exports folder:', err);
       toast.error('Failed to open exports folder');
     }
+  };
+
+  const handleGoToFFmpegEditor = () => {
+    navigate('/ffmpeg-editor');
   };
 
   return (
@@ -59,8 +67,20 @@ const ExportsPage = () => {
               startIcon={<FolderIcon />}
               onClick={handleOpenExportsFolder}
               size="large"
+              sx={{ mb: 2 }}
+              fullWidth
             >
               Open Exports Folder
+            </Button>
+            <Button 
+              variant="outlined" 
+              color="secondary" 
+              startIcon={<VideoSettingsIcon />}
+              onClick={handleGoToFFmpegEditor}
+              size="large"
+              fullWidth
+            >
+              Edit Videos with FFmpeg
             </Button>
           </Grid>
         </Grid>

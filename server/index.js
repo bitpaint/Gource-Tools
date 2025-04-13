@@ -150,6 +150,15 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Servir les fichiers statiques du répertoire exports
+app.use('/exports', express.static(path.join(__dirname, '../exports')));
+
+// Servir les fichiers de prévisualisation du répertoire temp/previews
+app.use('/temp/previews', express.static(path.join(__dirname, '../temp/previews')));
+
+// Servir les fichiers audio pour FFmpeg
+app.use('/temp/music', express.static(path.join(__dirname, '../temp/music')));
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Access the application at http://localhost:${PORT}`);

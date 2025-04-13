@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
-const { spawn, execSync } = require('child_process');
+const util = require('util');
+const exec = util.promisify(require('child_process').exec);
+const { spawn } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig, defaultSettings } = require('../config/defaultGourceConfig');
 const crypto = require('crypto');
+const multer = require('multer');
+const upload = multer({ dest: path.join(__dirname, '../../temp/uploads/') });
 
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
@@ -1760,6 +1764,300 @@ router.get('/preview-image/:previewId', (req, res) => {
   }
   
   res.sendFile(previewPath);
+});
+
+// Récupérer les rendus terminés (pour l'éditeur FFmpeg)
+router.get('/completed', async (req, res) => {
+  try {
+    console.log('Fetching completed renders...');
+    const renders = await db.get('renders')
+      .filter({ status: 'completed' })
+      .sortBy('created_at')
+      .reverse()
+      .value();
+    
+    console.log(`Found ${renders.length} completed renders`);
+    res.json(renders);
+  } catch (err) {
+    console.error('Error fetching completed renders:', err);
+    res.status(500).json({ error: 'Failed to fetch completed renders' });
+  }
+});
+
+// Upload de fichier audio pour FFmpeg
+router.post('/upload-music', upload.single('musicFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Créer le dossier music s'il n'existe pas
+    const musicDir = path.join(__dirname, '../../temp/music');
+    if (!fs.existsSync(musicDir)) {
+      fs.mkdirSync(musicDir, { recursive: true });
+    }
+
+    // Chemin de destination
+    const fileName = `music_${Date.now()}_${path.basename(req.file.originalname)}`;
+    const destinationPath = path.join(musicDir, fileName);
+
+    // Déplacer le fichier
+    fs.renameSync(req.file.path, destinationPath);
+
+    // Retourner le chemin relatif
+    res.json({ filePath: `/temp/music/${fileName}` });
+  } catch (err) {
+    console.error('Error uploading music file:', err);
+    res.status(500).json({ error: 'Failed to upload music file' });
+  }
+});
+
+// Générer un aperçu avec les filtres FFmpeg
+router.post('/:id/ffmpeg-preview', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const filters = req.body;
+
+    // Récupérer le rendu
+    const render = db.get('renders')
+      .find({ id: parseInt(id) || id })
+      .value();
+      
+    if (!render) {
+      return res.status(404).json({ error: 'Render not found' });
+    }
+
+    // Chemin du fichier vidéo
+    const videoPath = render.output_file;
+    if (!fs.existsSync(videoPath)) {
+      return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    // Créer le dossier previews s'il n'existe pas
+    const previewsDir = path.join(__dirname, '../../temp/previews');
+    if (!fs.existsSync(previewsDir)) {
+      fs.mkdirSync(previewsDir, { recursive: true });
+    }
+
+    // Nom du fichier de preview
+    const previewFileName = `preview_${id}_${Date.now()}.mp4`;
+    const previewPath = path.join(previewsDir, previewFileName);
+
+    // Construction de la commande FFmpeg
+    let ffmpegCmd = 'ffmpeg -y';
+
+    // Ajouter l'entrée vidéo
+    ffmpegCmd += ` -i "${videoPath}"`;
+
+    // Ajouter l'entrée audio si activée
+    if (filters.music && filters.music.enabled && filters.music.file) {
+      const musicPath = path.join(__dirname, '../..', filters.music.file);
+      if (fs.existsSync(musicPath)) {
+        ffmpegCmd += ` -i "${musicPath}"`;
+      }
+    }
+
+    // Construction du complexfilter pour les effets
+    let filterComplex = [];
+    
+    // Référence à la vidéo d'entrée
+    let videoStreamRef = '[0:v]';
+    
+    // Appliquer fade in si activé
+    if (filters.fadeIn && filters.fadeIn.enabled) {
+      filterComplex.push(`${videoStreamRef}fade=t=in:st=0:d=${filters.fadeIn.duration}[v1]`);
+      videoStreamRef = '[v1]';
+    }
+    
+    // Appliquer fade out si activé
+    if (filters.fadeOut && filters.fadeOut.enabled) {
+      // Obtenir la durée de la vidéo
+      const { stdout } = await exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
+      const duration = parseFloat(stdout.trim());
+      
+      // Calculer le point de départ du fade out
+      const fadeOutStart = duration - filters.fadeOut.duration;
+      
+      filterComplex.push(`${videoStreamRef}fade=t=out:st=${fadeOutStart}:d=${filters.fadeOut.duration}[v2]`);
+      videoStreamRef = '[v2]';
+    }
+    
+    // Configuration audio
+    let audioMapping = '';
+    if (filters.music && filters.music.enabled && filters.music.file) {
+      const volume = filters.music.volume;
+      filterComplex.push(`[1:a]volume=${volume}[a1]`);
+      audioMapping = '-map [a1]';
+    } else {
+      audioMapping = '-map 0:a';
+    }
+    
+    // Ajouter le filterComplex si nécessaire
+    if (filterComplex.length > 0) {
+      ffmpegCmd += ' -filter_complex "' + filterComplex.join(';') + '"';
+    }
+    
+    // Mappage des flux
+    ffmpegCmd += ` -map ${videoStreamRef.replace(/\[|\]/g, '')} ${audioMapping}`;
+    
+    // Paramètres de sortie pour la prévisualisation (résolution et bitrate réduits)
+    ffmpegCmd += ' -c:v libx264 -preset ultrafast -crf 28 -s 640x360';
+    
+    // Ajouter la sortie
+    ffmpegCmd += ` "${previewPath}"`;
+    
+    console.log(`Executing FFmpeg preview command: ${ffmpegCmd}`);
+    
+    // Exécuter la commande FFmpeg
+    await exec(ffmpegCmd);
+    
+    // URL relative pour accéder au fichier de prévisualisation
+    const previewUrl = `/temp/previews/${previewFileName}`;
+    
+    res.json({ previewUrl });
+  } catch (err) {
+    console.error('Error generating FFmpeg preview:', err);
+    res.status(500).json({ error: 'Failed to generate preview', details: err.message });
+  }
+});
+
+// Appliquer les filtres FFmpeg et sauvegarder la vidéo
+router.post('/:id/ffmpeg-process', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const filters = req.body;
+
+    // Récupérer le rendu
+    const render = db.get('renders')
+      .find({ id: parseInt(id) || id })
+      .value();
+      
+    if (!render) {
+      return res.status(404).json({ error: 'Render not found' });
+    }
+
+    // Chemin du fichier vidéo
+    const videoPath = render.output_file;
+    if (!fs.existsSync(videoPath)) {
+      return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    // Créer le nom du fichier de sortie
+    const originalFileName = path.basename(videoPath);
+    const fileExt = path.extname(originalFileName);
+    const fileNameWithoutExt = path.basename(originalFileName, fileExt);
+    const newFileName = `${fileNameWithoutExt}_edited${fileExt}`;
+    
+    // Chemin du fichier de sortie
+    const exportsDir = path.join(__dirname, '../../exports');
+    const outputPath = path.join(exportsDir, newFileName);
+
+    // Construction de la commande FFmpeg
+    let ffmpegCmd = 'ffmpeg -y';
+
+    // Ajouter l'entrée vidéo
+    ffmpegCmd += ` -i "${videoPath}"`;
+
+    // Ajouter l'entrée audio si activée
+    if (filters.music && filters.music.enabled && filters.music.file) {
+      const musicPath = path.join(__dirname, '../..', filters.music.file);
+      if (fs.existsSync(musicPath)) {
+        ffmpegCmd += ` -i "${musicPath}"`;
+      }
+    }
+
+    // Construction du complexfilter pour les effets
+    let filterComplex = [];
+    
+    // Référence à la vidéo d'entrée
+    let videoStreamRef = '[0:v]';
+    
+    // Appliquer fade in si activé
+    if (filters.fadeIn && filters.fadeIn.enabled) {
+      filterComplex.push(`${videoStreamRef}fade=t=in:st=0:d=${filters.fadeIn.duration}[v1]`);
+      videoStreamRef = '[v1]';
+    }
+    
+    // Appliquer fade out si activé
+    if (filters.fadeOut && filters.fadeOut.enabled) {
+      // Obtenir la durée de la vidéo
+      const { stdout } = await exec(`ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${videoPath}"`);
+      const duration = parseFloat(stdout.trim());
+      
+      // Calculer le point de départ du fade out
+      const fadeOutStart = duration - filters.fadeOut.duration;
+      
+      filterComplex.push(`${videoStreamRef}fade=t=out:st=${fadeOutStart}:d=${filters.fadeOut.duration}[v2]`);
+      videoStreamRef = '[v2]';
+    }
+    
+    // Configuration audio
+    let audioMapping = '';
+    if (filters.music && filters.music.enabled && filters.music.file) {
+      const volume = filters.music.volume;
+      filterComplex.push(`[1:a]volume=${volume}[a1]`);
+      audioMapping = '-map [a1]';
+    } else {
+      audioMapping = '-map 0:a';
+    }
+    
+    // Ajouter le filterComplex si nécessaire
+    if (filterComplex.length > 0) {
+      ffmpegCmd += ' -filter_complex "' + filterComplex.join(';') + '"';
+    }
+    
+    // Mappage des flux
+    ffmpegCmd += ` -map ${videoStreamRef.replace(/\[|\]/g, '')} ${audioMapping}`;
+    
+    // Paramètres de sortie en fonction de la qualité sélectionnée
+    let quality = '';
+    switch(filters.quality) {
+      case 'low':
+        quality = '-c:v libx264 -preset fast -crf 28';
+        break;
+      case 'medium':
+        quality = '-c:v libx264 -preset medium -crf 22';
+        break;
+      case 'high':
+      default:
+        quality = '-c:v libx264 -preset slower -crf 18';
+        break;
+    }
+    
+    ffmpegCmd += ` ${quality}`;
+    
+    // Ajouter la sortie
+    ffmpegCmd += ` "${outputPath}"`;
+    
+    console.log(`Executing FFmpeg processing command: ${ffmpegCmd}`);
+    
+    // Exécuter la commande FFmpeg
+    await exec(ffmpegCmd);
+    
+    // Créer une entrée dans la base de données pour le rendu édité
+    const newRender = {
+      repository_id: render.repository_id,
+      project_id: render.project_id,
+      render_profile_id: render.render_profile_id,
+      name: `${render.name || 'Unnamed render'} (Edited with FFmpeg)`,
+      status: 'completed',
+      log_file: null, // Pas de fichier log pour les éditions FFmpeg
+      output_file: outputPath,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      parent_render_id: id // Référence au rendu original
+    };
+    
+    // Ajouter à la base de données
+    db.get('renders')
+      .push(newRender)
+      .write();
+    
+    res.json({ success: true, outputPath });
+  } catch (err) {
+    console.error('Error processing video with FFmpeg:', err);
+    res.status(500).json({ error: 'Failed to process video', details: err.message });
+  }
 });
 
 module.exports = router; 

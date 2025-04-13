@@ -21,6 +21,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import MovieIcon from '@mui/icons-material/Movie';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import TuneIcon from '@mui/icons-material/Tune';
+import VideoSettingsIcon from '@mui/icons-material/VideoSettings';
 
 const drawerWidth = 240;
 
@@ -31,6 +32,7 @@ const menuItems = [
   { text: 'Projects', icon: <FolderSpecialIcon />, path: '/projects' },
   { text: 'Render', icon: <MovieIcon />, path: '/render' },
   { text: 'Exports', icon: <VideoLibraryIcon />, path: '/exports' },
+  { text: 'FFmpeg Editor', icon: <VideoSettingsIcon />, path: '/ffmpeg-editor' },
   { text: 'Settings', icon: <TuneIcon />, path: '/settings' },
 ];
 
