@@ -160,6 +160,32 @@ export function fixGourceConfig(config) {
     fixedConfig.background = '#000000';
   }
   
+  // S'assurer que toutes les autres couleurs ont le format correct (avec #)
+  const colorParams = ['fontColor', 'titleColor', 'dirColor', 'highlightColor', 'selectionColor'];
+  
+  colorParams.forEach(param => {
+    if (fixedConfig[param]) {
+      // Ajouter le # si manquant
+      if (!fixedConfig[param].startsWith('#')) {
+        fixedConfig[param] = `#${fixedConfig[param]}`;
+      }
+      
+      // Valider le format et remplacer par défaut si invalide
+      if (!/^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(fixedConfig[param])) {
+        fixedConfig[param] = '#FFFFFF'; // Blanc par défaut pour la plupart des couleurs
+      }
+    }
+  });
+  
+  // Définir par défaut les options booléennes importantes
+  if (fixedConfig.title === undefined) fixedConfig.title = true;
+  if (fixedConfig.key === undefined) fixedConfig.key = true;
+  if (fixedConfig.showLines === undefined) fixedConfig.showLines = true;
+  if (fixedConfig.disableAutoRotate === undefined) fixedConfig.disableAutoRotate = false;
+  if (fixedConfig.swapTitleDate === undefined) fixedConfig.swapTitleDate = false;
+  if (fixedConfig.highlightUsers === undefined) fixedConfig.highlightUsers = false;
+  if (fixedConfig.hideRoot === undefined) fixedConfig.hideRoot = false;
+  
   return fixedConfig;
 }
 

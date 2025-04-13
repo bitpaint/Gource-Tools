@@ -42,6 +42,16 @@ function validateAndFixSettings(settings) {
     'show-files', 'follow-users', 'hide-root', 'swap-title-date'
   ];
   
+  // Assurer que title est toujours défini correctement
+  if (fixedSettings['title'] === undefined) {
+    fixedSettings['title'] = true;
+  }
+  
+  // Assurer que la couleur de fond est définie correctement
+  if (!fixedSettings['background-colour'] && !fixedSettings['background']) {
+    fixedSettings['background-colour'] = '000000';
+  }
+  
   // Validation et correction des valeurs numériques
   for (const [key, value] of Object.entries(fixedSettings)) {
     // Ignorer les valeurs vides ou undefined
@@ -106,6 +116,9 @@ function validateAndFixSettings(settings) {
     else if (flagParams.includes(key)) {
       if (typeof value === 'string') {
         fixedSettings[key] = value === 'true' || value === '1';
+      } else if (typeof value !== 'boolean') {
+        // Convertir en booléen si ce n'est pas déjà un
+        fixedSettings[key] = Boolean(value);
       }
     }
     
@@ -114,6 +127,17 @@ function validateAndFixSettings(settings) {
              (key.endsWith('-colour') || key === 'background-colour' || key === 'background')) {
       fixedSettings[key] = value.replace(/^#/, '');
     }
+  }
+  
+  // Convertir background en background-colour si nécessaire
+  if (fixedSettings['background'] && !fixedSettings['background-colour']) {
+    fixedSettings['background-colour'] = fixedSettings['background'];
+    delete fixedSettings['background'];
+  }
+  
+  // S'assurer que title est toujours défini si manquant
+  if (fixedSettings['title'] === undefined) {
+    fixedSettings['title'] = true;
   }
   
   return fixedSettings;

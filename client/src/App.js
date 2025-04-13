@@ -10,6 +10,7 @@ import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
 
 // Pages
+import DashboardPage from './pages/DashboardPage';
 import RepositoriesPage from './pages/RepositoriesPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ConfigFilesPage from './pages/ConfigFilesPage';
@@ -88,7 +89,8 @@ function App() {
             boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.2)'
           }}>
             <Routes>
-              <Route path="/" element={<RepositoriesPage />} />
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/repositories" element={<RepositoriesPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/render-profiles" element={<ConfigFilesPage />} />

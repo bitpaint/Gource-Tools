@@ -43,12 +43,12 @@ import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils } from '../api/api';
 import { defaultSettings, settingsDescriptions } from '../shared/defaultGourceConfig';
 import { 
-  convertToCamelCase, 
-  convertToKebabCase,
+  convertToCamelCase,
   getCommonResolutions,
-  getCameraModes
+  getCameraModes,
+  convertFormToApiParams,
+  convertApiToFormParams
 } from '../utils/gourceUtils';
-import { validateGourceConfig, fixGourceConfig } from '../utils/configValidator';
 
 // Import custom components
 import ColorPickerField from '../components/ColorPickerField';
@@ -130,11 +130,13 @@ const ConfigFilesPage = () => {
   const handleOpenProfileDialog = (profile = null) => {
     if (profile) {
       setIsEditing(true);
+      // Convertir les paramètres API au format du formulaire
+      const formParams = convertApiToFormParams({ ...profile.settings });
       setCurrentProfile({
         id: profile.id,
         name: profile.name,
         description: profile.description || '',
-        settings: convertToCamelCase({ ...defaultSettings, ...profile.settings })
+        settings: formParams
       });
     } else {
       setIsEditing(false);
@@ -142,7 +144,7 @@ const ConfigFilesPage = () => {
         id: null,
         name: '',
         description: '',
-        settings: convertToCamelCase({ ...defaultSettings })
+        settings: convertApiToFormParams({ ...defaultSettings })
       });
     }
     setTabValue(0);
@@ -159,23 +161,20 @@ const ConfigFilesPage = () => {
       return;
     }
 
-    // Valider et corriger les paramètres
-    const fixedSettings = fixGourceConfig(currentProfile.settings);
-    const validation = validateGourceConfig(fixedSettings);
-    
-    if (!validation.isValid) {
-      console.warn('Problèmes de configuration détectés, tentative de correction automatique:', validation.errors);
-      // Nous continuons avec les paramètres corrigés, mais nous affichons un avertissement
-      toast.warning('Certains paramètres ont été ajustés pour être compatibles avec Gource');
-    }
-
     try {
       setSavingProfile(true);
       
-      // Utiliser les paramètres corrigés
+      // Convertir les paramètres de formulaire au format API
+      const apiParams = convertFormToApiParams(currentProfile.settings);
+      
+      // Vérification de débogage
+      console.log('Paramètres originaux:', currentProfile.settings);
+      console.log('Paramètres convertis pour API:', apiParams);
+      
+      // Utiliser les paramètres convertis
       const profileToSave = {
         ...currentProfile,
-        settings: convertToKebabCase(fixedSettings)
+        settings: apiParams
       };
       
       if (isEditing) {
@@ -242,13 +241,38 @@ const ConfigFilesPage = () => {
 
   // Profile settings handlers
   const handleSettingsChange = (key, value) => {
+    // Traitement spécial pour certains paramètres
+    let processedValue = value;
+    
+    // Pour les couleurs, s'assurer qu'elles ont toujours un # au début
+    if ((key.includes('Color') || key === 'background') && typeof value === 'string' && !value.startsWith('#')) {
+      processedValue = '#' + value;
+    }
+    
+    // Pour les paramètres booléens, s'assurer qu'ils sont bien des booléens
+    if (['title', 'key', 'showLines', 'disableAutoRotate', 'swapTitleDate', 'highlightUsers', 'hideRoot'].includes(key)) {
+      if (value === 'true' || value === '1') {
+        processedValue = true;
+      } else if (value === 'false' || value === '0') {
+        processedValue = false;
+      } else {
+        processedValue = Boolean(value);
+      }
+    }
+    
+    // Mettre à jour l'état
     setCurrentProfile({
       ...currentProfile,
       settings: {
         ...currentProfile.settings,
-        [key]: value
+        [key]: processedValue
       }
     });
+    
+    // Afficher des informations de débogage en développement
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Setting ${key} = ${processedValue} (original: ${value})`);
+    }
   };
 
   // Handle tab change

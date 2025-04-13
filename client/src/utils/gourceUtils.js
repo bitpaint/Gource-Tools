@@ -244,4 +244,78 @@ export function getCameraModes() {
  */
 export function getAllGourceParameters() {
   return Object.values(paramMapping);
+}
+
+/**
+ * Utilitaires pour la conversion et manipulation des paramètres Gource
+ */
+
+/**
+ * Convertit les paramètres de l'interface utilisateur au format attendu par l'API
+ * @param {Object} formData - Données du formulaire d'édition
+ * @returns {Object} Paramètres formatés pour l'API
+ */
+export function convertFormToApiParams(formData) {
+  // Faire une copie pour ne pas modifier l'original
+  const apiParams = { ...formData };
+  
+  // Table de conversion pour les paramètres spéciaux
+  const mappings = {
+    background: 'background-colour', // La couleur est stockée dans background-colour pour l'API
+  };
+  
+  // Appliquer les mappings spéciaux
+  Object.entries(mappings).forEach(([formKey, apiKey]) => {
+    if (apiParams[formKey] !== undefined) {
+      // Conserver à la fois le format camelCase et kebab-case pour assurer la compatibilité
+      apiParams[apiKey] = apiParams[formKey];
+      console.log(`Conversion: ${formKey} -> ${apiKey} = ${apiParams[formKey]}`);
+    }
+  });
+  
+  // Traitement spécial des couleurs: s'assurer que le # est présent
+  Object.keys(apiParams).forEach(key => {
+    if (
+      typeof apiParams[key] === 'string' && 
+      (key.includes('color') || key.includes('colour') || key === 'background')
+    ) {
+      // Si c'est une couleur et qu'elle n'a pas de #, l'ajouter
+      if (apiParams[key] && !apiParams[key].startsWith('#')) {
+        apiParams[key] = `#${apiParams[key]}`;
+      }
+    }
+  });
+  
+  return apiParams;
+}
+
+/**
+ * Convertit les paramètres de l'API au format d'affichage de l'interface utilisateur
+ * @param {Object} apiParams - Paramètres de l'API
+ * @returns {Object} Paramètres formatés pour l'interface utilisateur
+ */
+export function convertApiToFormParams(apiParams) {
+  // Faire une copie pour ne pas modifier l'original
+  const formParams = { ...apiParams };
+  
+  // Priorité à background-colour sur background
+  if (apiParams['background-colour']) {
+    formParams.background = apiParams['background-colour'];
+    console.log(`Priorité background-colour: ${apiParams['background-colour']}`);
+  }
+  
+  // S'assurer que les couleurs ont le '#'
+  Object.keys(formParams).forEach(key => {
+    if (
+      typeof formParams[key] === 'string' && 
+      (key.includes('color') || key.includes('colour') || key === 'background')
+    ) {
+      // Si c'est une couleur et qu'elle n'a pas de #, l'ajouter
+      if (formParams[key] && !formParams[key].startsWith('#')) {
+        formParams[key] = `#${formParams[key]}`;
+      }
+    }
+  });
+  
+  return formParams;
 } 

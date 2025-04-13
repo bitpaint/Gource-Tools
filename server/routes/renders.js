@@ -6,6 +6,7 @@ const { spawn, execSync } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig, defaultSettings } = require('../config/defaultGourceConfig');
+const crypto = require('crypto');
 
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
@@ -854,7 +855,75 @@ async function startRenderProcess(logFilePath, videoFilePath, settings, render) 
         
         // Paramètres d'apparence
         configContent += `elasticity=${elasticity !== undefined && !isNaN(elasticity) ? elasticity : 0.3}\n`;
-        configContent += `background-colour=${background ? background.replace('#', '') : '000000'}\n`;
+        
+        // Traitement prioritaire pour la couleur d'arrière-plan
+        // Vérifie d'abord background-colour puis background pour être cohérent avec notre logique
+        let finalBackgroundColor = '000000'; // Noir par défaut
+        
+        if (settings['background-colour']) {
+          const colorValue = settings['background-colour'].replace(/^#/, '');
+          finalBackgroundColor = colorValue;
+          console.log(`Couleur de fond utilisée: background-colour=${colorValue}`);
+        } else if (background) {
+          const colorValue = background.replace(/^#/, '');
+          finalBackgroundColor = colorValue;
+          console.log(`Couleur de fond utilisée: background=${colorValue}`);
+        }
+        
+        // Traçage des paramètres pour le débogage
+        console.log("Paramètres originaux:", JSON.stringify(settings, null, 2));
+        console.log("Paramètres extraits:", JSON.stringify({
+          resolution, framerate, secondsPerDay, autoSkipSeconds, 
+          elasticity, title, key, background, fontScale,
+          cameraMode, userScale, timeScale
+        }, null, 2));
+        
+        configContent += `background-colour=${finalBackgroundColor}\n`;
+        
+        // Options du titre et de l'affichage - rendre le titre explicitement visible par défaut
+        if (title === false) {
+          configContent += `hide-title=true\n`;  // Utiliser hide-title plutôt que title=false
+        } else {
+          configContent += `title=true\n`;  // Forcer l'affichage du titre
+        }
+        
+        // S'assurer que le titre du projet est affiché même sans texte personnalisé
+        if (settings.titleText) {
+          configContent += `title-text=${settings.titleText}\n`;
+        } else if (render.projectName) {
+          // Utiliser le nom du projet si disponible
+          configContent += `title-text=${render.projectName}\n`;
+        }
+        
+        // Tracer les valeurs pour le débogage
+        console.log(`Paramètres de titre: title=${title}, titleText=${settings.titleText}, projectName=${render.projectName}`);
+        
+        // Gestion correcte de toutes les couleurs (enlever le # pour Gource)
+        if (settings.titleColor) configContent += `title-colour=${settings.titleColor.replace('#', '')}\n`;
+        if (settings.fontColor) configContent += `font-colour=${settings.fontColor.replace('#', '')}\n`;
+        if (settings.dirColor) configContent += `dir-colour=${settings.dirColor.replace('#', '')}\n`;
+        if (settings.highlightColor) configContent += `highlight-colour=${settings.highlightColor.replace('#', '')}\n`;
+        if (settings.selectionColor) configContent += `selection-colour=${settings.selectionColor.replace('#', '')}\n`;
+        
+        // Tracer les valeurs des couleurs pour le débogage
+        console.log(`Paramètres de couleur: background=${background}, background-colour=${settings['background-colour']}`);
+        
+        // Ajouter les échelles et tailles de police correctement
+        if (settings.fontScale !== undefined && !isNaN(settings.fontScale)) configContent += `font-scale=${settings.fontScale}\n`;
+        if (settings.fileScale !== undefined && !isNaN(settings.fileScale)) configContent += `file-scale=${settings.fileScale}\n`;
+        if (settings.dirSize !== undefined && !isNaN(settings.dirSize)) configContent += `dir-size=${settings.dirSize}\n`;
+        
+        // Tailles de police
+        if (settings.fontSize !== undefined && !isNaN(settings.fontSize)) configContent += `font-size=${settings.fontSize}\n`;
+        if (settings.filenameFontSize !== undefined && !isNaN(settings.filenameFontSize)) configContent += `filename-font-size=${settings.filenameFontSize}\n`;
+        if (settings.dirnameFontSize !== undefined && !isNaN(settings.dirnameFontSize)) configContent += `dirname-font-size=${settings.dirnameFontSize}\n`;
+        if (settings.userFontSize !== undefined && !isNaN(settings.userFontSize)) configContent += `user-font-size=${settings.userFontSize}\n`;
+        
+        // Ajouter autres options booléennes importantes
+        if (settings.swapTitleDate === true) configContent += `swap-title-date=true\n`;
+        if (settings.disableAutoRotate === true) configContent += `disable-auto-rotate=true\n`;
+        if (settings.showLines === false) configContent += `hide-files=true\n`;
+        if (settings.showLines === true) configContent += `hide-files=false\n`;
         
         // Paramètres de caméra
         // Le mode 'follow' de l'interface est en fait 'overview' dans la config Gource
@@ -882,7 +951,6 @@ async function startRenderProcess(logFilePath, videoFilePath, settings, render) 
         // Options booléennes
         if (highlightUsers) configContent += `highlight-users=1\n`;
         if (settings['highlight-all-users']) configContent += `highlight-all-users=true\n`;
-        if (title === false) configContent += `hide=date\n`; // Date et titre sont liés
         if (key === false) configContent += `key=false\n`;
         
         // Extras si définis
@@ -994,19 +1062,87 @@ exit /b 0
           updateRenderStatus(render.id, 'rendering', 'Trying alternative method with PowerShell...', 40);
           
           try {
-            // Créer un script PowerShell pour exécuter la commande
+            // Tracer les paramètres pour le débogage
+            console.log("Méthode PowerShell - Paramètres:");
+            console.log(`- Titre: titre=${title}, texte=${settings.titleText || render.projectName}`);
+            console.log(`- Couleurs: background=${background}, fontColor=${settings.fontColor}, titleColor=${settings.titleColor}`);
+            
+            // Créer un script PowerShell simplifié et plus robuste
             const psScriptPath = path.join(tempDir, `${render.id}_render.ps1`);
             const psScriptContent = `
-# Exécuter Gource avec pipeline direct vers ffmpeg
-$gourceCommand = "gource \\"${normLogFilePath}\\" --log-format custom --stop-at-end --output-framerate ${framerate} --viewport ${width}x${height} ${title ? '--title' : ''} ${key ? '--key' : ''} -o -"
-$ffmpegCommand = "ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 \\"${normVideoFilePath}\\""
+# Script PowerShell amélioré pour Gource
+Write-Host "Démarrage du rendu Gource via PowerShell..."
 
-# Exécuter la commande complète
-$process = Start-Process -FilePath "cmd.exe" -ArgumentList "/c $gourceCommand | $ffmpegCommand" -NoNewWindow -PassThru -Wait
-if ($process.ExitCode -ne 0) {
-    Write-Error "Le processus a échoué avec le code de sortie $($process.ExitCode)"
-    exit 1
+# Créer une liste de paramètres Gource
+$gourceParams = @(
+  "\\"${normLogFilePath}\\"",
+  "--log-format", "custom", 
+  "--stop-at-end",
+  "--output-framerate", "${framerate}",
+  "--viewport", "${width}x${height}"
+)
+
+# Paramètres de titre
+if ($${title === false}) {
+  $gourceParams += "--hide-title"
+} else {
+  $gourceParams += "--title"
 }
+
+# Couleur de fond (toujours explicitement définie)
+$gourceParams += "--background-colour"
+$gourceParams += "${background ? background.replace('#', '') : '000000'}"
+
+# Texte du titre
+${settings.titleText || render.projectName ? `
+$gourceParams += "--title-text" 
+$gourceParams += "\\"${settings.titleText || render.projectName}\\""` : ''}
+
+# Autres paramètres de couleur
+${settings.fontColor ? `
+$gourceParams += "--font-colour"
+$gourceParams += "${settings.fontColor.replace('#', '')}"` : ''}
+
+${settings.titleColor ? `
+$gourceParams += "--title-colour"
+$gourceParams += "${settings.titleColor.replace('#', '')}"` : ''}
+
+# Paramètres d'échelle et taille
+${settings.fontScale !== undefined ? `
+$gourceParams += "--font-scale"
+$gourceParams += "${settings.fontScale}"` : ''}
+
+${settings.userScale !== undefined ? `
+$gourceParams += "--user-scale"
+$gourceParams += "${settings.userScale}"` : ''}
+
+# Options booléennes
+${settings.swapTitleDate === true ? '$gourceParams += "--swap-title-date"' : ''}
+${settings.disableAutoRotate === true ? '$gourceParams += "--disable-auto-rotate"' : ''}
+${settings.showLines === false ? '$gourceParams += "--hide-files"' : ''}
+
+# Finaliser la commande
+$gourceParams += "-o"
+$gourceParams += "-"
+
+# Convertir le tableau en chaîne de commande
+$gourceParamsStr = $gourceParams -join " "
+$fullCmd = "gource $gourceParamsStr | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 \\"${normVideoFilePath}\\""
+
+# Afficher la commande complète pour débogage
+Write-Host "Commande complète: $fullCmd"
+
+# Exécuter la commande
+cmd /c $fullCmd
+
+# Vérifier si la commande a réussi
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "La commande a échoué avec le code $LASTEXITCODE"
+    exit $LASTEXITCODE
+}
+
+Write-Host "Rendu terminé avec succès!"
+exit 0
 `;
 
             fs.writeFileSync(psScriptPath, psScriptContent);
@@ -1049,17 +1185,52 @@ if ($process.ExitCode -ne 0) {
             updateRenderStatus(render.id, 'rendering', 'Trying simplified approach...', 50);
             
             try {
-              // Créer un script batch final avec une commande simplifiée
+              // Créer un fichier batch pour l'approche simplifiée
               const finalBatchPath = path.join(tempDir, `${render.id}_final.bat`);
+              
+              // Tracer les paramètres pour le débogage
+              console.log("Méthode simplifiée - Paramètres:");
+              console.log(`- Titre: titre=${title}, texte=${settings.titleText || render.projectName}`);
+              console.log(`- Couleurs: background=${background}, fontColor=${settings.fontColor}, titleColor=${settings.titleColor}`);
+
+              // Construire la commande en séparant chaque option pour plus de clarté
+              let gourceCmd = `gource "${normLogFilePath}" -${width}x${height} --stop-at-end --seconds-per-day ${secondsPerDay} --auto-skip-seconds ${autoSkipSeconds} --camera-mode overview --user-scale ${userScale} --disable-progress --log-format custom`;
+              
+              // Ajouter les options de titre
+              gourceCmd += ` ${title === false ? '--hide-title' : '--title'}`;
+              gourceCmd += ` --background-colour ${background ? background.replace('#', '') : '000000'}`;
+              
+              // Ajouter le texte du titre
+              if (settings.titleText) {
+                gourceCmd += ` --title-text "${settings.titleText}"`;
+              } else if (render.projectName) {
+                gourceCmd += ` --title-text "${render.projectName}"`;
+              }
+              
+              // Ajouter les options de couleur
+              if (settings.fontColor) gourceCmd += ` --font-colour ${settings.fontColor.replace('#', '')}`;
+              if (settings.titleColor) gourceCmd += ` --title-colour ${settings.titleColor.replace('#', '')}`;
+              
+              // Ajouter les autres options
+              if (settings.fontScale !== undefined) gourceCmd += ` --font-scale ${settings.fontScale}`;
+              if (settings.dirSize !== undefined) gourceCmd += ` --dir-size ${settings.dirSize}`;
+              if (settings.swapTitleDate === true) gourceCmd += ` --swap-title-date`;
+              if (settings.disableAutoRotate === true) gourceCmd += ` --disable-auto-rotate`;
+              if (settings.showLines === false) gourceCmd += ` --hide-files`;
+              
+              // Compléter la commande avec ffmpeg
+              gourceCmd += ` -o - | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 "${normVideoFilePath}"`;
+              
               const finalBatchContent = `@echo off
 echo Running Gource with simplified approach...
 echo Log file: ${normLogFilePath}
 
-gource "${normLogFilePath}" -${width}x${height} --stop-at-end --seconds-per-day ${secondsPerDay} --auto-skip-seconds ${autoSkipSeconds} --camera-mode overview --user-scale ${userScale} --disable-progress --log-format custom -o - | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 "${normVideoFilePath}"
+${gourceCmd}
 `;
-              
+
               fs.writeFileSync(finalBatchPath, finalBatchContent);
               
+              // Exécuter le fichier batch
               console.log(`Executing final batch file with direct pipeline: ${finalBatchPath}`);
               execSync(`"${finalBatchPath}"`, {
                 stdio: 'inherit',
@@ -1163,7 +1334,67 @@ gource "${normLogFilePath}" -${width}x${height} --stop-at-end --seconds-per-day 
         
         // Paramètres d'apparence
         configContent += `elasticity=${elasticity !== undefined && !isNaN(elasticity) ? elasticity : 0.3}\n`;
-        configContent += `background-colour=${background ? background.replace('#', '') : '000000'}\n`;
+        
+        // Traitement prioritaire pour la couleur d'arrière-plan
+        // Vérifie d'abord background-colour puis background pour être cohérent avec notre logique
+        let finalBackgroundColor = '000000'; // Noir par défaut
+        
+        if (settings['background-colour']) {
+          const colorValue = settings['background-colour'].replace(/^#/, '');
+          finalBackgroundColor = colorValue;
+          console.log(`Couleur de fond utilisée: background-colour=${colorValue}`);
+        } else if (background) {
+          const colorValue = background.replace(/^#/, '');
+          finalBackgroundColor = colorValue;
+          console.log(`Couleur de fond utilisée: background=${colorValue}`);
+        }
+        
+        configContent += `background-colour=${finalBackgroundColor}\n`;
+        
+        // Options du titre et de l'affichage - rendre le titre explicitement visible par défaut
+        if (title === false) {
+          configContent += `hide-title=true\n`;  // Utiliser hide-title plutôt que title=false
+        } else {
+          configContent += `title=true\n`;  // Forcer l'affichage du titre
+        }
+        
+        // S'assurer que le titre du projet est affiché même sans texte personnalisé
+        if (settings.titleText) {
+          configContent += `title-text=${settings.titleText}\n`;
+        } else if (render.projectName) {
+          // Utiliser le nom du projet si disponible
+          configContent += `title-text=${render.projectName}\n`;
+        }
+        
+        // Tracer les valeurs pour le débogage
+        console.log(`Paramètres de titre: title=${title}, titleText=${settings.titleText}, projectName=${render.projectName}`);
+        
+        // Gestion correcte de toutes les couleurs (enlever le # pour Gource)
+        if (settings.titleColor) configContent += `title-colour=${settings.titleColor.replace('#', '')}\n`;
+        if (settings.fontColor) configContent += `font-colour=${settings.fontColor.replace('#', '')}\n`;
+        if (settings.dirColor) configContent += `dir-colour=${settings.dirColor.replace('#', '')}\n`;
+        if (settings.highlightColor) configContent += `highlight-colour=${settings.highlightColor.replace('#', '')}\n`;
+        if (settings.selectionColor) configContent += `selection-colour=${settings.selectionColor.replace('#', '')}\n`;
+        
+        // Tracer les valeurs des couleurs pour le débogage
+        console.log(`Paramètres de couleur: background=${background}, background-colour=${settings['background-colour']}`);
+        
+        // Ajouter les échelles et tailles de police correctement
+        if (settings.fontScale !== undefined && !isNaN(settings.fontScale)) configContent += `font-scale=${settings.fontScale}\n`;
+        if (settings.fileScale !== undefined && !isNaN(settings.fileScale)) configContent += `file-scale=${settings.fileScale}\n`;
+        if (settings.dirSize !== undefined && !isNaN(settings.dirSize)) configContent += `dir-size=${settings.dirSize}\n`;
+        
+        // Tailles de police
+        if (settings.fontSize !== undefined && !isNaN(settings.fontSize)) configContent += `font-size=${settings.fontSize}\n`;
+        if (settings.filenameFontSize !== undefined && !isNaN(settings.filenameFontSize)) configContent += `filename-font-size=${settings.filenameFontSize}\n`;
+        if (settings.dirnameFontSize !== undefined && !isNaN(settings.dirnameFontSize)) configContent += `dirname-font-size=${settings.dirnameFontSize}\n`;
+        if (settings.userFontSize !== undefined && !isNaN(settings.userFontSize)) configContent += `user-font-size=${settings.userFontSize}\n`;
+        
+        // Ajouter autres options booléennes importantes
+        if (settings.swapTitleDate === true) configContent += `swap-title-date=true\n`;
+        if (settings.disableAutoRotate === true) configContent += `disable-auto-rotate=true\n`;
+        if (settings.showLines === false) configContent += `hide-files=true\n`;
+        if (settings.showLines === true) configContent += `hide-files=false\n`;
         
         // Paramètres de caméra
         // Le mode 'follow' de l'interface est en fait 'overview' dans la config Gource
@@ -1191,7 +1422,6 @@ gource "${normLogFilePath}" -${width}x${height} --stop-at-end --seconds-per-day 
         // Options booléennes
         if (highlightUsers) configContent += `highlight-users=1\n`;
         if (settings['highlight-all-users']) configContent += `highlight-all-users=true\n`;
-        if (title === false) configContent += `hide=date\n`; // Date et titre sont liés
         if (key === false) configContent += `key=false\n`;
         
         // Extras si définis
@@ -1322,6 +1552,102 @@ router.post('/open-exports', (req, res) => {
     console.error('Error opening exports folder:', error);
     res.status(500).json({ error: 'Failed to open exports folder' });
   }
+});
+
+/**
+ * @route POST /api/renders/preview
+ * @desc Generate a preview image of a Gource render
+ */
+router.post('/preview', async (req, res) => {
+  try {
+    const { settings, repositoryPath } = req.body;
+    
+    if (!settings || !repositoryPath) {
+      return res.status(400).json({ error: 'Settings and repository path are required' });
+    }
+    
+    // Créer le répertoire de prévisualisation s'il n'existe pas
+    const previewDir = path.join(__dirname, '../../temp/previews');
+    if (!fs.existsSync(previewDir)) {
+      fs.mkdirSync(previewDir, { recursive: true });
+    }
+    
+    // Générer un nom unique pour l'image d'aperçu
+    const previewId = crypto.randomUUID();
+    const previewPath = path.join(previewDir, `${previewId}.png`);
+    
+    // Convertir les paramètres en options Gource
+    const options = [];
+    for (const [key, value] of Object.entries(settings)) {
+      if (value === true) {
+        options.push(`--${key}`);
+      } else if (value !== false && value !== null && value !== '') {
+        options.push(`--${key} ${value}`);
+      }
+    }
+    
+    // Ajouter des paramètres spécifiques pour l'aperçu
+    options.push('--seconds-per-day 0.1');
+    options.push('--auto-skip-seconds 1');
+    options.push('--stop-at-end');
+    options.push('--output-ppm-stream -');
+    
+    // Construire la commande Gource
+    const gourceCmd = `gource ${options.join(' ')} "${repositoryPath}" | ffmpeg -y -f image2pipe -vcodec ppm -i - -vframes 1 -vcodec png "${previewPath}"`;
+    
+    // Exécuter la commande avec un délai d'expiration
+    console.log('Generating preview with command:', gourceCmd);
+    
+    exec(gourceCmd, { timeout: 15000 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('Error generating preview:', error);
+        return res.status(500).json({ error: 'Failed to generate preview', details: error.message });
+      }
+      
+      if (!fs.existsSync(previewPath)) {
+        return res.status(500).json({ error: 'Preview file was not generated' });
+      }
+      
+      // Servir l'image via une URL temporaire
+      const previewUrl = `/api/renders/preview-image/${previewId}`;
+      res.json({ previewUrl });
+      
+      // Supprimer automatiquement l'aperçu après 5 minutes
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(previewPath)) {
+            fs.unlinkSync(previewPath);
+          }
+        } catch (err) {
+          console.error('Error cleaning up preview file:', err);
+        }
+      }, 5 * 60 * 1000);
+    });
+  } catch (err) {
+    console.error('Error in preview generation:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
+/**
+ * @route GET /api/renders/preview-image/:previewId
+ * @desc Get a generated preview image
+ */
+router.get('/preview-image/:previewId', (req, res) => {
+  const { previewId } = req.params;
+  
+  // Valider l'ID pour éviter l'injection de chemin
+  if (!/^[0-9a-f-]+$/i.test(previewId)) {
+    return res.status(400).json({ error: 'Invalid preview ID' });
+  }
+  
+  const previewPath = path.join(__dirname, '../../temp/previews', `${previewId}.png`);
+  
+  if (!fs.existsSync(previewPath)) {
+    return res.status(404).json({ error: 'Preview not found' });
+  }
+  
+  res.sendFile(previewPath);
 });
 
 module.exports = router; 

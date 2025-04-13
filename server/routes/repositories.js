@@ -1603,4 +1603,106 @@ router.post('/bulk-import/confirm', (req, res) => {
   }
 });
 
+/**
+ * @route GET /api/repositories/stats
+ * @desc Get statistics about repositories
+ */
+router.get('/stats', async (req, res) => {
+  try {
+    const repositories = db.get('repositories').value() || [];
+    const projects = db.get('projects').value() || [];
+    const renders = db.get('renders').value() || [];
+
+    // Calculer les statistiques avec gestion des erreurs
+    const stats = {
+      total: repositories.length,
+      byType: {
+        github: repositories.filter(repo => repo?.url?.includes('github.com')).length,
+        gitlab: repositories.filter(repo => repo?.url?.includes('gitlab.com')).length,
+        bitbucket: repositories.filter(repo => repo?.url?.includes('bitbucket.org')).length,
+        local: repositories.filter(repo => {
+          const url = repo?.url || '';
+          return url.startsWith('file://') || 
+                 url.startsWith('/') || 
+                 /^[A-Z]:\\/.test(url);
+        }).length,
+        other: repositories.filter(repo => {
+          const url = repo?.url || '';
+          return !url.includes('github.com') && 
+                 !url.includes('gitlab.com') && 
+                 !url.includes('bitbucket.org') && 
+                 !(url.startsWith('file://') || url.startsWith('/') || /^[A-Z]:\\/.test(url));
+        }).length
+      },
+      bySize: {
+        small: repositories.filter(repo => (repo?.stats?.sizeKb || 0) < 10000).length,
+        medium: repositories.filter(repo => {
+          const sizeKb = repo?.stats?.sizeKb || 0;
+          return sizeKb >= 10000 && sizeKb < 100000;
+        }).length,
+        large: repositories.filter(repo => (repo?.stats?.sizeKb || 0) >= 100000).length
+      },
+      byCommitCount: {
+        small: repositories.filter(repo => (repo?.stats?.totalCommits || 0) < 100).length,
+        medium: repositories.filter(repo => {
+          const totalCommits = repo?.stats?.totalCommits || 0;
+          return totalCommits >= 100 && totalCommits < 1000;
+        }).length,
+        large: repositories.filter(repo => (repo?.stats?.totalCommits || 0) >= 1000).length
+      },
+      projectUsage: repositories.map(repo => {
+        try {
+          const projectsUsingRepo = projects.filter(project => 
+            project?.repositories?.some(repoId => repoId === repo.id)
+          );
+          
+          return {
+            id: repo?.id || '',
+            name: repo?.name || 'Unknown',
+            projectCount: projectsUsingRepo?.length || 0,
+            projects: projectsUsingRepo?.map(p => ({ id: p?.id || '', name: p?.name || 'Unknown' })) || []
+          };
+        } catch (err) {
+          console.error('Error processing repository stats:', err);
+          return {
+            id: repo?.id || '',
+            name: repo?.name || 'Unknown',
+            projectCount: 0,
+            projects: []
+          };
+        }
+      })
+    };
+
+    // Ajouter des statistiques sur la partie "activité" (commits, rendu, etc.)
+    stats.activity = {
+      totalCommits: repositories.reduce((sum, repo) => sum + (repo?.stats?.totalCommits || 0), 0),
+      totalRenders: renders.length,
+      // Statistiques sur les rendus par projet
+      rendersByProject: projects.map(project => {
+        try {
+          const projectRenders = renders.filter(render => render?.projectId === project?.id);
+          return {
+            id: project?.id || '',
+            name: project?.name || 'Unknown',
+            renderCount: projectRenders?.length || 0
+          };
+        } catch (err) {
+          console.error('Error processing project render stats:', err);
+          return {
+            id: project?.id || '',
+            name: project?.name || 'Unknown',
+            renderCount: 0
+          };
+        }
+      }).sort((a, b) => (b?.renderCount || 0) - (a?.renderCount || 0)) // Triés par nombre de rendus
+    };
+
+    res.json(stats);
+  } catch (err) {
+    console.error('Error fetching repository stats:', err);
+    res.status(500).json({ error: 'Failed to fetch repository statistics', details: err.message });
+  }
+});
+
 module.exports = router; 

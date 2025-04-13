@@ -96,6 +96,7 @@ export const repositoriesApi = {
   getBulkImportStatus: (bulkImportId) => api.get(`/repositories/bulk-import-status/${bulkImportId}`),
   update: (id) => api.put(`/repositories/${id}/update`),
   delete: (id) => api.delete(`/repositories/${id}`),
+  getStats: () => api.get('/repositories/stats'),
 };
 
 // Projects API

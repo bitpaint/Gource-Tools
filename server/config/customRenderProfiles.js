@@ -5,23 +5,37 @@
  */
 const { defaultSettings } = require('./defaultGourceConfig');
 
-// Profil pour visualiser la dernière semaine en 30 secondes
+// Profil pour visualiser la dernière semaine en 1 minute
 const lastWeekProfile = {
-  id: 'last_week_30s',
-  name: 'Last Week - 30 seconds',
-  description: 'Visualisation condensée de l\'activité de la dernière semaine en 30 secondes',
+  id: 'last_week_1m',
+  name: 'Last week: 1 min',
+  description: '1 minute visualization of the last week activity',
   isDefault: false,
   settings: {
     ...defaultSettings,
-    'seconds-per-day': 4.3, // 30 secondes / 7 jours = ~4.3 secondes par jour
+    'resolution': '1920x1080',
+    'framerate': 30,
+    'seconds-per-day': 8.57, // 60 secondes / 7 jours = ~8.57 secondes par jour
     'auto-skip-seconds': 0.1,
     'max-file-lag': 0.15,
-    'user-scale': 1.2, // Légèrement plus grand pour mettre en évidence les utilisateurs
+    'elasticity': 0.3,
+    'title': true,
+    'key': true,
+    'background': '#000000',
+    'font-scale': 1.5,
+    'camera-mode': 'overview',
+    'user-scale': 1.2,
     'time-scale': 1.2,
     'highlight-users': true,
+    'hide-root': true,
+    'title-text': ' ',
+    'show-dates': true,
+    'disable-progress': true,
+    'show-files': true,
+    'multi-sampling': true,
     'date-format': '%d %b',
-    'highlight-all-users': true,
-    'range-days': 7, // Nombre de jours à visualiser (sera utilisé pour calculer start-date)
+    'range-days': 7, // Nombre de jours à visualiser
+    'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()
@@ -30,40 +44,70 @@ const lastWeekProfile = {
 // Profil pour visualiser le dernier mois en 1 minute
 const lastMonthProfile = {
   id: 'last_month_1m',
-  name: 'Last Month - 1 minute',
-  description: 'Visualisation condensée de l\'activité du dernier mois en 1 minute',
+  name: 'Last month: 1 min',
+  description: '1 minute visualization of the last month activity',
   isDefault: false,
   settings: {
     ...defaultSettings,
+    'resolution': '1920x1080',
+    'framerate': 30,
     'seconds-per-day': 2, // 60 secondes / 30 jours = 2 secondes par jour
     'auto-skip-seconds': 0.2,
     'max-file-lag': 0.2,
+    'elasticity': 0.3,
+    'title': true,
+    'key': true,
+    'background': '#000000',
+    'font-scale': 1.5,
+    'camera-mode': 'overview',
     'user-scale': 1.1,
     'time-scale': 1.2,
     'highlight-users': true,
+    'hide-root': true,
+    'title-text': ' ',
+    'show-dates': true,
+    'disable-progress': true,
+    'show-files': true,
+    'multi-sampling': true,
     'date-format': '%d %b',
-    'range-days': 30, // Nombre de jours à visualiser (sera utilisé pour calculer start-date)
+    'range-days': 30, // Nombre de jours à visualiser
+    'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()
 };
 
-// Profil pour visualiser la dernière année en 3 minutes
+// Profil pour visualiser la dernière année en 1 minute
 const lastYearProfile = {
-  id: 'last_year_3m',
-  name: 'Last Year - 3 minutes',
-  description: 'Visualisation condensée de l\'activité de la dernière année en 3 minutes',
+  id: 'last_year_1m',
+  name: 'Last year: 1 min',
+  description: '1 minute visualization of the last year activity',
   isDefault: false,
   settings: {
     ...defaultSettings,
-    'seconds-per-day': 0.5, // 180 secondes / 365 jours ~= 0.5 secondes par jour
+    'resolution': '1920x1080',
+    'framerate': 30,
+    'seconds-per-day': 0.167, // 60 secondes / 365 jours ~= 0.167 secondes par jour
     'auto-skip-seconds': 0.5,
     'max-file-lag': 0.3,
+    'elasticity': 0.3,
+    'title': true,
+    'key': true,
+    'background': '#000000',
+    'font-scale': 1.5,
+    'camera-mode': 'overview',
     'user-scale': 1.0,
     'time-scale': 1.5,
     'highlight-users': true,
+    'hide-root': true,
+    'title-text': ' ',
+    'show-dates': true,
+    'disable-progress': true,
+    'show-files': true,
+    'multi-sampling': true,
     'date-format': '%b %Y',
-    'range-days': 365, // Nombre de jours à visualiser (sera utilisé pour calculer start-date)
+    'range-days': 365, // Nombre de jours à visualiser
+    'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()

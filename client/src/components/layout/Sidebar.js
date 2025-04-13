@@ -14,6 +14,7 @@ import {
   Toolbar,
   Typography
 } from '@mui/material';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import GitHubIcon from '@mui/icons-material/GitHub';
 import FolderSpecialIcon from '@mui/icons-material/FolderSpecial';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -24,6 +25,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 const drawerWidth = 240;
 
 const menuItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Repositories', icon: <GitHubIcon />, path: '/repositories' },
   { text: 'Projects', icon: <FolderSpecialIcon />, path: '/projects' },
   { text: 'Gource Config Files', icon: <SettingsIcon />, path: '/render-profiles' },

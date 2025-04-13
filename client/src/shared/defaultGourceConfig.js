@@ -58,7 +58,7 @@ const settingsDescriptions = {
   elasticity: "Contrôle l'élasticité des connexions entre fichiers et utilisateurs (0.0-1.0)",
   title: "Affiche le titre du projet en haut de la visualisation",
   key: "Affiche la légende des types de fichiers",
-  background: "Couleur d'arrière-plan de la visualisation",
+  background: "Couleur d'arrière-plan de la visualisation (format hexadécimal avec #)",
   fontScale: "Taille relative des textes dans la visualisation",
   cameraMode: "Mode de caméra: 'overview' (vue d'ensemble), 'track' (suit l'activité), 'follow' (suit les utilisateurs)",
   userScale: "Taille relative des avatars utilisateurs",
@@ -79,8 +79,20 @@ const settingsDescriptions = {
   bloom: "Ajoute un effet de luminosité (bloom) aux éléments brillants",
   bloomIntensity: "Intensité de l'effet de bloom (0.0-1.0)",
   bloomMultiplier: "Multiplicateur de l'effet de bloom (0.0-1.0)",
-  extraArgs: "Arguments supplémentaires à passer directement à Gource"
+  extraArgs: "Arguments supplémentaires à passer directement à Gource",
+  dateFormat: "Format d'affichage des dates",
+  highlightAllUsers: "Met en évidence tous les utilisateurs",
+  rangeDays: "Nombre de jours à visualiser à partir de la fin du projet"
 };
 
+/**
+ * Convertit les paramètres de configuration en arguments pour la ligne de commande Gource
+ * Pour utilisation côté client uniquement - existe pour compatibilité avec le code serveur
+ */
+function convertToGourceArgs(settings) {
+  console.log("Client-side convertToGourceArgs called - this is just a stub");
+  return "";
+}
+
 // Export for ES modules (client-side)
-export { defaultSettings, defaultGourceConfig, settingsDescriptions }; 
+export { defaultSettings, defaultGourceConfig, settingsDescriptions, convertToGourceArgs }; 
