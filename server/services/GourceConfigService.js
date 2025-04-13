@@ -1,6 +1,10 @@
 /**
- * Service de gestion des configurations Gource
- * Responsable de l'accès et des opérations sur les profils de rendu
+ * GourceConfigService
+ * 
+ * Service for managing Gource configuration profiles
+ * - Creation and modification of configuration profiles
+ * - Profile parameters management
+ * - Default profile management
  */
 
 const path = require('path');
@@ -16,34 +20,31 @@ class GourceConfigService {
   }
 
   /**
-   * Initialise la base de données
+   * Initialize the database
    */
   init() {
     const db = this.getDatabase();
     
-    // Vérifier si la collection renderProfiles existe
+    // Check if the renderProfiles collection exists
     if (!db.has('renderProfiles').value()) {
-      db.set('renderProfiles', []).write();
-    }
-    
-    // Vérifier si un profil par défaut existe
-    const defaultProfileExists = db.get('renderProfiles')
-      .find({ isDefault: true })
-      .value();
-    
-    if (!defaultProfileExists) {
-      // Ajouter le profil par défaut
-      db.get('renderProfiles')
-        .push(defaultGourceConfig)
-        .write();
+      db.set('renderProfiles', [defaultGourceConfig]).write();
+    } else {
+      // Make sure there's at least one default profile
+      const hasDefault = db.get('renderProfiles')
+        .find({ isDefault: true })
+        .value();
       
-      console.log('Profil de rendu par défaut créé');
+      if (!hasDefault) {
+        db.get('renderProfiles')
+          .push(defaultGourceConfig)
+          .write();
+      }
     }
   }
 
   /**
-   * Récupère une instance fraîche de la base de données
-   * @returns {Object} Instance de la base de données
+   * Get a fresh instance of the database
+   * @returns {Object} Database instance
    */
   getDatabase() {
     const adapter = new FileSync(this.dbPath);
@@ -51,20 +52,20 @@ class GourceConfigService {
   }
 
   /**
-   * Récupère tous les profils de rendu
-   * @returns {Array} Liste des profils de rendu
+   * Get all render profiles
+   * @returns {Array} List of render profiles
    */
-  getAllRenderProfiles() {
+  getAllProfiles() {
     const db = this.getDatabase();
     return db.get('renderProfiles').value() || [];
   }
 
   /**
-   * Récupère un profil de rendu par son ID
-   * @param {string} id - ID du profil à récupérer
-   * @returns {Object|null} Profil de rendu ou null si non trouvé
+   * Get a render profile by its ID
+   * @param {string} id - ID of the profile to retrieve
+   * @returns {Object|null} Profile or null if not found
    */
-  getRenderProfileById(id) {
+  getProfileById(id) {
     if (!id) return null;
     
     const db = this.getDatabase();
@@ -74,64 +75,64 @@ class GourceConfigService {
   }
 
   /**
-   * Récupère le profil de rendu par défaut
-   * @returns {Object|null} Profil de rendu par défaut ou null si non trouvé
+   * Get the default render profile
+   * @returns {Object} Default profile
    */
-  getDefaultRenderProfile() {
+  getDefaultProfile() {
     const db = this.getDatabase();
     return db.get('renderProfiles')
       .find({ isDefault: true })
-      .value() || null;
+      .value() || defaultGourceConfig;
   }
 
   /**
-   * Crée un nouveau profil de rendu
-   * @param {Object} profileData - Données du profil à créer
-   * @returns {Object} Profil créé
+   * Create a new render profile
+   * @param {Object} profileData - Profile data to create
+   * @returns {Object} Created profile
    */
-  createRenderProfile(profileData) {
+  createProfile(profileData) {
     const db = this.getDatabase();
     
-    // Valider les données requises
+    // Validate required data
     if (!profileData.name) {
-      throw new Error('Le nom du profil est requis');
+      throw new Error('Profile name is required');
     }
     
-    // Vérifier si un profil avec le même nom existe déjà
+    // Check if a profile with the same name already exists
     const existingProfile = db.get('renderProfiles')
       .find({ name: profileData.name })
       .value();
     
     if (existingProfile) {
-      throw new Error(`Un profil avec le nom "${profileData.name}" existe déjà`);
+      throw new Error(`A profile with the name "${profileData.name}" already exists`);
     }
     
-    // Générer un ID unique
+    // Generate a unique ID
     const id = Date.now().toString();
     
-    // Créer le profil
+    // Create the profile
     const newProfile = {
       id,
       name: profileData.name,
       description: profileData.description || '',
-      settings: profileData.settings || {},
-      isDefault: !!profileData.isDefault,
+      isDefault: profileData.isDefault === true ? true : false,
       dateCreated: new Date().toISOString(),
-      lastModified: new Date().toISOString()
+      lastModified: new Date().toISOString(),
+      settings: profileData.settings || defaultGourceConfig.settings
     };
     
-    // Si c'est un profil par défaut, supprimer l'état par défaut des autres profils
+    // If new profile is default, update other profiles to non-default
     if (newProfile.isDefault) {
       db.get('renderProfiles')
         .forEach(profile => {
-          if (profile.isDefault) {
+          if (profile.id !== id) {
             profile.isDefault = false;
           }
         })
         .write();
     }
     
-    // Ajouter le profil à la base de données
+    // Add the profile to the database
     db.get('renderProfiles')
       .push(newProfile)
       .write();
@@ -140,12 +141,12 @@ class GourceConfigService {
   }
 
   /**
-   * Met à jour un profil de rendu existant
-   * @param {string} id - ID du profil à mettre à jour
-   * @param {Object} profileData - Nouvelles données du profil
-   * @returns {Object|null} Profil mis à jour ou null si non trouvé
+   * Update an existing render profile
+   * @param {string} id - ID of the profile to update
+   * @param {Object} profileData - New profile data
+   * @returns {Object|null} Updated profile or null if not found
    */
-  updateRenderProfile(id, profileData) {
+  updateProfile(id, profileData) {
     if (!id) return null;
     
     const db = this.getDatabase();
@@ -155,36 +156,44 @@ class GourceConfigService {
     
     if (!profile) return null;
     
-    // Vérifier si un autre profil avec le même nom existe déjà
+    // Check if another profile with the same name already exists
     if (profileData.name && profileData.name !== profile.name) {
       const existingProfile = db.get('renderProfiles')
         .find({ name: profileData.name })
         .value();
       
       if (existingProfile && existingProfile.id !== id) {
-        throw new Error(`Un profil avec le nom "${profileData.name}" existe déjà`);
+        throw new Error(`A profile with the name "${profileData.name}" already exists`);
       }
     }
     
-    // Préparer les données à mettre à jour
+    // Update settings by merging with existing ones
+    const updatedSettings = profileData.settings 
+      ? { ...profile.settings, ...profileData.settings }
+      : profile.settings;
+    
+    // Prepare data to update
     const updatedProfile = {
       ...profile,
-      ...profileData,
-      lastModified: new Date().toISOString()
+      name: profileData.name || profile.name,
+      description: profileData.description !== undefined ? profileData.description : profile.description,
+      isDefault: profileData.isDefault === true ? true : profile.isDefault,
+      lastModified: new Date().toISOString(),
+      settings: updatedSettings
     };
     
-    // Si c'est un profil par défaut, supprimer l'état par défaut des autres profils
-    if (updatedProfile.isDefault) {
+    // If updated profile is default, update other profiles to non-default
+    if (profileData.isDefault === true) {
       db.get('renderProfiles')
         .forEach(p => {
-          if (p.id !== id && p.isDefault) {
+          if (p.id !== id) {
             p.isDefault = false;
           }
         })
         .write();
     }
     
-    // Mettre à jour le profil dans la base de données
+    // Update the profile in the database
     db.get('renderProfiles')
       .find({ id: id.toString() })
       .assign(updatedProfile)
@@ -194,11 +203,11 @@ class GourceConfigService {
   }
 
   /**
-   * Supprime un profil de rendu
-   * @param {string} id - ID du profil à supprimer
-   * @returns {boolean} true si supprimé, false sinon
+   * Delete a render profile
+   * @param {string} id - ID of the profile to delete
+   * @returns {boolean} true if deleted, false otherwise
    */
-  deleteRenderProfile(id) {
+  deleteProfile(id) {
     if (!id) return false;
     
     const db = this.getDatabase();
@@ -208,17 +217,44 @@ class GourceConfigService {
     
     if (!profile) return false;
     
-    // Ne pas supprimer un profil par défaut
+    // Cannot delete default profile
     if (profile.isDefault) {
-      throw new Error('Cannot delete the default render profile');
+      throw new Error('Cannot delete the default profile');
     }
     
-    // Supprimer le profil de la base de données
+    // Delete the profile from the database
     db.get('renderProfiles')
       .remove({ id: id.toString() })
       .write();
     
     return true;
+  }
+
+  /**
+   * Set a profile as the default
+   * @param {string} id - ID of the profile to make default
+   * @returns {Object|null} Updated profile or null if not found
+   */
+  setDefaultProfile(id) {
+    if (!id) return null;
+    
+    const db = this.getDatabase();
+    const profile = db.get('renderProfiles')
+      .find({ id: id.toString() })
+      .value();
+    
+    if (!profile) return null;
+    
+    // Update all profiles: set current one as default, others as non-default
+    db.get('renderProfiles')
+      .forEach(p => {
+        p.isDefault = (p.id === id.toString());
+      })
+      .write();
+    
+    return db.get('renderProfiles')
+      .find({ id: id.toString() })
+      .value();
   }
 }
 
