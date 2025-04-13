@@ -1,10 +1,10 @@
 /**
- * Module partagé pour les configurations Gource
- * Utilisé à la fois par le client et le serveur
- * Ce fichier sert de source unique de vérité pour les paramètres par défaut de Gource
+ * Shared module for Gource configurations
+ * Used by both client and server
+ * This file serves as a single source of truth for Gource default parameters
  */
 
-// Paramètres par défaut pour Gource
+// Default parameters for Gource
 const defaultSettings = {
   resolution: '1920x1080',
   framerate: 60,
@@ -37,7 +37,7 @@ const defaultSettings = {
   extraArgs: ''
 };
 
-// Profil de configuration par défaut
+// Default configuration profile
 const defaultGourceConfig = {
   id: 'default',
   name: 'Default Gource Config File',
@@ -50,56 +50,56 @@ const defaultGourceConfig = {
 
 // Descriptions for each setting with detailed explanations
 const settingsDescriptions = {
-  resolution: "Définit la résolution de la vidéo au format LARGEURxHAUTEUR (ex: 1920x1080)",
-  framerate: "Nombre d'images par seconde dans la vidéo exportée",
-  secondsPerDay: "Nombre de secondes à consacrer à chaque journée d'activité",
-  autoSkipSeconds: "Saute automatiquement les périodes d'inactivité supérieures à cette valeur (en secondes)",
-  elasticity: "Contrôle l'élasticité des connexions entre fichiers et utilisateurs (0.0-1.0)",
-  title: "Affiche le titre du projet en haut de la visualisation",
-  key: "Affiche la légende des types de fichiers",
-  background: "Couleur d'arrière-plan de la visualisation",
-  fontScale: "Taille relative des textes dans la visualisation",
-  cameraMode: "Mode de caméra: 'overview' (vue d'ensemble), 'track' (suit l'activité), 'follow' (suit les utilisateurs)",
-  userScale: "Taille relative des avatars utilisateurs",
-  timeScale: "Vitesse relative du temps dans la visualisation",
-  highlightUsers: "Met en évidence les utilisateurs durant leur activité",
-  hideUsers: "Masque certains utilisateurs (séparés par des virgules)",
-  hideFilesRegex: "Expression régulière pour masquer certains fichiers",
-  hideRoot: "Masque le répertoire racine dans la visualisation",
-  maxUserCount: "Limite le nombre maximal d'utilisateurs affichés (0 = pas de limite)",
-  titleText: "Texte personnalisé du titre (vide = utiliser le nom du projet)",
-  showDates: "Affiche les dates dans la visualisation",
-  disableProgress: "Désactive la barre de progression",
-  disableAutoRotate: "Désactive la rotation automatique de la caméra",
-  showLines: "Affiche les lignes reliant les fichiers aux utilisateurs",
-  followUsers: "La caméra suit les utilisateurs actifs",
-  maxFilelag: "Délai maximal avant que les fichiers n'apparaissent (en secondes)",
-  multiSampling: "Active l'anti-aliasing pour une meilleure qualité d'image",
-  bloom: "Ajoute un effet de luminosité (bloom) aux éléments brillants",
-  bloomIntensity: "Intensité de l'effet de bloom (0.0-1.0)",
-  bloomMultiplier: "Multiplicateur de l'effet de bloom (0.0-1.0)",
-  extraArgs: "Arguments supplémentaires à passer directement à Gource"
+  resolution: "Sets the video resolution in WIDTHxHEIGHT format (e.g., 1920x1080)",
+  framerate: "Number of frames per second in the exported video",
+  secondsPerDay: "Number of seconds allocated to each day of activity",
+  autoSkipSeconds: "Automatically skips periods of inactivity longer than this value (in seconds)",
+  elasticity: "Controls the elasticity of connections between files and users (0.0-1.0)",
+  title: "Displays the project title at the top of the visualization",
+  key: "Displays the legend for file types",
+  background: "Background color of the visualization",
+  fontScale: "Relative size of text in the visualization",
+  cameraMode: "Camera mode: 'overview', 'track' (follows activity), 'follow' (follows users)",
+  userScale: "Relative size of user avatars",
+  timeScale: "Relative speed of time in the visualization",
+  highlightUsers: "Highlights users during their activity",
+  hideUsers: "Hides specific users (comma-separated)",
+  hideFilesRegex: "Regular expression to hide certain files",
+  hideRoot: "Hides the root directory in the visualization",
+  maxUserCount: "Limits the maximum number of users displayed (0 = no limit)",
+  titleText: "Custom title text (empty = use project name)",
+  showDates: "Shows dates in the visualization",
+  disableProgress: "Disables the progress bar",
+  disableAutoRotate: "Disables automatic camera rotation",
+  showLines: "Shows lines connecting files to users",
+  followUsers: "Camera follows active users",
+  maxFilelag: "Maximum delay before files appear (in seconds)",
+  multiSampling: "Enables anti-aliasing for better image quality",
+  bloom: "Adds a bloom effect to bright elements",
+  bloomIntensity: "Intensity of the bloom effect (0.0-1.0)",
+  bloomMultiplier: "Multiplier for the bloom effect (0.0-1.0)",
+  extraArgs: "Additional arguments to pass directly to Gource"
 };
 
 /**
- * Convertit les paramètres de configuration en arguments pour la ligne de commande Gource
- * @param {Object} settings - Paramètres de configuration
- * @returns {string} Arguments pour Gource au format ligne de commande
+ * Converts configuration parameters into command line arguments for Gource
+ * @param {Object} settings - Configuration parameters
+ * @returns {string} Command line arguments for Gource
  */
 function convertToGourceArgs(settings) {
   if (!settings) {
     return '';
   }
 
-  // ÉTAPE 1: Normaliser les paramètres pour éviter les incohérences
+  // STEP 1: Normalize parameters to avoid inconsistencies
   // ==========================================================
   
-  // Créer un objet de paramètres normalisés
+  // Create a normalized parameters object
   let normalizedSettings = {};
   
-  // Table de correspondance entre les différents formats possibles
+  // Mapping table between different possible formats
   const kebabToCamel = {
-    // Format kebab-case vers camelCase
+    // kebab-case to camelCase format
     'seconds-per-day': 'secondsPerDay',
     'auto-skip-seconds': 'autoSkipSeconds',
     'font-scale': 'fontScale',
@@ -134,29 +134,29 @@ function convertToGourceArgs(settings) {
     'background-colour': 'background'
   };
   
-  // Générer le mapping inverse camelToKebab
+  // Generate reverse mapping camelToKebab
   const camelToKebab = {};
   Object.entries(kebabToCamel).forEach(([kebab, camel]) => {
     camelToKebab[camel] = kebab;
   });
   
-  // PHASE 1: D'abord, récupérer tous les paramètres en camelCase (paramètres par défaut)
+  // PHASE 1: First, get all camelCase parameters (default parameters)
   for (const [key, value] of Object.entries(settings)) {
-    // Ignorer les paramètres kebab-case pour cette phase
+    // Ignore kebab-case parameters for this phase
     if (key.includes('-')) continue;
     if (value === null || value === undefined) continue;
     
-    // Normaliser les valeurs
+    // Normalize values
     let normalizedValue = value;
     
-    // Conversion pour les valeurs booléennes
+    // Conversion for boolean values
     if (value === 1 || value === '1' || value === 'true') {
       normalizedValue = true;
     } 
     else if (value === 0 || value === '0' || value === 'false') {
       normalizedValue = false;
     }
-    // Normalisation des couleurs (ajout du # si manquant)
+    // Color normalization (add # if missing)
     else if (typeof value === 'string' && 
         (key.includes('Color') || key === 'background')) {
       normalizedValue = value.startsWith('#') ? value : `#${value}`;
@@ -165,44 +165,44 @@ function convertToGourceArgs(settings) {
     normalizedSettings[key] = normalizedValue;
   }
   
-  // PHASE 2: Ensuite, appliquer les paramètres kebab-case (qui ont priorité car ils viennent probablement de l'UI)
+  // PHASE 2: Then, apply kebab-case parameters (which have priority as they probably come from the UI)
   for (const [key, value] of Object.entries(settings)) {
-    // Ignorer les valeurs null/undefined
+    // Ignore null/undefined values
     if (value === null || value === undefined) continue;
-    if (!key.includes('-')) continue; // Ne traiter que les paramètres kebab-case
+    if (!key.includes('-')) continue; // Only process kebab-case parameters
     
-    // Trouver la clé camelCase correspondante
+    // Find the corresponding camelCase key
     const camelKey = kebabToCamel[key] || key;
     
-    // Normaliser les valeurs
+    // Normalize values
     let normalizedValue = value;
     
-    // Conversion pour les valeurs booléennes
+    // Conversion for boolean values
     if (value === 1 || value === '1' || value === 'true') {
       normalizedValue = true;
     } 
     else if (value === 0 || value === '0' || value === 'false') {
       normalizedValue = false;
     }
-    // Normalisation des couleurs (ajout du # si manquant)
+    // Color normalization (add # if missing)
     else if (typeof value === 'string' && 
         (key.includes('colour') || key === 'background-colour')) {
       normalizedValue = value.startsWith('#') ? value : `#${value}`;
     }
     
-    // Ajouter un log pour voir quel paramètre est remplacé
+    // Add a log to see which parameter is being replaced
     if (normalizedSettings[camelKey] !== undefined) {
-      console.log(`Priorité: ${key}=${normalizedValue} remplace ${camelKey}=${normalizedSettings[camelKey]}`);
+      console.log(`Priority: ${key}=${normalizedValue} replaces ${camelKey}=${normalizedSettings[camelKey]}`);
     }
     
-    // Appliquer avec priorité
+    // Apply with priority
     normalizedSettings[camelKey] = normalizedValue;
   }
   
-  // ÉTAPE 2: Convertir les paramètres normalisés en arguments Gource
+  // STEP 2: Convert normalized parameters to Gource command line arguments
   // ==========================================================
   
-  // Map de conversion des noms de paramètres JS vers les options Gource
+  // Map of conversion from JS parameter names to Gource options
   const paramMap = {
     resolution: 'viewport',
     framerate: 'output-framerate',
@@ -235,30 +235,30 @@ function convertToGourceArgs(settings) {
     rangeDays: 'range-days'
   };
 
-  // Debug: afficher les paramètres normalisés
-  console.log("Paramètres FINAUX normalisés:", JSON.stringify(normalizedSettings, null, 2));
+  // Debug: display final normalized parameters
+  console.log("Final normalized parameters:", JSON.stringify(normalizedSettings, null, 2));
 
-  // Générer les arguments
+  // Generate arguments
   let args = '';
 
-  // Traiter chaque paramètre normalisé
+  // Process each normalized parameter
   for (const [key, value] of Object.entries(normalizedSettings)) {
-    // Ignorer les valeurs vides
+    // Ignore empty values
     if (value === '' || value === null || value === undefined) {
       continue;
     }
 
-    // Cas spécial pour les arguments supplémentaires
+    // Special case for extra arguments
     if (key === 'extraArgs') {
-      // Ajouter directement les arguments supplémentaires
+      // Add extra arguments directly
       args += `${value} `;
       continue;
     }
 
-    // Obtenir l'option Gource correspondante
+    // Get the corresponding Gource option
     const gourceOption = paramMap[key] || key;
 
-    // Traitement spécial pour les couleurs (enlever le #)
+    // Special handling for colors (remove #)
     if (typeof value === 'string' && 
         (key.includes('Color') || key === 'background')) {
       const colorValue = value.replace(/^#/, '');
@@ -266,7 +266,7 @@ function convertToGourceArgs(settings) {
       continue;
     }
 
-    // Traitement spécial pour les valeurs booléennes
+    // Special handling for boolean values
     if (typeof value === 'boolean') {
       if (key === 'title' && !value) {
         args += '--hide-title ';
@@ -284,13 +284,13 @@ function convertToGourceArgs(settings) {
       continue;
     }
 
-    // Paramètres numériques
+    // Numeric parameters
     if (typeof value === 'number') {
       args += `--${gourceOption} ${value} `;
       continue;
     }
 
-    // Paramètres string standards
+    // Standard string parameters
     if (typeof value === 'string') {
       args += `--${gourceOption} "${value}" `;
       continue;
@@ -300,7 +300,7 @@ function convertToGourceArgs(settings) {
   return args.trim();
 }
 
-// Export pour les modules CommonJS (côté serveur)
+// Export for CommonJS modules (server side)
 module.exports = {
   defaultGourceConfig,
   defaultSettings,
