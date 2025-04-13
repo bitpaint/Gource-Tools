@@ -866,7 +866,10 @@ router.put('/:id/update', async (req, res) => {
 // Delete a repository
 router.delete('/:id', (req, res) => {
   try {
-    const repo = db.get('repositories')
+    // Recharger la base de données pour avoir les données les plus récentes
+    const freshDb = reloadDatabase();
+    
+    const repo = freshDb.get('repositories')
       .find({ id: req.params.id })
       .value();
 
@@ -880,12 +883,12 @@ router.delete('/:id', (req, res) => {
     }
 
     // Remove from database
-    db.get('repositories')
+    freshDb.get('repositories')
       .remove({ id: req.params.id })
       .write();
 
     // Also remove from any projects
-    db.get('projects')
+    freshDb.get('projects')
       .forEach(project => {
         if (project.repositories.includes(req.params.id)) {
           project.repositories = project.repositories.filter(repoId => repoId !== req.params.id);

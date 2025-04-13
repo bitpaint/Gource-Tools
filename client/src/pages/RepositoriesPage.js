@@ -52,7 +52,8 @@ import {
   Check as CheckIcon,
   Error as ErrorIcon,
   SkipNext as SkipIcon,
-  CloudSync as CloudSyncIcon
+  CloudSync as CloudSyncIcon,
+  DeleteForever as DeleteForeverIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { repositoriesApi, dateUtils, settingsApi } from '../api/api';
@@ -100,6 +101,11 @@ const RepositoriesPage = () => {
   
   // Ajouter un état pour vérifier si un token GitHub est configuré
   const [hasGithubToken, setHasGithubToken] = useState(false);
+  
+  // Delete user repositories dialog
+  const [openDeleteUserDialog, setOpenDeleteUserDialog] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deletingUserRepos, setDeletingUserRepos] = useState(false);
   
   // Ajouter l'effet pour vérifier si un token GitHub est configuré
   useEffect(() => {
@@ -505,6 +511,69 @@ const RepositoriesPage = () => {
     return acc;
   }, {});
 
+  // Nouvelle fonction pour supprimer tous les dépôts d'un utilisateur
+  const handleDeleteUserRepositories = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      setDeletingUserRepos(true);
+      let successCount = 0;
+      let errorCount = 0;
+      
+      // Liste des IDs qui ont déjà échoué pour éviter une boucle infinie
+      const failedIds = new Set();
+      
+      // Récupérer la liste initiale des dépôts
+      await fetchRepositories();
+      let currentUserRepos = groupedRepositories[userToDelete] || [];
+      
+      // Continuer tant qu'il reste des dépôts pour cet utilisateur
+      // et que nous n'avons pas déjà essayé tous les dépôts sans succès
+      while (currentUserRepos.length > 0 && failedIds.size < currentUserRepos.length) {
+        // Trouver le premier dépôt qui n'a pas encore échoué
+        const repoToDelete = currentUserRepos.find(repo => !failedIds.has(repo.id));
+        
+        // Si tous les dépôts ont échoué, sortir de la boucle
+        if (!repoToDelete) break;
+        
+        try {
+          await repositoriesApi.delete(repoToDelete.id);
+          successCount++;
+          // Récupérer la liste mise à jour après suppression réussie
+          await fetchRepositories();
+          currentUserRepos = groupedRepositories[userToDelete] || [];
+        } catch (err) {
+          console.error(`Error deleting repository ${repoToDelete.name}:`, err);
+          errorCount++;
+          // Marquer cet ID comme ayant échoué
+          failedIds.add(repoToDelete.id);
+        }
+      }
+      
+      // Mise à jour finale de la liste
+      await fetchRepositories();
+      
+      const message = `${successCount} dépôts supprimés${errorCount > 0 ? `, ${errorCount} échecs` : ''}`;
+      toast.success(message);
+      handleCloseDeleteUserDialog();
+    } catch (err) {
+      console.error('Error deleting user repositories:', err);
+      toast.error('Échec de la suppression des dépôts');
+    } finally {
+      setDeletingUserRepos(false);
+    }
+  };
+
+  const handleOpenDeleteUserDialog = (owner) => {
+    setUserToDelete(owner);
+    setOpenDeleteUserDialog(true);
+  };
+
+  const handleCloseDeleteUserDialog = () => {
+    setOpenDeleteUserDialog(false);
+    setUserToDelete(null);
+  };
+
   return (
     <Container maxWidth="xl">
       <Box sx={{ mb: 4 }}>
@@ -579,21 +648,38 @@ const RepositoriesPage = () => {
             <Box 
               sx={{ 
                 display: 'flex', 
+                justifyContent: 'space-between',
                 alignItems: 'center',
                 borderBottom: '1px solid',
                 borderColor: 'divider',
                 pb: 1,
-                mb: expandedOwners[owner] ? 2 : 0,
-                cursor: 'pointer'
+                mb: expandedOwners[owner] ? 2 : 0
               }}
-              onClick={() => toggleOwnerExpanded(owner)}
             >
-              <IconButton size="small">
-                {expandedOwners[owner] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  cursor: 'pointer'
+                }}
+                onClick={() => toggleOwnerExpanded(owner)}
+              >
+                <IconButton size="small">
+                  {expandedOwners[owner] ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                </IconButton>
+                <Typography variant="h6" component="h2" sx={{ ml: 1 }}>
+                  {owner} ({repos.length})
+                </Typography>
+              </Box>
+              
+              <IconButton 
+                size="small" 
+                color="error"
+                onClick={() => handleOpenDeleteUserDialog(owner)}
+                title={`Supprimer tous les dépôts de ${owner}`}
+              >
+                <DeleteForeverIcon />
               </IconButton>
-              <Typography variant="h6" component="h2" sx={{ ml: 1 }}>
-                {owner} ({repos.length})
-              </Typography>
             </Box>
             
             <Collapse in={expandedOwners[owner]} timeout="auto">
@@ -979,6 +1065,30 @@ const RepositoriesPage = () => {
             startIcon={deletingRepo && <CircularProgress size={16} color="inherit" />}
           >
             {deletingRepo ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete User Repositories Dialog */}
+      <Dialog open={openDeleteUserDialog} onClose={handleCloseDeleteUserDialog}>
+        <DialogTitle>Supprimer tous les dépôts</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Êtes-vous sûr de vouloir supprimer tous les dépôts de "{userToDelete}" ?
+            Cette action supprimera {groupedRepositories[userToDelete]?.length || 0} dépôts et leurs fichiers locaux.
+            Cette action ne peut pas être annulée.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteUserDialog} disabled={deletingUserRepos}>Annuler</Button>
+          <Button 
+            onClick={handleDeleteUserRepositories} 
+            color="error" 
+            variant="contained" 
+            disabled={deletingUserRepos}
+            startIcon={deletingUserRepos && <CircularProgress size={16} color="inherit" />}
+          >
+            {deletingUserRepos ? 'Suppression...' : 'Supprimer tous'}
           </Button>
         </DialogActions>
       </Dialog>
