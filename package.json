@@ -1,6 +1,6 @@
 {
   "name": "gource-tools",
-  "version": "0.1.0",
+  "version": "0.3a",
   "description": "Gource visualization tools for Git repositories",
   "scripts": {
     "server": "cd server && npm start",

@@ -300,100 +300,118 @@ class RepositoryService {
    * Importe en masse des dépôts trouvés dans un répertoire
    * @param {string} baseDirectoryPath - Chemin du répertoire contenant les dépôts
    * @param {boolean} skipConfirmation - Si vrai, ignore les vérifications supplémentaires
-   * @returns {Object} Résultats de l'importation
+   * @returns {Promise<Object>} Résultats de l'importation
    */
   bulkImport(baseDirectoryPath, skipConfirmation = false) {
-    try {
-      if (!baseDirectoryPath) {
-        throw new Error('Le chemin du répertoire est requis');
-      }
-
-      // Normaliser le chemin pour Windows
-      const normalizedPath = baseDirectoryPath.replace(/[\/\\]+/g, path.sep);
-      
-      // Vérifier que le répertoire existe
-      if (!fs.existsSync(normalizedPath)) {
-        throw new Error(`Le répertoire ${normalizedPath} n'existe pas`);
-      }
-      
-      // Vérifier que c'est un répertoire
-      const stats = fs.statSync(normalizedPath);
-      if (!stats.isDirectory()) {
-        throw new Error(`${normalizedPath} n'est pas un répertoire`);
-      }
-      
-      // Récupérer tous les sous-répertoires
-      const dirs = fs.readdirSync(normalizedPath, { withFileTypes: true })
-        .filter(dirent => dirent.isDirectory())
-        .map(dirent => {
-          const dirPath = path.join(normalizedPath, dirent.name);
-          return {
-            name: dirent.name,
-            path: dirPath,
-            isGitRepo: this.isValidGitRepository(dirPath)
-          };
-        });
-      
-      // Si aucun dépôt Git trouvé
-      const validRepos = dirs.filter(dir => dir.isGitRepo);
-      if (validRepos.length === 0) {
-        throw new Error('Aucun dépôt Git valide trouvé dans le répertoire spécifié');
-      }
-      
-      // Récupérer les dépôts existants pour éviter les doublons
-      const existingRepos = this.getAllRepositories();
-      const existingPaths = existingRepos.map(repo => repo.path.toLowerCase());
-      const existingNames = existingRepos.map(repo => repo.name.toLowerCase());
-      
-      // Filtrer les dépôts déjà importés
-      const newRepos = validRepos.filter(repo => 
-        !existingPaths.includes(repo.path.toLowerCase()) && 
-        !existingNames.includes(repo.name.toLowerCase())
-      );
-      
-      if (newRepos.length === 0) {
-        throw new Error('Tous les dépôts Git valides ont déjà été importés');
-      }
-      
-      // Liste des résultats
-      const results = {
-        totalFound: validRepos.length,
-        totalImported: 0,
-        skipped: validRepos.length - newRepos.length,
-        imported: [],
-        errors: []
-      };
-      
-      // Importer chaque nouveau dépôt
-      for (const repo of newRepos) {
-        try {
-          const newRepo = this.createRepository({
-            name: repo.name,
-            description: `Importé automatiquement depuis ${normalizedPath}`,
-            path: repo.path
-          });
-          
-          results.imported.push({
-            id: newRepo.id,
-            name: newRepo.name,
-            path: newRepo.path
-          });
-          
-          results.totalImported++;
-        } catch (error) {
-          results.errors.push({
-            name: repo.name,
-            path: repo.path,
-            error: error.message
-          });
+    return new Promise(async (resolve, reject) => {
+      try {
+        if (!baseDirectoryPath) {
+          throw new Error('Le chemin du répertoire est requis');
         }
+
+        // Normaliser le chemin pour Windows
+        const normalizedPath = baseDirectoryPath.replace(/[\/\\]+/g, path.sep);
+        
+        // Vérifier que le répertoire existe
+        if (!fs.existsSync(normalizedPath)) {
+          throw new Error(`Le répertoire ${normalizedPath} n'existe pas`);
+        }
+        
+        // Vérifier que c'est un répertoire
+        const stats = fs.statSync(normalizedPath);
+        if (!stats.isDirectory()) {
+          throw new Error(`${normalizedPath} n'est pas un répertoire`);
+        }
+        
+        console.time('bulkImport');
+        
+        // Lecture des sous-répertoires (gardée synchrone pour simplicité d'implémentation)
+        const dirents = fs.readdirSync(normalizedPath, { withFileTypes: true })
+          .filter(dirent => dirent.isDirectory());
+          
+        // Vérification parallèle des dépôts Git valides
+        const dirs = await Promise.all(
+          dirents.map(async dirent => {
+            const dirPath = path.join(normalizedPath, dirent.name);
+            return {
+              name: dirent.name,
+              path: dirPath,
+              isGitRepo: this.isValidGitRepository(dirPath)
+            };
+          })
+        );
+        
+        // Filtrage des dépôts Git valides
+        const validRepos = dirs.filter(dir => dir.isGitRepo);
+        if (validRepos.length === 0) {
+          throw new Error('Aucun dépôt Git valide trouvé dans le répertoire spécifié');
+        }
+        
+        // Récupérer les dépôts existants pour éviter les doublons
+        const existingRepos = this.getAllRepositories();
+        
+        // Création de Set pour recherche O(1) au lieu de O(n)
+        const existingPathsSet = new Set(existingRepos.map(repo => repo.path.toLowerCase()));
+        const existingNamesSet = new Set(existingRepos.map(repo => repo.name.toLowerCase()));
+        
+        // Filtrer les dépôts déjà importés avec Set pour performance O(1)
+        const newRepos = validRepos.filter(repo => 
+          !existingPathsSet.has(repo.path.toLowerCase()) && 
+          !existingNamesSet.has(repo.name.toLowerCase())
+        );
+        
+        if (newRepos.length === 0) {
+          throw new Error('Tous les dépôts Git valides ont déjà été importés');
+        }
+        
+        // Liste des résultats
+        const results = {
+          totalFound: validRepos.length,
+          totalImported: 0,
+          skipped: validRepos.length - newRepos.length,
+          imported: [],
+          errors: []
+        };
+        
+        // Importer en parallèle chaque nouveau dépôt
+        const importPromises = newRepos.map(repo => {
+          return new Promise(resolve => {
+            try {
+              const newRepo = this.createRepository({
+                name: repo.name,
+                description: `Importé automatiquement depuis ${normalizedPath}`,
+                path: repo.path
+              });
+              
+              results.imported.push({
+                id: newRepo.id,
+                name: newRepo.name,
+                path: newRepo.path
+              });
+              
+              results.totalImported++;
+              resolve();
+            } catch (error) {
+              results.errors.push({
+                name: repo.name,
+                path: repo.path,
+                error: error.message
+              });
+              resolve();
+            }
+          });
+        });
+        
+        // Attendre que tous les imports soient terminés
+        await Promise.all(importPromises);
+        
+        console.timeEnd('bulkImport');
+        resolve(results);
+      } catch (error) {
+        console.error('Erreur lors de l\'importation en masse:', error);
+        reject(error);
       }
-      
-      return results;
-    } catch (error) {
-      console.error('Erreur lors de l\'importation en masse:', error);
-      throw error;
-    }
+    });
   }
 }
 

@@ -806,8 +806,24 @@ async function startRenderProcess(logFilePath, videoFilePath, settings, render) 
         configContent += `\n[gource]\n`;
         
         // Paramètres temporels (critiques pour le bon fonctionnement)
-        configContent += `seconds-per-day=${secondsPerDay !== undefined && !isNaN(secondsPerDay) ? secondsPerDay : 1}\n`;
-        configContent += `auto-skip-seconds=${autoSkipSeconds !== undefined && !isNaN(autoSkipSeconds) ? autoSkipSeconds : 0.1}\n`;
+        // Utiliser la valeur exacte 'seconds-per-day' si elle existe dans les settings, sinon utiliser secondsPerDay
+        if (settings['seconds-per-day'] !== undefined) {
+          configContent += `seconds-per-day=${settings['seconds-per-day']}\n`;
+        } else {
+          configContent += `seconds-per-day=${secondsPerDay !== undefined && !isNaN(secondsPerDay) ? secondsPerDay : 1}\n`;
+        }
+        
+        // Utiliser la valeur exacte 'auto-skip-seconds' si elle existe dans les settings, sinon utiliser autoSkipSeconds
+        if (settings['auto-skip-seconds'] !== undefined) {
+          configContent += `auto-skip-seconds=${settings['auto-skip-seconds']}\n`;
+        } else {
+          configContent += `auto-skip-seconds=${autoSkipSeconds !== undefined && !isNaN(autoSkipSeconds) ? autoSkipSeconds : 0.1}\n`;
+        }
+        
+        // Utiliser la valeur exacte 'max-file-lag' si elle existe dans les settings
+        if (settings['max-file-lag'] !== undefined) {
+          configContent += `max-file-lag=${settings['max-file-lag']}\n`;
+        }
         
         // Générer dynamiquement les dates de début et fin si range-days est spécifié
         if (settings['range-days'] && !isNaN(parseInt(settings['range-days']))) {
@@ -853,11 +869,55 @@ async function startRenderProcess(logFilePath, videoFilePath, settings, render) 
           }
         }
         
-        // Paramètres d'apparence
-        configContent += `elasticity=${elasticity !== undefined && !isNaN(elasticity) ? elasticity : 0.3}\n`;
+        // Paramètres d'apparence et autres paramètres
+        // Méthode améliorée: utiliser d'abord les paramètres avec tirets s'ils existent
+        // puis recourir aux variables extraites
+        
+        // Liste des correspondances entre les paramètres camelCase et avec tirets
+        const paramMappings = {
+          elasticity: 'elasticity',
+          backgroundColour: 'background-colour',
+          background: 'background',
+          title: 'title',
+          titleText: 'title-text',
+          key: 'key',
+          fontScale: 'font-scale',
+          cameraMode: 'camera-mode',
+          userScale: 'user-scale',
+          timeScale: 'time-scale',
+          highlightUsers: 'highlight-users',
+          highlightAllUsers: 'highlight-all-users',
+          hideUsers: 'user-filter',
+          hideFilesRegex: 'file-filter',
+          hideRoot: 'hide-root',
+          maxUserCount: 'max-user-count',
+          titleColor: 'title-colour',
+          fontColor: 'font-colour',
+          dirColor: 'dir-colour',
+          highlightColor: 'highlight-colour',
+          selectionColor: 'selection-colour',
+          fontSize: 'font-size',
+          filenameFontSize: 'filename-font-size',
+          dirnameFontSize: 'dirname-font-size',
+          userFontSize: 'user-font-size',
+          swapTitleDate: 'swap-title-date',
+          disableAutoRotate: 'disable-auto-rotate',
+          showLines: 'hide-files', // Inversé: showLines=false => hide-files=true
+          followUser: 'follow-user',
+          dateFormat: 'date-format',
+          disableProgress: 'disable-progress',
+          multiSampling: 'multi-sampling',
+          bloom: 'bloom',
+          bloomIntensity: 'bloom-intensity',
+          bloomMultiplier: 'bloom-multiplier',
+          padding: 'padding',
+          alpha: 'alpha',
+          fileIdleTime: 'file-idle-time',
+          filenameTime: 'filename-time'
+        };
         
         // Traitement prioritaire pour la couleur d'arrière-plan
-        // Vérifie d'abord background-colour puis background pour être cohérent avec notre logique
+        // qui a une gestion spéciale
         let finalBackgroundColor = '000000'; // Noir par défaut
         
         if (settings['background-colour']) {
@@ -870,90 +930,82 @@ async function startRenderProcess(logFilePath, videoFilePath, settings, render) 
           console.log(`Couleur de fond utilisée: background=${colorValue}`);
         }
         
-        // Traçage des paramètres pour le débogage
-        console.log("Paramètres originaux:", JSON.stringify(settings, null, 2));
-        console.log("Paramètres extraits:", JSON.stringify({
-          resolution, framerate, secondsPerDay, autoSkipSeconds, 
-          elasticity, title, key, background, fontScale,
-          cameraMode, userScale, timeScale
-        }, null, 2));
-        
         configContent += `background-colour=${finalBackgroundColor}\n`;
         
-        // Options du titre et de l'affichage - rendre le titre explicitement visible par défaut
-        if (title === false) {
-          configContent += `hide-title=true\n`;  // Utiliser hide-title plutôt que title=false
-        } else {
-          configContent += `title=true\n`;  // Forcer l'affichage du titre
+        // Traitement des autres paramètres
+        // Appliquer le même principe que pour seconds-per-day à tous les paramètres
+        for (const [camelKey, dashKey] of Object.entries(paramMappings)) {
+          // Sauter background-colour qui est déjà traité séparément
+          if (dashKey === 'background-colour') continue;
+          
+          // Vérifier d'abord si le paramètre avec tiret existe dans settings
+          if (settings[dashKey] !== undefined) {
+            // Cas spécial pour les paramètres booléens
+            if (settings[dashKey] === true) {
+              configContent += `${dashKey}=true\n`;
+            } else if (settings[dashKey] === false) {
+              // Pour les paramètres hide-*, false signifie qu'on ne les ajoute pas
+              // Pour d'autres paramètres booléens, on les désactive explicitement
+              if (!dashKey.startsWith('hide-')) {
+                configContent += `${dashKey}=false\n`;
+              }
+            } else {
+              // Traitement spécial pour les couleurs (enlever le # pour Gource)
+              if (dashKey.includes('colour') && typeof settings[dashKey] === 'string' && settings[dashKey].startsWith('#')) {
+                configContent += `${dashKey}=${settings[dashKey].replace('#', '')}\n`;
+              } else {
+                configContent += `${dashKey}=${settings[dashKey]}\n`;
+              }
+            }
+          } 
+          // Sinon, vérifier si la variable correspondante existe
+          else {
+            const localVar = camelKey.charAt(0).toLowerCase() + camelKey.slice(1);
+            if (eval(localVar) !== undefined) {
+              // Gestion spéciale pour showLines (inversé)
+              if (camelKey === 'showLines') {
+                if (eval(localVar) === false) {
+                  configContent += `hide-files=true\n`;
+                } else if (eval(localVar) === true) {
+                  configContent += `hide-files=false\n`;
+                }
+              } 
+              // Gestion spéciale pour hideRoot
+              else if (camelKey === 'hideRoot' && eval(localVar) === true) {
+                configContent += `hide=root\n`;
+              }
+              // Gestion normale pour les autres paramètres
+              else if (typeof eval(localVar) === 'boolean') {
+                if (eval(localVar) === true) {
+                  configContent += `${dashKey}=true\n`;
+                } else if (!dashKey.startsWith('hide-')) {
+                  configContent += `${dashKey}=false\n`;
+                }
+              } else if (eval(localVar) !== null && eval(localVar) !== '') {
+                // Traitement spécial pour les couleurs (enlever le # pour Gource)
+                if (dashKey.includes('colour') && typeof eval(localVar) === 'string' && eval(localVar).startsWith('#')) {
+                  configContent += `${dashKey}=${eval(localVar).replace('#', '')}\n`;
+                } else {
+                  configContent += `${dashKey}=${eval(localVar)}\n`;
+                }
+              }
+            }
+          }
         }
         
-        // S'assurer que le titre du projet est affiché même sans texte personnalisé
-        if (settings.titleText) {
-          configContent += `title-text=${settings.titleText}\n`;
-        } else if (render.projectName) {
-          // Utiliser le nom du projet si disponible
+        // S'assurer que le titre du projet est affiché si aucun titre personnalisé n'est spécifié
+        // mais que le titre est activé
+        if (!settings['title-text'] && 
+            settings['title'] !== false && 
+            render.projectName && 
+            render.projectName.trim() !== '') {
           configContent += `title-text=${render.projectName}\n`;
         }
         
-        // Tracer les valeurs pour le débogage
-        console.log(`Paramètres de titre: title=${title}, titleText=${settings.titleText}, projectName=${render.projectName}`);
-        
-        // Gestion correcte de toutes les couleurs (enlever le # pour Gource)
-        if (settings.titleColor) configContent += `title-colour=${settings.titleColor.replace('#', '')}\n`;
-        if (settings.fontColor) configContent += `font-colour=${settings.fontColor.replace('#', '')}\n`;
-        if (settings.dirColor) configContent += `dir-colour=${settings.dirColor.replace('#', '')}\n`;
-        if (settings.highlightColor) configContent += `highlight-colour=${settings.highlightColor.replace('#', '')}\n`;
-        if (settings.selectionColor) configContent += `selection-colour=${settings.selectionColor.replace('#', '')}\n`;
-        
-        // Tracer les valeurs des couleurs pour le débogage
-        console.log(`Paramètres de couleur: background=${background}, background-colour=${settings['background-colour']}`);
-        
-        // Ajouter les échelles et tailles de police correctement
-        if (settings.fontScale !== undefined && !isNaN(settings.fontScale)) configContent += `font-scale=${settings.fontScale}\n`;
-        if (settings.fileScale !== undefined && !isNaN(settings.fileScale)) configContent += `file-scale=${settings.fileScale}\n`;
-        if (settings.dirSize !== undefined && !isNaN(settings.dirSize)) configContent += `dir-size=${settings.dirSize}\n`;
-        
-        // Tailles de police
-        if (settings.fontSize !== undefined && !isNaN(settings.fontSize)) configContent += `font-size=${settings.fontSize}\n`;
-        if (settings.filenameFontSize !== undefined && !isNaN(settings.filenameFontSize)) configContent += `filename-font-size=${settings.filenameFontSize}\n`;
-        if (settings.dirnameFontSize !== undefined && !isNaN(settings.dirnameFontSize)) configContent += `dirname-font-size=${settings.dirnameFontSize}\n`;
-        if (settings.userFontSize !== undefined && !isNaN(settings.userFontSize)) configContent += `user-font-size=${settings.userFontSize}\n`;
-        
-        // Ajouter autres options booléennes importantes
-        if (settings.swapTitleDate === true) configContent += `swap-title-date=true\n`;
-        if (settings.disableAutoRotate === true) configContent += `disable-auto-rotate=true\n`;
-        if (settings.showLines === false) configContent += `hide-files=true\n`;
-        if (settings.showLines === true) configContent += `hide-files=false\n`;
-        
-        // Paramètres de caméra
-        // Le mode 'follow' de l'interface est en fait 'overview' dans la config Gource
-        if (cameraMode === 'follow') {
-          configContent += `camera-mode=overview\n`;
-          configContent += `follow-user=1\n`; // Activation du suivi utilisateur
-        } else {
-          configContent += `camera-mode=${cameraMode || 'overview'}\n`;
-        }
-        
-        // Échelles
-        configContent += `user-scale=${userScale !== undefined && !isNaN(userScale) ? userScale : 1.0}\n`;
-        configContent += `time-scale=${timeScale !== undefined && !isNaN(timeScale) ? timeScale : 1.0}\n`;
-        configContent += `font-scale=${fontScale !== undefined && !isNaN(fontScale) ? fontScale : 1.0}\n`;
-        
-        // Options standard toujours activées
+        // Options toujours activées
         configContent += `hide=mouse\n`;
         
-        // Options conditionnelles
-        if (hideRoot) configContent += `hide=root\n`;
-        if (hideFilesRegex) configContent += `file-filter=${hideFilesRegex}\n`;
-        if (hideUsers) configContent += `user-filter=${hideUsers}\n`;
-        if (maxUserCount > 0) configContent += `max-user-count=${maxUserCount}\n`;
-        
-        // Options booléennes
-        if (highlightUsers) configContent += `highlight-users=1\n`;
-        if (settings['highlight-all-users']) configContent += `highlight-all-users=true\n`;
-        if (key === false) configContent += `key=false\n`;
-        
-        // Extras si définis
+        // Extraire et ajouter les arguments supplémentaires si définis
         if (settings.extraArgs) {
           // Convertir les arguments supplémentaires en paramètres individuels
           const extraArgs = settings.extraArgs.split(/\s+/).filter(Boolean);
@@ -1285,8 +1337,24 @@ ${gourceCmd}
         configContent += `\n[gource]\n`;
         
         // Paramètres temporels (critiques pour le bon fonctionnement)
-        configContent += `seconds-per-day=${secondsPerDay !== undefined && !isNaN(secondsPerDay) ? secondsPerDay : 1}\n`;
-        configContent += `auto-skip-seconds=${autoSkipSeconds !== undefined && !isNaN(autoSkipSeconds) ? autoSkipSeconds : 0.1}\n`;
+        // Utiliser la valeur exacte 'seconds-per-day' si elle existe dans les settings, sinon utiliser secondsPerDay
+        if (settings['seconds-per-day'] !== undefined) {
+          configContent += `seconds-per-day=${settings['seconds-per-day']}\n`;
+        } else {
+          configContent += `seconds-per-day=${secondsPerDay !== undefined && !isNaN(secondsPerDay) ? secondsPerDay : 1}\n`;
+        }
+        
+        // Utiliser la valeur exacte 'auto-skip-seconds' si elle existe dans les settings, sinon utiliser autoSkipSeconds
+        if (settings['auto-skip-seconds'] !== undefined) {
+          configContent += `auto-skip-seconds=${settings['auto-skip-seconds']}\n`;
+        } else {
+          configContent += `auto-skip-seconds=${autoSkipSeconds !== undefined && !isNaN(autoSkipSeconds) ? autoSkipSeconds : 0.1}\n`;
+        }
+        
+        // Utiliser la valeur exacte 'max-file-lag' si elle existe dans les settings
+        if (settings['max-file-lag'] !== undefined) {
+          configContent += `max-file-lag=${settings['max-file-lag']}\n`;
+        }
         
         // Générer dynamiquement les dates de début et fin si range-days est spécifié
         if (settings['range-days'] && !isNaN(parseInt(settings['range-days']))) {
@@ -1332,11 +1400,55 @@ ${gourceCmd}
           }
         }
         
-        // Paramètres d'apparence
-        configContent += `elasticity=${elasticity !== undefined && !isNaN(elasticity) ? elasticity : 0.3}\n`;
+        // Paramètres d'apparence et autres paramètres
+        // Méthode améliorée: utiliser d'abord les paramètres avec tirets s'ils existent
+        // puis recourir aux variables extraites
+        
+        // Liste des correspondances entre les paramètres camelCase et avec tirets
+        const paramMappings = {
+          elasticity: 'elasticity',
+          backgroundColour: 'background-colour',
+          background: 'background',
+          title: 'title',
+          titleText: 'title-text',
+          key: 'key',
+          fontScale: 'font-scale',
+          cameraMode: 'camera-mode',
+          userScale: 'user-scale',
+          timeScale: 'time-scale',
+          highlightUsers: 'highlight-users',
+          highlightAllUsers: 'highlight-all-users',
+          hideUsers: 'user-filter',
+          hideFilesRegex: 'file-filter',
+          hideRoot: 'hide-root',
+          maxUserCount: 'max-user-count',
+          titleColor: 'title-colour',
+          fontColor: 'font-colour',
+          dirColor: 'dir-colour',
+          highlightColor: 'highlight-colour',
+          selectionColor: 'selection-colour',
+          fontSize: 'font-size',
+          filenameFontSize: 'filename-font-size',
+          dirnameFontSize: 'dirname-font-size',
+          userFontSize: 'user-font-size',
+          swapTitleDate: 'swap-title-date',
+          disableAutoRotate: 'disable-auto-rotate',
+          showLines: 'hide-files', // Inversé: showLines=false => hide-files=true
+          followUser: 'follow-user',
+          dateFormat: 'date-format',
+          disableProgress: 'disable-progress',
+          multiSampling: 'multi-sampling',
+          bloom: 'bloom',
+          bloomIntensity: 'bloom-intensity',
+          bloomMultiplier: 'bloom-multiplier',
+          padding: 'padding',
+          alpha: 'alpha',
+          fileIdleTime: 'file-idle-time',
+          filenameTime: 'filename-time'
+        };
         
         // Traitement prioritaire pour la couleur d'arrière-plan
-        // Vérifie d'abord background-colour puis background pour être cohérent avec notre logique
+        // qui a une gestion spéciale
         let finalBackgroundColor = '000000'; // Noir par défaut
         
         if (settings['background-colour']) {
@@ -1351,80 +1463,80 @@ ${gourceCmd}
         
         configContent += `background-colour=${finalBackgroundColor}\n`;
         
-        // Options du titre et de l'affichage - rendre le titre explicitement visible par défaut
-        if (title === false) {
-          configContent += `hide-title=true\n`;  // Utiliser hide-title plutôt que title=false
-        } else {
-          configContent += `title=true\n`;  // Forcer l'affichage du titre
+        // Traitement des autres paramètres
+        // Appliquer le même principe que pour seconds-per-day à tous les paramètres
+        for (const [camelKey, dashKey] of Object.entries(paramMappings)) {
+          // Sauter background-colour qui est déjà traité séparément
+          if (dashKey === 'background-colour') continue;
+          
+          // Vérifier d'abord si le paramètre avec tiret existe dans settings
+          if (settings[dashKey] !== undefined) {
+            // Cas spécial pour les paramètres booléens
+            if (settings[dashKey] === true) {
+              configContent += `${dashKey}=true\n`;
+            } else if (settings[dashKey] === false) {
+              // Pour les paramètres hide-*, false signifie qu'on ne les ajoute pas
+              // Pour d'autres paramètres booléens, on les désactive explicitement
+              if (!dashKey.startsWith('hide-')) {
+                configContent += `${dashKey}=false\n`;
+              }
+            } else {
+              // Traitement spécial pour les couleurs (enlever le # pour Gource)
+              if (dashKey.includes('colour') && typeof settings[dashKey] === 'string' && settings[dashKey].startsWith('#')) {
+                configContent += `${dashKey}=${settings[dashKey].replace('#', '')}\n`;
+              } else {
+                configContent += `${dashKey}=${settings[dashKey]}\n`;
+              }
+            }
+          } 
+          // Sinon, vérifier si la variable correspondante existe
+          else {
+            const localVar = camelKey.charAt(0).toLowerCase() + camelKey.slice(1);
+            if (eval(localVar) !== undefined) {
+              // Gestion spéciale pour showLines (inversé)
+              if (camelKey === 'showLines') {
+                if (eval(localVar) === false) {
+                  configContent += `hide-files=true\n`;
+                } else if (eval(localVar) === true) {
+                  configContent += `hide-files=false\n`;
+                }
+              } 
+              // Gestion spéciale pour hideRoot
+              else if (camelKey === 'hideRoot' && eval(localVar) === true) {
+                configContent += `hide=root\n`;
+              }
+              // Gestion normale pour les autres paramètres
+              else if (typeof eval(localVar) === 'boolean') {
+                if (eval(localVar) === true) {
+                  configContent += `${dashKey}=true\n`;
+                } else if (!dashKey.startsWith('hide-')) {
+                  configContent += `${dashKey}=false\n`;
+                }
+              } else if (eval(localVar) !== null && eval(localVar) !== '') {
+                // Traitement spécial pour les couleurs (enlever le # pour Gource)
+                if (dashKey.includes('colour') && typeof eval(localVar) === 'string' && eval(localVar).startsWith('#')) {
+                  configContent += `${dashKey}=${eval(localVar).replace('#', '')}\n`;
+                } else {
+                  configContent += `${dashKey}=${eval(localVar)}\n`;
+                }
+              }
+            }
+          }
         }
         
-        // S'assurer que le titre du projet est affiché même sans texte personnalisé
-        if (settings.titleText) {
-          configContent += `title-text=${settings.titleText}\n`;
-        } else if (render.projectName) {
-          // Utiliser le nom du projet si disponible
+        // S'assurer que le titre du projet est affiché si aucun titre personnalisé n'est spécifié
+        // mais que le titre est activé
+        if (!settings['title-text'] && 
+            settings['title'] !== false && 
+            render.projectName && 
+            render.projectName.trim() !== '') {
           configContent += `title-text=${render.projectName}\n`;
         }
         
-        // Tracer les valeurs pour le débogage
-        console.log(`Paramètres de titre: title=${title}, titleText=${settings.titleText}, projectName=${render.projectName}`);
-        
-        // Gestion correcte de toutes les couleurs (enlever le # pour Gource)
-        if (settings.titleColor) configContent += `title-colour=${settings.titleColor.replace('#', '')}\n`;
-        if (settings.fontColor) configContent += `font-colour=${settings.fontColor.replace('#', '')}\n`;
-        if (settings.dirColor) configContent += `dir-colour=${settings.dirColor.replace('#', '')}\n`;
-        if (settings.highlightColor) configContent += `highlight-colour=${settings.highlightColor.replace('#', '')}\n`;
-        if (settings.selectionColor) configContent += `selection-colour=${settings.selectionColor.replace('#', '')}\n`;
-        
-        // Tracer les valeurs des couleurs pour le débogage
-        console.log(`Paramètres de couleur: background=${background}, background-colour=${settings['background-colour']}`);
-        
-        // Ajouter les échelles et tailles de police correctement
-        if (settings.fontScale !== undefined && !isNaN(settings.fontScale)) configContent += `font-scale=${settings.fontScale}\n`;
-        if (settings.fileScale !== undefined && !isNaN(settings.fileScale)) configContent += `file-scale=${settings.fileScale}\n`;
-        if (settings.dirSize !== undefined && !isNaN(settings.dirSize)) configContent += `dir-size=${settings.dirSize}\n`;
-        
-        // Tailles de police
-        if (settings.fontSize !== undefined && !isNaN(settings.fontSize)) configContent += `font-size=${settings.fontSize}\n`;
-        if (settings.filenameFontSize !== undefined && !isNaN(settings.filenameFontSize)) configContent += `filename-font-size=${settings.filenameFontSize}\n`;
-        if (settings.dirnameFontSize !== undefined && !isNaN(settings.dirnameFontSize)) configContent += `dirname-font-size=${settings.dirnameFontSize}\n`;
-        if (settings.userFontSize !== undefined && !isNaN(settings.userFontSize)) configContent += `user-font-size=${settings.userFontSize}\n`;
-        
-        // Ajouter autres options booléennes importantes
-        if (settings.swapTitleDate === true) configContent += `swap-title-date=true\n`;
-        if (settings.disableAutoRotate === true) configContent += `disable-auto-rotate=true\n`;
-        if (settings.showLines === false) configContent += `hide-files=true\n`;
-        if (settings.showLines === true) configContent += `hide-files=false\n`;
-        
-        // Paramètres de caméra
-        // Le mode 'follow' de l'interface est en fait 'overview' dans la config Gource
-        if (cameraMode === 'follow') {
-          configContent += `camera-mode=overview\n`;
-          configContent += `follow-user=1\n`; // Activation du suivi utilisateur
-        } else {
-          configContent += `camera-mode=${cameraMode || 'overview'}\n`;
-        }
-        
-        // Échelles
-        configContent += `user-scale=${userScale !== undefined && !isNaN(userScale) ? userScale : 1.0}\n`;
-        configContent += `time-scale=${timeScale !== undefined && !isNaN(timeScale) ? timeScale : 1.0}\n`;
-        configContent += `font-scale=${fontScale !== undefined && !isNaN(fontScale) ? fontScale : 1.0}\n`;
-        
-        // Options standard toujours activées
+        // Options toujours activées
         configContent += `hide=mouse\n`;
         
-        // Options conditionnelles
-        if (hideRoot) configContent += `hide=root\n`;
-        if (hideFilesRegex) configContent += `file-filter=${hideFilesRegex}\n`;
-        if (hideUsers) configContent += `user-filter=${hideUsers}\n`;
-        if (maxUserCount > 0) configContent += `max-user-count=${maxUserCount}\n`;
-        
-        // Options booléennes
-        if (highlightUsers) configContent += `highlight-users=1\n`;
-        if (settings['highlight-all-users']) configContent += `highlight-all-users=true\n`;
-        if (key === false) configContent += `key=false\n`;
-        
-        // Extras si définis
+        // Extraire et ajouter les arguments supplémentaires si définis
         if (settings.extraArgs) {
           // Convertir les arguments supplémentaires en paramètres individuels
           const extraArgs = settings.extraArgs.split(/\s+/).filter(Boolean);

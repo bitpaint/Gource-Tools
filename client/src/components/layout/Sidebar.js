@@ -26,9 +26,9 @@ const drawerWidth = 240;
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Repositories', icon: <GitHubIcon />, path: '/repositories' },
-  { text: 'Projects', icon: <FolderSpecialIcon />, path: '/projects' },
+  { text: 'Repos', icon: <GitHubIcon />, path: '/repositories' },
   { text: 'Gource Config Files', icon: <SettingsIcon />, path: '/render-profiles' },
+  { text: 'Projects', icon: <FolderSpecialIcon />, path: '/projects' },
   { text: 'Render', icon: <MovieIcon />, path: '/render' },
   { text: 'Exports', icon: <VideoLibraryIcon />, path: '/exports' },
   { text: 'Settings', icon: <TuneIcon />, path: '/settings' },
@@ -56,13 +56,13 @@ const Sidebar = ({ drawerOpen, handleDrawerToggle }) => {
             align="center"
             sx={{ fontSize: '0.8rem', color: 'text.secondary', mt: 1 }}
           >
-            v0.2a
+            v0.3a
           </Typography>
         </Box>
       </Toolbar>
       <Divider />
       <List>
-        {menuItems.map((item) => (
+        {menuItems.slice(0, 1).map((item) => (
           <ListItem key={item.text} disablePadding>
             <ListItemButton 
               selected={location.pathname === item.path}
@@ -83,11 +83,103 @@ const Sidebar = ({ drawerOpen, handleDrawerToggle }) => {
           </ListItem>
         ))}
       </List>
+      <Divider />
+      <List>
+        {menuItems.slice(1, 4).map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton 
+              selected={location.pathname === item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (isMobile) {
+                  handleDrawerToggle();
+                }
+              }}
+            >
+              <ListItemIcon sx={{ 
+                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+              }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+      <Divider />
+      <List>
+        {menuItems.slice(4, 5).map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton 
+              selected={location.pathname === item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (isMobile) {
+                  handleDrawerToggle();
+                }
+              }}
+            >
+              <ListItemIcon sx={{ 
+                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+              }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+      <Divider />
+      <List>
+        {menuItems.slice(5, 6).map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton 
+              selected={location.pathname === item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (isMobile) {
+                  handleDrawerToggle();
+                }
+              }}
+            >
+              <ListItemIcon sx={{ 
+                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+              }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
+      <Divider />
       <Box sx={{ flexGrow: 1 }} />
+      <List>
+        {menuItems.slice(6).map((item) => (
+          <ListItem key={item.text} disablePadding>
+            <ListItemButton 
+              selected={location.pathname === item.path}
+              onClick={() => {
+                navigate(item.path);
+                if (isMobile) {
+                  handleDrawerToggle();
+                }
+              }}
+            >
+              <ListItemIcon sx={{ 
+                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+              }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          </ListItem>
+        ))}
+      </List>
       <Divider sx={{ mt: 'auto' }} />
       <Box sx={{ p: 2, textAlign: 'center' }}>
         <Typography variant="caption" color="text.secondary">
-          © 2025 Gource Tools
+          Gource Tools is made by bitpaint and liscenced is under MIT
         </Typography>
       </Box>
     </div>

@@ -113,11 +113,51 @@ const lastYearProfile = {
   lastModified: new Date().toISOString()
 };
 
+// Profil pour visualiser tout le projet en 1 minute
+const everythingProfile = {
+  id: 'everything_1m',
+  name: 'Everything in 1min',
+  description: '1 minute visualization of the entire project history',
+  isDefault: true,
+  settings: {
+    ...defaultSettings,
+    'resolution': '1920x1080',
+    'framerate': 30,
+    'seconds-per-day': 'auto', // Cette valeur sera calculée dynamiquement
+    'auto-skip-seconds': 0.5,
+    'max-file-lag': 0.3,
+    'elasticity': 0.3,
+    'title': true,
+    'key': true,
+    'background': '#000000',
+    'font-scale': 1.5,
+    'camera-mode': 'overview',
+    'user-scale': 1.0,
+    'time-scale': 1.5,
+    'highlight-users': true,
+    'hide-root': true,
+    'title-text': ' ',
+    'show-dates': true,
+    'disable-progress': true,
+    'show-files': true,
+    'multi-sampling': true,
+    'date-format': '%b %Y',
+    'range-days': 'all', // Tous les jours du projet
+    'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
+  },
+  dateCreated: new Date().toISOString(),
+  lastModified: new Date().toISOString(),
+  // Indique que ce profil nécessite un calcul dynamique du seconds-per-day
+  // basé sur la durée totale du projet (premier commit à dernier commit)
+  dynamicTimeCalculation: true
+};
+
 // Exporter tous les profils personnalisés
 const customRenderProfiles = [
   lastWeekProfile,
   lastMonthProfile,
-  lastYearProfile
+  lastYearProfile,
+  everythingProfile
 ];
 
 module.exports = {

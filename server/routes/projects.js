@@ -11,9 +11,52 @@ const db = low(adapter);
 
 // Fonction pour recharger la base de données
 function reloadDatabase() {
-  // Recharger explicitement la base de données pour avoir les données les plus récentes
-  const refreshedAdapter = new FileSync(path.join(__dirname, '../../db/db.json'));
-  return low(refreshedAdapter);
+  const dbPath = path.join(__dirname, '../../db/db.json');
+  const adapter = new FileSync(dbPath);
+  return low(adapter);
+}
+
+// Récupérer un projet avec tous ses détails (référentiels et profil de rendu)
+function getProjectWithDetails(projectId) {
+  if (!projectId) return null;
+  
+  // Recharger la base de données pour avoir les données les plus récentes
+  const freshDb = reloadDatabase();
+  
+  // Récupérer le projet
+  const project = freshDb.get('projects')
+    .find({ id: projectId.toString() })
+    .value();
+  
+  if (!project) return null;
+  
+  // Récupérer les détails des référentiels
+  const repositoryDetails = project.repositories.map(repoId => {
+    return freshDb.get('repositories')
+      .find({ id: repoId })
+      .value();
+  }).filter(repo => repo !== undefined);
+  
+  // Récupérer le profil de rendu
+  let renderProfile = null;
+  if (project.renderProfileId) {
+    renderProfile = freshDb.get('renderProfiles')
+      .find({ id: project.renderProfileId })
+      .value();
+  }
+  
+  if (!renderProfile) {
+    // Utiliser le profil par défaut si aucun profil n'est spécifié
+    renderProfile = freshDb.get('renderProfiles')
+      .find({ isDefault: true })
+      .value();
+  }
+  
+  return {
+    ...project,
+    repositoryDetails,
+    renderProfile
+  };
 }
 
 // Get all projects
@@ -308,4 +351,7 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;
+
+// Exporter également la fonction getProjectWithDetails
+module.exports.getProjectWithDetails = getProjectWithDetails; 

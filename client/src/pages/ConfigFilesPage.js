@@ -6,9 +6,6 @@ import {
   Paper,
   Box,
   Grid,
-  Card,
-  CardContent,
-  CardActions,
   Dialog,
   DialogActions,
   DialogContent,
@@ -18,9 +15,6 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   InputAdornment,
   MenuItem,
   Select,
@@ -28,16 +22,21 @@ import {
   InputLabel,
   Tabs,
   Tab,
-  Chip,
   Tooltip,
-  IconButton
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow
 } from '@mui/material';
 import { 
   Add as AddIcon, 
   Edit as EditIcon, 
   Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  HelpOutline
+  HelpOutline,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils } from '../api/api';
@@ -88,6 +87,7 @@ const ConfigFilesPage = () => {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Profile dialog state
   const [openProfileDialog, setOpenProfileDialog] = useState(false);
@@ -280,10 +280,15 @@ const ConfigFilesPage = () => {
     setTabValue(newValue);
   };
 
-  // Format date for display
+  // Filtered profiles based on search query
+  const filteredProfiles = profiles.filter(profile => 
+    profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (profile.description && profile.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return dateUtils.formatRelativeTime(dateString);
+    return dateUtils.formatDateTime(dateString);
   };
 
   if (loading) {
@@ -305,139 +310,110 @@ const ConfigFilesPage = () => {
 
   return (
     <Container maxWidth="xl">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Config Files
-        </Typography>
-        <Typography variant="body1" color="text.secondary" paragraph>
-          Create and manage Gource configuration files
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
+      <Typography variant="h4" component="h1" gutterBottom>
+        Config Files
+      </Typography>
+      <Typography variant="subtitle1" gutterBottom>
+        Create and manage Gource configuration files
+      </Typography>
+      
+      {error && (
+        <Alert severity="error" sx={{ my: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, mt: 3 }}>
+        <TextField
+          placeholder="Search config files..."
+          variant="outlined"
+          size="small"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ width: '350px' }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Button 
+          variant="contained" 
+          color="primary" 
+          startIcon={<AddIcon />} 
           onClick={() => handleOpenProfileDialog()}
         >
           Create Config File
         </Button>
       </Box>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
+      
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper} sx={{ mt: 2 }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Description</TableCell>
+                <TableCell>Background Color</TableCell>
+                <TableCell>Seconds per Day</TableCell>
+                <TableCell>Last Modified</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredProfiles.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    No config files found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProfiles.map((profile) => (
+                  <TableRow key={profile.id}>
+                    <TableCell>{profile.name}</TableCell>
+                    <TableCell>{profile.description || 'No description'}</TableCell>
+                    <TableCell>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 1 
+                      }}>
+                        <Box 
+                          sx={{ 
+                            width: 24, 
+                            height: 24, 
+                            bgcolor: profile.settings.background || '#000000',
+                            borderRadius: '4px',
+                            border: '1px solid rgba(224, 224, 224, 1)'
+                          }} 
+                        />
+                        {profile.settings.background || '#000000'}
+                      </Box>
+                    </TableCell>
+                    <TableCell>{getProfileSetting(profile, 'seconds-per-day') || '1'}</TableCell>
+                    <TableCell>{formatDate(profile.updatedAt)}</TableCell>
+                    <TableCell>
+                      <IconButton color="primary" onClick={() => handleOpenProfileDialog(profile)}>
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton color="error" onClick={() => handleOpenDeleteDialog(profile)}>
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
-
-      <Grid container spacing={3}>
-        {profiles.length === 0 ? (
-          <Grid item xs={12}>
-            <Paper sx={{ p: 3, textAlign: 'center' }}>
-              <Typography variant="body1" color="text.secondary">
-                No config files found. Create one to get started.
-              </Typography>
-            </Paper>
-          </Grid>
-        ) : (
-          profiles.map((profile) => (
-            <Grid item xs={12} md={6} key={profile.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h5" component="div" gutterBottom>
-                    {profile.name}
-                    {profile.isDefault && (
-                      <Chip 
-                        label="Default" 
-                        color="primary" 
-                        size="small" 
-                        sx={{ ml: 1, fontSize: '0.7rem' }} 
-                      />
-                    )}
-                  </Typography>
-                  
-                  {profile.description && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      {profile.description}
-                    </Typography>
-                  )}
-                  
-                  <Divider sx={{ my: 2 }} />
-                  
-                  <Accordion>
-                    <AccordionSummary
-                      expandIcon={<ExpandMoreIcon />}
-                      aria-controls="profile-settings-content"
-                      id="profile-settings-header"
-                    >
-                      <Typography>Config Settings</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Resolution:</strong> {profile.settings.resolution}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Framerate:</strong> {profile.settings.framerate} fps
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Seconds per day:</strong> {getProfileSetting(profile, 'seconds-per-day')}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Camera mode:</strong> {getProfileSetting(profile, 'camera-mode')}
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        <strong>Background:</strong> {profile.settings.background}
-                      </Typography>
-                      {getProfileSetting(profile, 'title-text') && (
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          <strong>Custom Title:</strong> {getProfileSetting(profile, 'title-text')}
-                        </Typography>
-                      )}
-                      {profile.settings.elasticity !== undefined && (
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          <strong>Elasticity:</strong> {profile.settings.elasticity}
-                        </Typography>
-                      )}
-                      {getProfileSetting(profile, 'extra-args') && (
-                        <Typography variant="body2" sx={{ mb: 1 }}>
-                          <strong>Extra args:</strong> {getProfileSetting(profile, 'extra-args')}
-                        </Typography>
-                      )}
-                    </AccordionDetails>
-                  </Accordion>
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Last modified: {' '}
-                    <Tooltip title={dateUtils.formatLocaleDate(profile.lastModified)}>
-                      <span>{formatDate(profile.lastModified)}</span>
-                    </Tooltip>
-                  </Typography>
-                </CardContent>
-                <CardActions>
-                  <Button 
-                    size="small" 
-                    startIcon={<EditIcon />}
-                    onClick={() => handleOpenProfileDialog(profile)}
-                  >
-                    Edit
-                  </Button>
-                  <Button 
-                    size="small" 
-                    color="error" 
-                    startIcon={<DeleteIcon />}
-                    onClick={() => handleOpenDeleteDialog(profile)}
-                    disabled={profile.isDefault}
-                    title={profile.isDefault ? "Default config file cannot be deleted" : "Delete config file"}
-                  >
-                    Delete
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))
-        )}
-      </Grid>
-
+      
       {/* Config File Dialog */}
       <Dialog 
         open={openProfileDialog} 
