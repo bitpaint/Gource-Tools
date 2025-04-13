@@ -2,17 +2,26 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const simpleGit = require('simple-git');
 const { Octokit } = require('octokit');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const os = require('os');
 
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
 
 // Maximum length of file paths for Windows
 const MAX_PATH_LENGTH_WINDOWS = 240; // Windows limite est à ~260, mais gardons une marge
+
+// Nombre de processeurs disponibles sur la machine
+const NUM_CPUS = os.cpus().length;
+
+// Configuration par défaut pour l'importation massive optimisée
+const DEFAULT_MAX_CONCURRENT_CLONES = Math.max(4, Math.min(12, NUM_CPUS)); // Entre 4 et 12, basé sur les CPUs
+const DEFAULT_CLONE_DEPTH = 1; // Clone superficiel par défaut pour économiser de la bande passante et du temps
+const THROUGHPUT_CHECK_INTERVAL = 1000; // Intervalle de vérification du débit en ms
 
 // Fonction pour recharger la base de données
 function reloadDatabase() {
@@ -1170,8 +1179,8 @@ router.post('/bulk-import', async (req, res) => {
         }
         
         // Process repositories in parallel with a concurrency limit
-        const MAX_CONCURRENT_CLONES = maxConcurrentClones || 8; // Increased default from 3 to 8, user configurable
-        console.log(`[BULK IMPORT] Starting parallel cloning with max ${MAX_CONCURRENT_CLONES} concurrent operations`);
+        const MAX_CONCURRENT_CLONES = maxConcurrentClones || DEFAULT_MAX_CONCURRENT_CLONES;
+        console.log(`[BULK IMPORT] Starting parallel cloning with max ${MAX_CONCURRENT_CLONES} concurrent operations (CPU cores: ${NUM_CPUS})`);
         
         // Store successful repository IDs for project creation
         const successfulRepoIds = [];
@@ -1182,8 +1191,77 @@ router.post('/bulk-import', async (req, res) => {
           successfulRepoIdsByOwner[owner] = [];
         });
         
+        // Initialiser les métriques de débit
+        const throughputStats = {
+          startTime: Date.now(),
+          totalBytesProcessed: 0,
+          lastUpdateTime: Date.now(),
+          lastBytesProcessed: 0,
+          currentSpeed: 0, // bytes/sec
+          averageSpeed: 0,  // bytes/sec
+          reposCompleted: 0,
+          reposAttempted: 0
+        };
+        
+        // Fonction pour mettre à jour les métriques et les afficher
+        const updateThroughputStats = (newBytes = 0, isCompleted = false) => {
+          const now = Date.now();
+          
+          // Mettre à jour les statistiques
+          throughputStats.totalBytesProcessed += newBytes;
+          if (isCompleted) throughputStats.reposCompleted++;
+          
+          // Ne mettre à jour le débit que si l'intervalle de temps s'est écoulé
+          const timeSinceLastUpdate = now - throughputStats.lastUpdateTime;
+          if (timeSinceLastUpdate >= THROUGHPUT_CHECK_INTERVAL) {
+            // Calcul du débit instantané
+            throughputStats.currentSpeed = (throughputStats.totalBytesProcessed - throughputStats.lastBytesProcessed) / 
+                                          (timeSinceLastUpdate / 1000);
+            
+            // Calcul du débit moyen
+            const totalTimeSeconds = (now - throughputStats.startTime) / 1000;
+            if (totalTimeSeconds > 0) {
+              throughputStats.averageSpeed = throughputStats.totalBytesProcessed / totalTimeSeconds;
+            }
+            
+            // Formatage du débit pour l'affichage
+            const formatSpeed = (bytesPerSec) => {
+              if (bytesPerSec < 1024) return `${bytesPerSec.toFixed(1)} B/s`;
+              if (bytesPerSec < 1024 * 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+              if (bytesPerSec < 1024 * 1024 * 1024) return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+              return `${(bytesPerSec / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
+            };
+            
+            const currentSpeedFormatted = formatSpeed(throughputStats.currentSpeed);
+            const averageSpeedFormatted = formatSpeed(throughputStats.averageSpeed);
+            
+            // Mise à jour du statut avec les informations de débit
+            updateCloneStatus(bulkImportId, {
+              throughput: {
+                current: currentSpeedFormatted,
+                average: averageSpeedFormatted,
+                reposCompleted: throughputStats.reposCompleted,
+                reposTotal: allRepositories.length
+              }
+            });
+            
+            // Log des métriques de débit
+            console.log(`[BULK IMPORT] Performance metrics - Current speed: ${currentSpeedFormatted}, Average: ${averageSpeedFormatted}, Completed: ${throughputStats.reposCompleted}/${allRepositories.length}`);
+            
+            // Réinitialiser pour la prochaine mise à jour
+            throughputStats.lastUpdateTime = now;
+            throughputStats.lastBytesProcessed = throughputStats.totalBytesProcessed;
+          }
+        };
+        
+        // Configurer un intervalle pour mettre à jour régulièrement les statistiques de débit
+        const throughputInterval = setInterval(() => {
+          updateThroughputStats();
+        }, THROUGHPUT_CHECK_INTERVAL);
+        
         // Helper function to process a repository
         const processRepository = async (repo, index) => {
+          throughputStats.reposAttempted++;
           const repoName = repo.name;
           const repoUrl = repo.clone_url;
           const repoDescription = repo.description || '';
@@ -1207,8 +1285,7 @@ router.post('/bulk-import', async (req, res) => {
             
             updateCloneStatus(bulkImportId, {
               repositories: updatedRepos,
-              completedRepos: currentStatus.completedRepos + 1,
-              progress: Math.min(10 + Math.floor((currentStatus.completedRepos + 1) / allRepositories.length * 80), 90)
+              completedRepos: currentStatus.completedRepos + 1
             });
             
             // Add existing repo ID for project creation
@@ -1218,14 +1295,6 @@ router.post('/bulk-import', async (req, res) => {
               // Also add to per-owner list
               if (successfulRepoIdsByOwner[ownerName]) {
                 successfulRepoIdsByOwner[ownerName].push(existingRepo.id);
-              }
-              
-              // Update repo ID in the repositoriesByOwner structure
-              if (repositoriesByOwner[ownerName]) {
-                const repoIndex = repositoriesByOwner[ownerName].repositories.findIndex(r => r.url === repoUrl);
-                if (repoIndex !== -1) {
-                  repositoriesByOwner[ownerName].repositories[repoIndex].id = existingRepo.id;
-                }
               }
             }
             
@@ -1430,19 +1499,15 @@ router.post('/bulk-import', async (req, res) => {
             // Check if we're on Windows and should use the path length workaround
             const isWindows = process.platform === 'win32';
             
-            // Clone options
-            const cloneOptions = {};
+            // Clone options - Par défaut, utiliser des clones superficiels pour économiser du temps et de la bande passante
+            const cloneOptions = ['--depth=1', '--single-branch'];
             
             // For Windows, add options to handle long paths if the repo name suggests it could have long paths
-            // Repositories like 'hadoop', 'kubernetes', etc. have been known to have very long paths
             const riskyRepoKeywords = ['hadoop', 'kubernetes', 'spark', 'android', 'tensorflow'];
             const isRiskyRepo = riskyRepoKeywords.some(keyword => repoName.toLowerCase().includes(keyword));
             
             if (isWindows && isRiskyRepo) {
-              console.log(`[BULK IMPORT] Repository ${repoName} might have long paths, applying mitigation for Windows`);
-              // On Windows, try to use a shorter base path if possible
-              // Also use depth=1 to reduce clone size and speed up the process
-              cloneOptions.depth = 1;
+              console.log(`[BULK IMPORT] Repository ${repoName} might have long paths, applying additional Windows mitigations`);
             }
             
             // Clone the repository
@@ -1451,21 +1516,138 @@ router.post('/bulk-import', async (req, res) => {
             )}`);
             
             try {
-              await simpleGit().clone(cloneUrl, repoPath, cloneOptions);
-              console.log(`[BULK IMPORT] Clone of ${repoName} completed successfully`);
+              // Utiliser spawn plutôt que simpleGit ou execSync pour mieux contrôler et mesurer le processus
+              let repoBytes = 0;
+              
+              const startTime = Date.now();
+              
+              // Créer le dossier parent si nécessaire
+              const repoParentDir = path.dirname(repoPath);
+              if (!fs.existsSync(repoParentDir)) {
+                fs.mkdirSync(repoParentDir, { recursive: true });
+              }
+              
+              // Fonction pour exécuter un clone avec spawn et mesurer le débit
+              const doGitClone = () => {
+                return new Promise((resolve, reject) => {
+                  // Construire la commande git en tableau d'arguments
+                  const gitArgs = ['clone', '--progress', ...cloneOptions, cloneUrl, repoPath];
+                  
+                  // Lancer le processus git
+                  const gitProcess = spawn('git', gitArgs);
+                  
+                  // Écouter les données sur stderr (git y envoie les infos de progression)
+                  gitProcess.stderr.on('data', (data) => {
+                    const output = data.toString();
+                    
+                    // Estimer les données téléchargées basées sur la sortie
+                    // C'est une approximation car git ne fournit pas le nombre exact d'octets
+                    if (output.includes('Receiving objects:')) {
+                      // Extraire le pourcentage et estimer les octets basés sur la taille moyenne des dépôts
+                      const match = output.match(/Receiving objects:\s+(\d+)%/);
+                      if (match && match[1]) {
+                        const percent = parseInt(match[1], 10);
+                        // Supposons une taille moyenne de dépôt de 10MB (ajuster si nécessaire)
+                        const estimatedTotalSize = 10 * 1024 * 1024; 
+                        const previousPercent = Math.floor(repoBytes / estimatedTotalSize * 100);
+                        const newBytes = (percent - previousPercent) / 100 * estimatedTotalSize;
+                        
+                        if (newBytes > 0) {
+                          repoBytes += newBytes;
+                          updateThroughputStats(newBytes);
+                        }
+                      }
+                    }
+                    
+                    // Log détaillé pour le débogge
+                    console.log(`[BULK IMPORT] [${repoName}] ${output.trim()}`);
+                  });
+                  
+                  // Écouter la fin du processus
+                  gitProcess.on('close', (code) => {
+                    if (code === 0) {
+                      const timeElapsed = (Date.now() - startTime) / 1000;
+                      const speed = repoBytes / (timeElapsed || 1);
+                      console.log(`[BULK IMPORT] Cloned ${repoName} successfully in ${timeElapsed.toFixed(1)}s (avg. speed: ${(speed / (1024 * 1024)).toFixed(2)} MB/s)`);
+                      resolve();
+                    } else {
+                      reject(new Error(`Git clone exited with code ${code}`));
+                    }
+                  });
+                  
+                  // Gérer les erreurs de lancement du processus
+                  gitProcess.on('error', (err) => {
+                    reject(new Error(`Failed to spawn git process: ${err.message}`));
+                  });
+                });
+              };
+              
+              await doGitClone();
+              updateThroughputStats(0, true); // Marquer comme terminé, sans ajouter de bytes supplémentaires
+              
             } catch (cloneError) {
-              // Check if the error is related to long file names
-              if (isWindows && cloneError.message && (
+              console.error(`[BULK IMPORT] Error cloning ${repoName}:`, cloneError.message);
+              
+              // Essayer avec un fallback pour les erreurs connues
+              if (cloneError.message && (
                   cloneError.message.includes('Filename too long') || 
-                  cloneError.message.includes('unable to create file')
+                  cloneError.message.includes('unable to create file') ||
+                  cloneError.message.includes('Too many arguments')
               )) {
-                console.log(`[BULK IMPORT] Detected long filename error for ${repoName}, trying shallow clone`);
+                console.log(`[BULK IMPORT] Detected known error for ${repoName}, trying alternative clone approach...`);
                 
-                // Try a shallow clone as a workaround
-                await simpleGit().clone(cloneUrl, repoPath, ['--depth=1', '--single-branch']);
-                console.log(`[BULK IMPORT] Shallow clone of ${repoName} completed as a workaround for long filenames`);
+                try {
+                  // Nettoyer le répertoire s'il existe déjà partiellement
+                  if (fs.existsSync(repoPath)) {
+                    fs.rmSync(repoPath, { recursive: true, force: true });
+                  }
+                  
+                  // Créer d'abord le répertoire
+                  fs.mkdirSync(repoPath, { recursive: true });
+                  
+                  // Exécuter git avec un timeout plus long et un buffer plus grand
+                  execSync(
+                    `git clone --depth=1 --single-branch "${cloneUrl}" "${repoPath}"`,
+                    { 
+                      stdio: 'pipe',
+                      maxBuffer: 1024 * 1024 * 1024, // 1GB buffer
+                      timeout: 1200000 // 20 minutes timeout
+                    }
+                  );
+                  console.log(`[BULK IMPORT] Alternative clone of ${repoName} completed successfully`);
+                  updateThroughputStats(0, true); // Marquer comme terminé
+                  
+                } catch (altCloneError) {
+                  console.error(`[BULK IMPORT] Alternative clone approach also failed:`, altCloneError.message);
+                  
+                  // Dernière tentative - clone sans checkout
+                  try {
+                    if (fs.existsSync(repoPath)) {
+                      fs.rmSync(repoPath, { recursive: true, force: true });
+                    }
+                    
+                    fs.mkdirSync(repoPath, { recursive: true });
+                    
+                    // Clone sans checkout initial
+                    execSync(
+                      `git clone --depth=1 --no-checkout "${cloneUrl}" "${repoPath}"`,
+                      { 
+                        stdio: 'pipe',
+                        maxBuffer: 1024 * 1024 * 1024,
+                        timeout: 900000 // 15 minutes
+                      }
+                    );
+                    
+                    console.log(`[BULK IMPORT] Final fallback clone of ${repoName} completed successfully`);
+                    updateThroughputStats(0, true);
+                    
+                  } catch (finalError) {
+                    console.error(`[BULK IMPORT] All clone approaches failed for ${repoName}:`, finalError.message);
+                    throw new Error(`Failed to clone repository using all methods: ${finalError.message}`);
+                  }
+                }
               } else {
-                // Re-throw the error if it's not a long filename issue
+                // Re-throw the error if it's not known
                 throw cloneError;
               }
             }
@@ -1636,6 +1818,24 @@ router.post('/bulk-import', async (req, res) => {
           const failedInChunk = results.filter(r => !r.success);
           if (failedInChunk.length > 0) {
             console.warn(`[BULK IMPORT] ${failedInChunk.length}/${results.length} repositories failed in chunk ${i + 1}`);
+            // Ajouter plus de logs pour les échecs
+            failedInChunk.forEach(failed => {
+              console.warn(`[BULK IMPORT] Failed repository: ${failed.name} - Error: ${failed.error}`);
+              
+              // Mettre à jour le statut de ce dépôt spécifique
+              const currentStatus = cloneStatuses.get(bulkImportId);
+              if (currentStatus && currentStatus.repositories) {
+                const updatedRepos = currentStatus.repositories.map(r => 
+                  (r.name === failed.name && r.owner === failed.owner) ? 
+                    { ...r, status: 'failed', message: `Failed to import: ${failed.error}` } : r
+                );
+                
+                updateCloneStatus(bulkImportId, {
+                  repositories: updatedRepos,
+                  failedRepos: (currentStatus.failedRepos || 0) + 1
+                });
+              }
+            });
           }
           
           console.log(`[BULK IMPORT] Completed ${completed}/${allRepositories.length} repositories`);
@@ -1648,10 +1848,23 @@ router.post('/bulk-import', async (req, res) => {
           
           // Add a timeout between chunks to let the system recover
           if (i < chunks.length - 1) {
-            console.log(`[BULK IMPORT] Pausing for 5 seconds before next chunk to prevent system overload`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            // Utiliser un temps de pause adaptatif basé sur le débit moyen
+            let pauseTime = 10000; // 10 secondes par défaut
+            
+            // Si le débit moyen est faible, augmenter le temps de pause
+            if (throughputStats.averageSpeed > 0 && throughputStats.averageSpeed < 1024 * 1024) { // Moins de 1 MB/s
+              pauseTime = 20000; // 20 secondes
+            } else if (throughputStats.averageSpeed >= 10 * 1024 * 1024) { // Plus de 10 MB/s
+              pauseTime = 5000; // 5 secondes
+            }
+            
+            console.log(`[BULK IMPORT] Pausing for ${pauseTime/1000} seconds before next chunk to prevent system overload`);
+            await new Promise(resolve => setTimeout(resolve, pauseTime));
           }
         }
+        
+        // Arrêter l'intervalle de mise à jour du débit
+        clearInterval(throughputInterval);
         
         // Create projects based on the specified mode
         const finalStatus = cloneStatuses.get(bulkImportId);
