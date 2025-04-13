@@ -44,3 +44,12 @@ Thumbs.db
 *.mp4
 *.avi
 *.webm
+gource-config-*.conf
+config/gource-config-*.conf
+*.log.txt
+combined.txt
+*_temp.log
+
+# Temporary render files
+temp/*
+!temp/.gitkeep

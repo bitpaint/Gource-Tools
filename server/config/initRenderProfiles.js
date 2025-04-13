@@ -6,7 +6,7 @@
 const path = require('path');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const { customProfiles } = require('./customRenderProfiles');
+const { customRenderProfiles } = require('./customRenderProfiles');
 
 // Fonction pour initialiser les profils de rendu personnalisés
 function initCustomRenderProfiles() {
@@ -29,7 +29,7 @@ function initCustomRenderProfiles() {
     // Vérifier et ajouter chaque profil personnalisé s'il n'existe pas déjà
     let addedCount = 0;
     
-    for (const profile of customProfiles) {
+    for (const profile of customRenderProfiles) {
       // Vérifier si un profil avec le même ID existe déjà
       const existingProfile = existingProfiles.find(p => p.id === profile.id);
       

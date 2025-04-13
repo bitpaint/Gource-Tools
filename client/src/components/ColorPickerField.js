@@ -1,100 +1,109 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  TextField, 
-  InputAdornment, 
-  IconButton,
+import {
+  Box,
+  TextField,
+  InputAdornment,
   Tooltip,
-  ClickAwayListener,
-  Paper
+  IconButton,
+  Popover,
+  Typography
 } from '@mui/material';
-import { HelpOutline } from '@mui/icons-material';
-import { ChromePicker } from 'react-color';
+import { HelpOutline, ColorLens } from '@mui/icons-material';
+import { SketchPicker } from 'react-color';
 
-/**
- * A color picker field component that allows selecting colors with a color picker
- */
-const ColorPickerField = ({ 
-  label, 
-  value, 
-  onChange, 
-  fullWidth = true, 
-  tooltip = null
-}) => {
-  const [displayColorPicker, setDisplayColorPicker] = useState(false);
+const ColorPickerField = ({ label, value, onChange, tooltip, disabled = false }) => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [tempColor, setTempColor] = useState(value || '#000000');
 
   const handleClick = (event) => {
-    setDisplayColorPicker(true);
+    setAnchorEl(event.currentTarget);
   };
 
   const handleClose = () => {
-    setDisplayColorPicker(false);
+    setAnchorEl(null);
   };
 
-  const handleColorChange = (color) => {
+  const handleChangeComplete = (color) => {
+    setTempColor(color.hex);
     onChange(color.hex);
   };
 
+  // Manual input change handler
+  const handleInputChange = (e) => {
+    const newColor = e.target.value;
+    setTempColor(newColor);
+    
+    // Only update parent if it's a valid hex color
+    if (/^#([0-9A-F]{3}){1,2}$/i.test(newColor)) {
+      onChange(newColor);
+    }
+  };
+
+  const open = Boolean(anchorEl);
+  const colorPreview = {
+    width: 20,
+    height: 20,
+    backgroundColor: value,
+    borderRadius: '3px',
+    border: '1px solid #ccc',
+    display: 'inline-block',
+    marginRight: 1
+  };
+
   return (
-    <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', width: fullWidth ? '100%' : 'auto' }}>
+    <Box sx={{ width: '100%' }}>
       <TextField
+        fullWidth
         label={label}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        fullWidth={fullWidth}
+        onChange={handleInputChange}
+        disabled={disabled}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <Box
-                sx={{
-                  width: 36,
-                  height: 36,
-                  backgroundColor: value,
-                  border: '1px solid rgba(0, 0, 0, 0.23)',
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  '&:hover': {
-                    boxShadow: '0 0 0 3px rgba(0, 0, 0, 0.1)'
-                  }
-                }}
-                onClick={handleClick}
-              />
+              <Box sx={colorPreview} />
             </InputAdornment>
           ),
-          endAdornment: tooltip && (
+          endAdornment: (
             <InputAdornment position="end">
-              <Tooltip title={tooltip}>
-                <IconButton size="small">
-                  <HelpOutline fontSize="small" />
-                </IconButton>
-              </Tooltip>
+              <IconButton onClick={handleClick} size="small" disabled={disabled}>
+                <ColorLens />
+              </IconButton>
+              {tooltip && (
+                <Tooltip title={tooltip}>
+                  <IconButton size="small" sx={{ ml: 0.5 }}>
+                    <HelpOutline fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </InputAdornment>
-          )
+          ),
         }}
       />
-
-      {displayColorPicker && (
-        <ClickAwayListener onClickAway={handleClose}>
-          <Box
-            sx={{
-              position: 'absolute',
-              zIndex: 1500,
-              top: '100%',
-              left: 0,
-              marginTop: '8px'
-            }}
-          >
-            <Paper elevation={3} sx={{ borderRadius: 1, overflow: 'hidden' }}>
-              <ChromePicker 
-                color={value} 
-                onChange={handleColorChange} 
-                disableAlpha 
-              />
-            </Paper>
-          </Box>
-        </ClickAwayListener>
-      )}
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handleClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'center',
+        }}
+      >
+        <Box sx={{ p: 1 }}>
+          <Typography variant="body2" gutterBottom>
+            Sélectionner une couleur
+          </Typography>
+          <SketchPicker
+            color={tempColor}
+            onChangeComplete={handleChangeComplete}
+            disableAlpha
+          />
+        </Box>
+      </Popover>
     </Box>
   );
 };

@@ -82,29 +82,7 @@ const ProjectsPage = () => {
   const [projectToModify, setProjectToModify] = useState(null);
   const [removingRepo, setRemovingRepo] = useState(false);
 
-  // Initialize expand state for repository groups in dialog
-  useEffect(() => {
-    const initialExpandedState = {};
-    Object.keys(groupedRepositories).forEach(owner => {
-      initialExpandedState[owner] = true;
-    });
-    setExpandedOwners(initialExpandedState);
-  }, [groupedRepositories]);
-
-  // Initialize expand state for projects
-  useEffect(() => {
-    const initialExpandedState = {};
-    projects.forEach(project => {
-      initialExpandedState[project.id] = false;
-    });
-    setExpandedProjects(initialExpandedState);
-  }, [projects]);
-
-  // Load data on component mount
-  useEffect(() => {
-    fetchData();
-  }, []);
-
+  // Define fetchData using useCallback before it's used
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -140,6 +118,29 @@ const ProjectsPage = () => {
       setLoading(false);
     }
   }, []);
+
+  // Initialize expand state for repository groups in dialog
+  useEffect(() => {
+    const initialExpandedState = {};
+    Object.keys(groupedRepositories).forEach(owner => {
+      initialExpandedState[owner] = true;
+    });
+    setExpandedOwners(initialExpandedState);
+  }, [groupedRepositories]);
+
+  // Initialize expand state for projects
+  useEffect(() => {
+    const initialExpandedState = {};
+    projects.forEach(project => {
+      initialExpandedState[project.id] = false;
+    });
+    setExpandedProjects(initialExpandedState);
+  }, [projects]);
+
+  // Load data on component mount
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   // Project handlers
   const handleOpenProjectDialog = (project = null) => {
@@ -352,17 +353,6 @@ const ProjectsPage = () => {
       ...prev,
       [projectId]: !prev[projectId]
     }));
-  };
-
-  const getRepositoryNames = (repoIds) => {
-    if (!repoIds || repoIds.length === 0) {
-      return 'No repositories';
-    }
-    
-    const repos = repositories.filter(repo => repoIds.includes(repo.id));
-    const repoNames = repos.map(repo => repo.name).join(', ');
-    
-    return repoNames || 'No repositories found';
   };
 
   const getRepositoriesForProject = (repoIds) => {

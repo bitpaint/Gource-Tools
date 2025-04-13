@@ -23,10 +23,14 @@ const DEFAULT_MAX_CONCURRENT_CLONES = Math.max(4, Math.min(12, NUM_CPUS)); // En
 const DEFAULT_CLONE_DEPTH = 1; // Clone superficiel par défaut pour économiser de la bande passante et du temps
 const THROUGHPUT_CHECK_INTERVAL = 1000; // Intervalle de vérification du débit en ms
 
+// Configuration des statuts de clonage et des limites
+const cloneStatuses = new Map();
+const MAX_CONCURRENT_CLONES = process.env.MAX_CONCURRENT_CLONES ? parseInt(process.env.MAX_CONCURRENT_CLONES) : DEFAULT_MAX_CONCURRENT_CLONES;
+
 // Configuration pour l'importation massive avec limites et sécurités
-const BULK_IMPORT_DEFAULT_LIMIT = 20; // Nombre maximum de dépôts par défaut
-const BULK_IMPORT_ABSOLUTE_LIMIT = 100; // Limite absolue (même avec confirmation)
-const BULK_IMPORT_REQUIRES_CONFIRMATION = 10; // Seuil à partir duquel une confirmation est requise
+const BULK_IMPORT_DEFAULT_LIMIT = 10000; // Nombre maximum de dépôts par défaut
+const BULK_IMPORT_ABSOLUTE_LIMIT = 99999; // Limite absolue (même avec confirmation)
+const BULK_IMPORT_REQUIRES_CONFIRMATION = 0; // Seuil à partir duquel une confirmation est requise
 
 // Fonction pour recharger la base de données
 function reloadDatabase() {
@@ -43,9 +47,6 @@ if (process.env.GITHUB_TOKEN) {
 } else {
   console.log('No GitHub API token found. Some operations may be rate-limited.');
 }
-
-// Stockage des statuts de clonage en cours
-const cloneStatuses = new Map();
 
 // Get all repositories
 router.get('/', async (req, res) => {
@@ -931,9 +932,9 @@ router.post('/bulk-import', async (req, res) => {
       projectCreationMode, 
       projectNameTemplate, 
       maxConcurrentClones,
-      repoLimit, // Nouveau paramètre pour limite personnalisée
-      skipConfirmation, // Paramètre pour ignorer la confirmation
-      confirmationToken // Token si déjà passé par l'étape de confirmation
+      repoLimit,
+      skipConfirmation,
+      confirmationToken
     } = req.body;
     
     // Validate input
@@ -950,19 +951,16 @@ router.post('/bulk-import', async (req, res) => {
         details: 'Valid modes are: none, single, per_owner' 
       });
     }
+
+    console.log(`[BULK IMPORT DEBUG] Démarrage de l'importation pour: ${githubUrl}`);
     
     // Reload database
     const freshDb = reloadDatabase();
     
     // Process the input to extract owner names
-    // Support multiple formats: 
-    // - Full URLs: 'https://github.com/username/' 
-    // - Simple usernames: 'username'
-    // - Multiple usernames: 'user1, user2' or 'user1 user2'
-    // - Specific repository URLs: 'https://github.com/username/repository'
     const ownersInput = githubUrl.trim();
     let ownerNames = [];
-    let specificRepos = []; // Nouveau: pour stocker des dépôts spécifiques
+    let specificRepos = [];
     
     // Check if input contains commas or spaces (multiple owners)
     if (ownersInput.includes(',') || /\s/.test(ownersInput)) {
@@ -1039,7 +1037,7 @@ router.post('/bulk-import', async (req, res) => {
       });
     }
     
-    console.log(`[BULK IMPORT] Processing ${ownerNames.length} GitHub users/orgs and ${specificRepos.length} specific repositories`);
+    console.log(`[BULK IMPORT DEBUG] Processing ${ownerNames.length} GitHub users/orgs and ${specificRepos.length} specific repositories`);
     
     // Generate a unique bulk import ID
     const bulkImportId = 'bulk_' + Date.now().toString();
@@ -1060,14 +1058,15 @@ router.post('/bulk-import', async (req, res) => {
       projectCreationMode: mode,
       projectNameTemplate: projectNameTemplate || `GitHub Import ${new Date().toLocaleDateString()}`,
       createdProjects: [],
-      requiresConfirmation: false
+      requiresConfirmation: false,
+      directImport: true // Nouvelle option pour forcer l'importation directe
     };
     
     cloneStatuses.set(bulkImportId, initialStatus);
     
     // Check if GitHub API token is available
     if (!process.env.GITHUB_TOKEN || !octokit) {
-      console.error('[BULK IMPORT] No GitHub API token available. Import failed.');
+      console.error('[BULK IMPORT DEBUG] No GitHub API token available. Import failed.');
       updateCloneStatus(bulkImportId, {
         status: 'failed',
         error: 'GitHub API token is required for bulk import. Please add it in the settings.'
@@ -1078,17 +1077,15 @@ router.post('/bulk-import', async (req, res) => {
       });
     }
     
-    // Si nous avons déjà un token de confirmation, passer directement à l'étape suivante
-    if (confirmationToken && confirmationToken === bulkImportId) {
-      console.log(`[BULK IMPORT] Confirmation token provided, skipping confirmation step`);
-      // Continue le processus...
-    } else {
-      // Phase 1: Récupérer la liste des dépôts pour validation
-      updateCloneStatus(bulkImportId, {
-        status: 'fetching_repos_for_validation',
-        message: 'Analyzing repositories before import...',
-        progress: 5
-      });
+    // Répondre immédiatement au client avec l'ID d'import en masse
+    res.status(202).json({ 
+      bulkImportId, 
+      message: `Starting bulk import for ${ownerNames.length > 0 ? `${ownerNames.length} GitHub users/orgs` : ''} ${specificRepos.length > 0 ? `and ${specificRepos.length} specific repositories` : ''}`
+    });
+    
+    // Démarrer immédiatement le processus de récupération des dépôts
+    try {
+      console.log(`[BULK IMPORT DEBUG] Démarrage immédiat de la récupération des dépôts`);
       
       // Liste complète des dépôts à importer
       let allRepositories = [];
@@ -1109,8 +1106,7 @@ router.post('/bulk-import', async (req, res) => {
             });
           }
         } catch (error) {
-          console.error(`[BULK IMPORT] Error fetching specific repo ${specificRepo.owner}/${specificRepo.repo}:`, error.message);
-          // Ne pas échouer pour un seul dépôt
+          console.error(`[BULK IMPORT DEBUG] Error fetching specific repo ${specificRepo.owner}/${specificRepo.repo}:`, error.message);
         }
       }
       
@@ -1122,17 +1118,19 @@ router.post('/bulk-import', async (req, res) => {
           try {
             await octokit.rest.orgs.get({ org: ownerName });
             isOrg = true;
+            console.log(`[BULK IMPORT DEBUG] ${ownerName} est une organisation`);
           } catch (error) {
             // Vérifier que l'utilisateur existe
             try {
               await octokit.rest.users.getByUsername({ username: ownerName });
+              console.log(`[BULK IMPORT DEBUG] ${ownerName} est un utilisateur`);
             } catch (userError) {
-              console.error(`[BULK IMPORT] User/org ${ownerName} does not exist:`, userError.message);
+              console.error(`[BULK IMPORT DEBUG] User/org ${ownerName} does not exist:`, userError.message);
               continue; // Passer au propriétaire suivant
             }
           }
           
-          // Récupérer la liste des dépôts (première page seulement pour la validation)
+          // Récupérer la liste des dépôts
           let response;
           if (isOrg) {
             response = await octokit.rest.repos.listForOrg({
@@ -1150,6 +1148,7 @@ router.post('/bulk-import', async (req, res) => {
           
           // Ajouter les dépôts avec info de propriétaire
           if (response.data && response.data.length > 0) {
+            console.log(`[BULK IMPORT DEBUG] ${response.data.length} dépôts trouvés pour ${ownerName}`);
             const ownerRepos = response.data.map(repo => ({
               ...repo,
               ownerName: ownerName
@@ -1157,82 +1156,49 @@ router.post('/bulk-import', async (req, res) => {
             allRepositories = [...allRepositories, ...ownerRepos];
           }
         } catch (error) {
-          console.error(`[BULK IMPORT] Error fetching repositories for ${ownerName}:`, error.message);
+          console.error(`[BULK IMPORT DEBUG] Error fetching repositories for ${ownerName}:`, error.message);
         }
       }
       
-      // Définir la limite de dépôts
-      const userRepoLimit = repoLimit ? parseInt(repoLimit) : BULK_IMPORT_DEFAULT_LIMIT;
-      const actualLimit = Math.min(userRepoLimit, BULK_IMPORT_ABSOLUTE_LIMIT);
+      // Préparer les dépôts pour l'importation
+      const repositoriesForImport = allRepositories.map(repo => ({
+        name: repo.name,
+        fullName: repo.full_name,
+        url: repo.clone_url,
+        description: repo.description || '',
+        owner: repo.ownerName
+      }));
       
-      // Vérifier si le nombre de dépôts dépasse la limite
-      if (allRepositories.length > actualLimit) {
-        console.log(`[BULK IMPORT] Too many repositories found: ${allRepositories.length}, limit is ${actualLimit}`);
-        updateCloneStatus(bulkImportId, {
-          status: 'too_many_repos',
-          error: `Too many repositories found: ${allRepositories.length}, limit is ${actualLimit}`,
-          repositories: allRepositories.map(repo => ({
-            name: repo.name,
-            fullName: repo.full_name,
-            url: repo.clone_url,
-            description: repo.description || '',
-            owner: repo.ownerName
-          })).slice(0, 100) // Limiter pour l'affichage
-        });
-        
-        return res.status(400).json({
-          error: `Too many repositories found: ${allRepositories.length}`,
-          limit: actualLimit,
-          bulkImportId,
-          details: 'Please use a more specific input or increase the limit'
-        });
-      }
+      console.log(`[BULK IMPORT DEBUG] ${repositoriesForImport.length} dépôts à importer au total`);
       
-      // Vérifier si le nombre de dépôts nécessite une confirmation
-      if (allRepositories.length > BULK_IMPORT_REQUIRES_CONFIRMATION && !skipConfirmation) {
-        console.log(`[BULK IMPORT] Confirmation required for ${allRepositories.length} repositories`);
+      // Mise à jour du statut avec les dépôts à importer
+      updateCloneStatus(bulkImportId, {
+        status: 'processing', // Toujours mettre directement en processing
+        message: `Préparation des ${repositoriesForImport.length} dépôts pour importation`,
+        progress: 10,
+        repositories: repositoriesForImport,
+        requiresConfirmation: false,
+        totalRepos: repositoriesForImport.length
+      });
+      
+      // Démarrer directement le processus d'importation
+      processBulkImport(bulkImportId).catch(error => {
+        console.error(`[BULK IMPORT DEBUG] Error processing bulk import ${bulkImportId}:`, error);
         updateCloneStatus(bulkImportId, {
-          status: 'confirmation_required',
-          message: `Confirmation required for ${allRepositories.length} repositories`,
-          progress: 10,
-          repositories: allRepositories.map(repo => ({
-            name: repo.name,
-            fullName: repo.full_name,
-            url: repo.clone_url,
-            description: repo.description || '',
-            owner: repo.ownerName
-          })),
-          requiresConfirmation: true
+          status: 'failed',
+          error: `Failed to process bulk import: ${error.message}`
         });
-        
-        return res.status(202).json({
-          status: 'confirmation_required',
-          message: `Found ${allRepositories.length} repositories. Confirmation required.`,
-          bulkImportId,
-          repositories: allRepositories.map(repo => ({
-            name: repo.name,
-            fullName: repo.full_name,
-            url: repo.clone_url,
-            description: repo.description || '',
-            owner: repo.ownerName,
-            stars: repo.stargazers_count,
-            forks: repo.forks_count
-          })),
-          limit: actualLimit
-        });
-      }
+      });
+      
+    } catch (processError) {
+      console.error('[BULK IMPORT DEBUG] Error in background process:', processError);
+      updateCloneStatus(bulkImportId, {
+        status: 'failed',
+        error: `Failed to process repositories: ${processError.message}`
+      });
     }
-    
-    // Répondre immédiatement au client avec l'ID d'import en masse
-    res.status(202).json({ 
-      bulkImportId, 
-      message: `Starting bulk import for ${ownerNames.length > 0 ? `${ownerNames.length} GitHub users/orgs` : ''} ${specificRepos.length > 0 ? `and ${specificRepos.length} specific repositories` : ''}`
-    });
-    
-    // Continue le processus en arrière-plan
-    // ... le reste du code pour l'importation massive ...
   } catch (error) {
-    console.error('Error starting bulk import:', error);
+    console.error('[BULK IMPORT DEBUG] Error starting bulk import:', error);
     res.status(500).json({ error: 'Failed to start bulk import', details: error.message });
   }
 });
@@ -1247,30 +1213,14 @@ router.get('/bulk-import-status/:bulkImportId', async (req, res) => {
       error: 'Bulk import not found or expired'
     };
     
-    // Si le statut est "confirmed" et que le processus n'a pas encore commencé,
-    // démarrer le processus d'importation en arrière-plan
-    if (status.status === 'confirmed' && !status.processing) {
-      // Marquer comme en cours de traitement pour éviter les doublons
-      updateCloneStatus(bulkImportId, {
-        processing: true,
-        status: 'processing',
-        message: 'Starting repository import...',
-        progress: 15
-      });
-      
-      // Démarrer le processus d'importation en arrière-plan
-      processBulkImport(bulkImportId).catch(error => {
-        console.error(`[BULK IMPORT] Error processing bulk import ${bulkImportId}:`, error);
-        updateCloneStatus(bulkImportId, {
-          status: 'failed',
-          error: `Failed to process bulk import: ${error.message}`
-        });
-      });
-    }
+    console.log(`[BULK IMPORT DEBUG] Status request for ${bulkImportId}: ${status.status}, progress: ${status.progress}`);
     
+    // Ne pas démarrer de processus, car il est déjà démarré dans la route bulk-import
+    // Simplement renvoyer le statut actuel
     res.json(status);
+    
   } catch (error) {
-    console.error('Error fetching bulk import status:', error);
+    console.error('[BULK IMPORT DEBUG] Error fetching bulk import status:', error);
     res.status(500).json({ error: 'Failed to fetch bulk import status' });
   }
 });
@@ -1284,7 +1234,7 @@ async function processBulkImport(bulkImportId) {
   }
   
   try {
-    console.log(`[BULK IMPORT] Starting processing for ${bulkImportId} with ${status.repositories.length} repositories`);
+    console.log(`[BULK IMPORT DEBUG] Démarrage du traitement pour ${bulkImportId} avec ${status.repositories.length} dépôts`);
     
     // Créer les répertoires nécessaires
     const reposDir = path.join(__dirname, '../../repos');
@@ -1297,24 +1247,293 @@ async function processBulkImport(bulkImportId) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
     
-    // Initialiser les métriques de débit et autres données
-    // (Code existant pour le traitement)
+    // Recharger la base de données
+    const freshDb = reloadDatabase();
     
-    // Logique d'importation des dépôts
-    // (Utiliser le code existant mais adapté pour gérer la nouvelle structure)
+    // Initialiser le suivi de progression
+    updateCloneStatus(bulkImportId, {
+      status: 'processing',
+      message: 'Démarrage de l\'importation des dépôts...',
+      progress: 15,
+      totalRepos: status.repositories.length,
+      completedRepos: 0,
+      failedRepos: 0,
+      repositories: status.repositories.map(repo => ({
+        ...repo,
+        status: 'pending'
+      }))
+    });
+    
+    console.log(`[BULK IMPORT DEBUG] Début du traitement des ${status.repositories.length} dépôts un par un`);
+    
+    // Traiter les dépôts un par un
+    for (let i = 0; i < status.repositories.length; i++) {
+      const repo = status.repositories[i];
+      const progress = 15 + (i / status.repositories.length) * 85; // 15% à 100%
+      
+      try {
+        console.log(`[BULK IMPORT DEBUG] Traitement du dépôt ${i+1}/${status.repositories.length}: ${repo.fullName}`);
+        
+        // Mise à jour du statut pour ce dépôt
+        updateCloneStatus(bulkImportId, {
+          progress,
+          message: `Clonage du dépôt ${i+1}/${status.repositories.length}: ${repo.name}`,
+          repositories: cloneStatuses.get(bulkImportId).repositories.map((r, idx) => 
+            idx === i ? { ...r, status: 'cloning' } : r
+          )
+        });
+        
+        // Vérifier si dépôt déjà existant
+        const existingRepo = freshDb.get('repositories')
+          .find({ url: repo.url })
+          .value();
+          
+        if (existingRepo) {
+          console.log(`[BULK IMPORT DEBUG] Le dépôt existe déjà: ${repo.fullName}`);
+          
+          // Mettre à jour le statut
+          const updatedStatus = cloneStatuses.get(bulkImportId);
+          const updatedRepos = updatedStatus.repositories.map((r, idx) => 
+            idx === i ? { ...r, status: 'skipped', message: 'Dépôt déjà existant' } : r
+          );
+          
+          updateCloneStatus(bulkImportId, {
+            repositories: updatedRepos,
+            completedRepos: updatedStatus.completedRepos + 1
+          });
+          
+          continue;
+        }
+        
+        // Préparer le clone
+        const folderName = `${repo.owner}_${repo.name}`;
+        const repoPath = path.join(reposDir, folderName);
+        
+        // Générer un ID unique pour ce dépôt
+        const id = Date.now().toString() + Math.floor(Math.random() * 1000);
+        const logFilePath = path.join(logsDir, `${id}.log`);
+        
+        // Cloner le dépôt
+        let cloneUrl = repo.url;
+        
+        // Utiliser le token GitHub si disponible
+        if (process.env.GITHUB_TOKEN) {
+          cloneUrl = repo.url.replace('https://', `https://${process.env.GITHUB_TOKEN}@`);
+        }
+        
+        console.log(`[BULK IMPORT DEBUG] Clonage du dépôt: ${repo.fullName}`);
+        
+        // Cloner avec simple-git
+        try {
+          const git = simpleGit();
+          await git.clone(cloneUrl, repoPath);
+          console.log(`[BULK IMPORT DEBUG] Dépôt ${repo.fullName} cloné avec succès`);
+        } catch (cloneError) {
+          console.error(`[BULK IMPORT DEBUG] Erreur lors du clonage de ${repo.fullName}:`, cloneError.message);
+          throw new Error(`Erreur de clonage: ${cloneError.message}`);
+        }
+        
+        // Générer le log Gource
+        let logGenerationSuccess = false;
+        try {
+          console.log(`[BULK IMPORT DEBUG] Génération du log Gource pour ${repo.fullName}`);
+          execSync(
+            `gource --output-custom-log "${logFilePath}" "${repoPath}"`,
+            { stdio: 'ignore', maxBuffer: 100 * 1024 * 1024 }
+          );
+          
+          logGenerationSuccess = true;
+          console.log(`[BULK IMPORT DEBUG] Log Gource généré pour ${repo.fullName}`);
+        } catch (logError) {
+          console.error(`[BULK IMPORT DEBUG] Échec de génération du log Gource pour ${repo.fullName}:`, logError.message);
+          // Continuer même si la génération du log échoue
+        }
+        
+        // Ajouter le dépôt à la base de données
+        console.log(`[BULK IMPORT DEBUG] Ajout du dépôt ${repo.fullName} à la base de données`);
+        const newRepo = {
+          id,
+          url: repo.url,
+          name: folderName,
+          owner: repo.owner,
+          description: repo.description || '',
+          path: repoPath,
+          logPath: logFilePath,
+          dateAdded: new Date().toISOString(),
+          lastUpdated: new Date().toISOString()
+        };
+        
+        freshDb.get('repositories')
+          .push(newRepo)
+          .write();
+          
+        // Mise à jour du statut global
+        const currentStatus = cloneStatuses.get(bulkImportId);
+        const updatedRepos = currentStatus.repositories.map((r, idx) => 
+          idx === i ? { 
+            ...r, 
+            status: 'completed', 
+            message: logGenerationSuccess ? 'Dépôt importé avec succès' : 'Importé mais génération du log échouée'
+          } : r
+        );
+        
+        updateCloneStatus(bulkImportId, {
+          repositories: updatedRepos,
+          completedRepos: currentStatus.completedRepos + 1
+        });
+        
+        console.log(`[BULK IMPORT DEBUG] Dépôt ${repo.fullName} traité avec succès (${i+1}/${status.repositories.length})`);
+        
+      } catch (repoError) {
+        console.error(`[BULK IMPORT DEBUG] Erreur lors du traitement du dépôt ${repo.fullName}:`, repoError.message);
+        
+        // Mise à jour du statut pour ce dépôt en échec
+        const currentStatus = cloneStatuses.get(bulkImportId);
+        const updatedRepos = currentStatus.repositories.map((r, idx) => 
+          idx === i ? { ...r, status: 'failed', message: repoError.message } : r
+        );
+        
+        updateCloneStatus(bulkImportId, {
+          repositories: updatedRepos,
+          completedRepos: currentStatus.completedRepos + 1,
+          failedRepos: currentStatus.failedRepos + 1
+        });
+      }
+    }
+    
+    // Création de projets si demandé
+    const currentStatus = cloneStatuses.get(bulkImportId);
+    
+    if (currentStatus.projectCreationMode !== 'none') {
+      console.log(`[BULK IMPORT DEBUG] Création de projets en mode: ${currentStatus.projectCreationMode}`);
+      
+      try {
+        updateCloneStatus(bulkImportId, {
+          message: 'Création des projets...',
+          progress: 95
+        });
+        
+        // Créer les projets selon le mode
+        if (currentStatus.projectCreationMode === 'single') {
+          // Un seul projet pour tous les dépôts
+          const projectName = currentStatus.projectNameTemplate.replace('{owner}', 'GitHub Import');
+          
+          // Récupérer les IDs des dépôts importés avec succès
+          const importedRepoIds = [];
+          
+          for (const repo of currentStatus.repositories.filter(r => r.status === 'completed')) {
+            const dbRepo = freshDb.get('repositories')
+              .find({ url: repo.url })
+              .value();
+              
+            if (dbRepo) {
+              importedRepoIds.push(dbRepo.id);
+            }
+          }
+          
+          if (importedRepoIds.length > 0) {
+            // Créer le projet
+            const newProject = {
+              id: Date.now().toString(),
+              name: projectName,
+              description: `Import en masse depuis ${currentStatus.owners.join(', ')}`,
+              repositories: importedRepoIds,
+              dateCreated: new Date().toISOString(),
+              lastModified: new Date().toISOString()
+            };
+            
+            freshDb.get('projects')
+              .push(newProject)
+              .write();
+              
+            // Mettre à jour le statut
+            const updatedStatus = cloneStatuses.get(bulkImportId);
+            updatedStatus.createdProjects = [
+              ...updatedStatus.createdProjects || [],
+              {
+                id: newProject.id,
+                name: newProject.name,
+                repoCount: importedRepoIds.length
+              }
+            ];
+            cloneStatuses.set(bulkImportId, updatedStatus);
+            
+            console.log(`[BULK IMPORT DEBUG] Projet unique "${projectName}" créé avec ${importedRepoIds.length} dépôts`);
+          }
+        } else if (currentStatus.projectCreationMode === 'per_owner') {
+          // Un projet par propriétaire
+          const ownerProjects = {};
+          
+          // Grouper les dépôts par propriétaire
+          for (const repo of currentStatus.repositories.filter(r => r.status === 'completed')) {
+            const dbRepo = freshDb.get('repositories')
+              .find({ url: repo.url })
+              .value();
+              
+            if (dbRepo) {
+              if (!ownerProjects[repo.owner]) {
+                ownerProjects[repo.owner] = [];
+              }
+              ownerProjects[repo.owner].push(dbRepo.id);
+            }
+          }
+          
+          // Créer un projet pour chaque propriétaire
+          const createdProjects = [];
+          for (const owner in ownerProjects) {
+            if (ownerProjects[owner].length > 0) {
+              const projectName = currentStatus.projectNameTemplate.replace('{owner}', owner);
+              
+              const newProject = {
+                id: Date.now().toString() + Math.floor(Math.random() * 1000),
+                name: projectName,
+                description: `Import en masse depuis ${owner}`,
+                repositories: ownerProjects[owner],
+                dateCreated: new Date().toISOString(),
+                lastModified: new Date().toISOString()
+              };
+              
+              freshDb.get('projects')
+                .push(newProject)
+                .write();
+                
+              createdProjects.push({
+                id: newProject.id,
+                name: newProject.name,
+                repoCount: ownerProjects[owner].length
+              });
+              
+              console.log(`[BULK IMPORT DEBUG] Projet "${projectName}" créé pour le propriétaire "${owner}" avec ${ownerProjects[owner].length} dépôts`);
+            }
+          }
+          
+          // Mettre à jour le statut
+          const updatedStatus = cloneStatuses.get(bulkImportId);
+          updatedStatus.createdProjects = [
+            ...updatedStatus.createdProjects || [],
+            ...createdProjects
+          ];
+          cloneStatuses.set(bulkImportId, updatedStatus);
+        }
+      } catch (projectError) {
+        console.error(`[BULK IMPORT DEBUG] Erreur lors de la création des projets:`, projectError.message);
+      }
+    }
     
     // Mise à jour du statut final
     updateCloneStatus(bulkImportId, {
       status: 'completed',
-      message: `Bulk import completed. Imported ${status.completedRepos - status.failedRepos}/${status.totalRepos} repositories.`,
+      message: `Import en masse terminé. Importé ${currentStatus.completedRepos - currentStatus.failedRepos}/${currentStatus.totalRepos} dépôts.`,
       progress: 100
     });
     
+    console.log(`[BULK IMPORT DEBUG] Import en masse ${bulkImportId} terminé avec succès`);
+    
   } catch (error) {
-    console.error(`[BULK IMPORT] Error processing bulk import ${bulkImportId}:`, error);
+    console.error(`[BULK IMPORT DEBUG] Erreur lors du traitement de l'import en masse ${bulkImportId}:`, error);
     updateCloneStatus(bulkImportId, {
       status: 'failed',
-      error: `Failed to process bulk import: ${error.message}`
+      error: `Échec de l'import en masse: ${error.message}`
     });
   }
 }

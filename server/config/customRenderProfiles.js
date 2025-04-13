@@ -13,13 +13,15 @@ const lastWeekProfile = {
   isDefault: false,
   settings: {
     ...defaultSettings,
-    secondsPerDay: 4.3, // 30 secondes / 7 jours = ~4.3 secondes par jour
-    autoSkipSeconds: 0.1,
-    maxFilelag: 0.15,
-    userScale: 1.2, // Légèrement plus grand pour mettre en évidence les utilisateurs
-    timeScale: 1.2,
-    highlightUsers: true,
-    extraArgs: '--start-date $(date -d "7 days ago" "+%Y-%m-%d") --stop-date $(date "+%Y-%m-%d") --date-format "%d %b" --highlight-all-users'
+    'seconds-per-day': 4.3, // 30 secondes / 7 jours = ~4.3 secondes par jour
+    'auto-skip-seconds': 0.1,
+    'max-file-lag': 0.15,
+    'user-scale': 1.2, // Légèrement plus grand pour mettre en évidence les utilisateurs
+    'time-scale': 1.2,
+    'highlight-users': true,
+    'date-format': '%d %b',
+    'highlight-all-users': true,
+    'range-days': 7, // Nombre de jours à visualiser (sera utilisé pour calculer start-date)
   },
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()
@@ -33,48 +35,47 @@ const lastMonthProfile = {
   isDefault: false,
   settings: {
     ...defaultSettings,
-    secondsPerDay: 2, // 60 secondes / 30 jours = 2 secondes par jour
-    autoSkipSeconds: 0.2,
-    maxFilelag: 0.2,
-    userScale: 1.1,
-    timeScale: 1.2,
-    highlightUsers: true,
-    extraArgs: '--start-date $(date -d "30 days ago" "+%Y-%m-%d") --stop-date $(date "+%Y-%m-%d") --date-format "%d %b"'
+    'seconds-per-day': 2, // 60 secondes / 30 jours = 2 secondes par jour
+    'auto-skip-seconds': 0.2,
+    'max-file-lag': 0.2,
+    'user-scale': 1.1,
+    'time-scale': 1.2,
+    'highlight-users': true,
+    'date-format': '%d %b',
+    'range-days': 30, // Nombre de jours à visualiser (sera utilisé pour calculer start-date)
   },
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()
 };
 
-// Profil pour visualiser la dernière année en 1 minute
+// Profil pour visualiser la dernière année en 3 minutes
 const lastYearProfile = {
-  id: 'last_year_1m',
-  name: 'Last Year - 1 minute',
-  description: 'Visualisation condensée de l\'activité de l\'année entière en 1 minute',
+  id: 'last_year_3m',
+  name: 'Last Year - 3 minutes',
+  description: 'Visualisation condensée de l\'activité de la dernière année en 3 minutes',
   isDefault: false,
   settings: {
     ...defaultSettings,
-    secondsPerDay: 0.17, // 60 secondes / 365 jours = ~0.17 secondes par jour
-    autoSkipSeconds: 0.5,
-    maxFilelag: 0.3,
-    timeScale: 1.5, // Accentuer l'échelle du temps pour mieux voir la progression
-    elasticity: 0.4,
-    highlightUsers: false, // Désactivé pour éviter la surcharge visuelle sur 1 an
-    extraArgs: '--start-date $(date -d "365 days ago" "+%Y-%m-%d") --stop-date $(date "+%Y-%m-%d") --date-format "%b %Y"'
+    'seconds-per-day': 0.5, // 180 secondes / 365 jours ~= 0.5 secondes par jour
+    'auto-skip-seconds': 0.5,
+    'max-file-lag': 0.3,
+    'user-scale': 1.0,
+    'time-scale': 1.5,
+    'highlight-users': true,
+    'date-format': '%b %Y',
+    'range-days': 365, // Nombre de jours à visualiser (sera utilisé pour calculer start-date)
   },
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()
 };
 
-// Liste des profils personnalisés
-const customProfiles = [
+// Exporter tous les profils personnalisés
+const customRenderProfiles = [
   lastWeekProfile,
   lastMonthProfile,
   lastYearProfile
 ];
 
 module.exports = {
-  customProfiles,
-  lastWeekProfile,
-  lastMonthProfile,
-  lastYearProfile
+  customRenderProfiles
 }; 

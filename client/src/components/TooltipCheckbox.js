@@ -1,38 +1,40 @@
 import React from 'react';
-import { 
-  FormControlLabel, 
-  Checkbox, 
+import {
   Box,
+  FormControlLabel,
+  Checkbox,
   Tooltip,
   IconButton
 } from '@mui/material';
 import { HelpOutline } from '@mui/icons-material';
 
-/**
- * A checkbox with a tooltip icon for additional information
- */
-const TooltipCheckbox = ({ 
-  label, 
-  checked, 
-  onChange, 
-  tooltip = null,
-  ...props
+const TooltipCheckbox = ({
+  label,
+  checked,
+  onChange,
+  tooltip,
+  disabled = false
 }) => {
+  
+  const handleChange = (event) => {
+    onChange(event.target.checked);
+  };
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+    <Box sx={{ width: '100%', display: 'flex', alignItems: 'center' }}>
       <FormControlLabel
         control={
           <Checkbox
             checked={checked}
-            onChange={(e) => onChange(e.target.checked)}
-            {...props}
+            onChange={handleChange}
+            disabled={disabled}
           />
         }
         label={label}
       />
       {tooltip && (
         <Tooltip title={tooltip}>
-          <IconButton size="small">
+          <IconButton size="small" sx={{ ml: 0.5 }}>
             <HelpOutline fontSize="small" />
           </IconButton>
         </Tooltip>

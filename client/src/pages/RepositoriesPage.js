@@ -228,48 +228,56 @@ const RepositoriesPage = () => {
   useEffect(() => {
     let interval;
     if (bulkImportId && isBulkImporting) {
-      interval = setInterval(async () => {
-        try {
-          const response = await repositoriesApi.getBulkImportStatus(bulkImportId);
-          setBulkImportStatus(response.data);
-          
-          // If bulk import is complete, stop polling
-          if (response.data.status === 'completed' || response.data.status === 'failed') {
-            clearInterval(interval);
+      console.log('Démarrage du polling pour le statut d\'importation:', bulkImportId);
+      
+      // Attendre un peu avant de commencer le polling pour donner
+      // au serveur le temps de démarrer le traitement
+      setTimeout(() => {
+        interval = setInterval(async () => {
+          try {
+            console.log('Envoi d\'une requête de statut pour:', bulkImportId);
+            const response = await repositoriesApi.getBulkImportStatus(bulkImportId);
+            setBulkImportStatus(response.data);
+            console.log('Statut reçu:', response.data.status, 'Progress:', response.data.progress);
             
-            if (response.data.status === 'completed') {
-              // Refresh repository list
-              await fetchRepositories();
+            // If bulk import is complete, stop polling
+            if (response.data.status === 'completed' || response.data.status === 'failed') {
+              clearInterval(interval);
               
-              let successMessage = `Bulk import completed. Imported ${response.data.completedRepos - response.data.failedRepos}/${response.data.totalRepos} repositories.`;
-              
-              // Add project creation info to success message
-              if (response.data.createdProjects && response.data.createdProjects.length > 0) {
-                successMessage += ` Created ${response.data.createdProjects.length} project(s).`;
-              }
-              
-              toast.success(successMessage);
-              
-              // Wait a short time to show the completed status before closing
-              setTimeout(() => {
-                // First set importing to false
+              if (response.data.status === 'completed') {
+                // Refresh repository list
+                await fetchRepositories();
+                
+                let successMessage = `Bulk import completed. Imported ${response.data.completedRepos - response.data.failedRepos}/${response.data.totalRepos} repositories.`;
+                
+                // Add project creation info to success message
+                if (response.data.createdProjects && response.data.createdProjects.length > 0) {
+                  successMessage += ` Created ${response.data.createdProjects.length} project(s).`;
+                }
+                
+                toast.success(successMessage);
+                
+                // Wait a short time to show the completed status before closing
+                setTimeout(() => {
+                  // First set importing to false
+                  setIsBulkImporting(false);
+                  // Then close the dialog
+                  setOpenAddDialog(false);
+                  // Reset bulk import state
+                  setBulkImportId(null);
+                  setBulkImportStatus(null);
+                }, 2000); // 2 seconds delay before closing
+              } else {
+                toast.error(`Bulk import failed: ${response.data.error || 'Unknown error'}`);
                 setIsBulkImporting(false);
-                // Then close the dialog
-                setOpenAddDialog(false);
-                // Reset bulk import state
-                setBulkImportId(null);
-                setBulkImportStatus(null);
-              }, 2000); // 2 seconds delay before closing
-            } else {
-              toast.error(`Bulk import failed: ${response.data.error || 'Unknown error'}`);
-              setIsBulkImporting(false);
+              }
             }
+          } catch (err) {
+            console.error('Error fetching bulk import status:', err);
+            clearInterval(interval);
           }
-        } catch (err) {
-          console.error('Error fetching bulk import status:', err);
-          clearInterval(interval);
-        }
-      }, 2000); // Poll every 2 seconds
+        }, 3000); // Poll every 3 seconds instead of 2
+      }, 2000); // Attendre 2 secondes avant de commencer le polling
     }
     
     return () => {
@@ -329,6 +337,8 @@ const RepositoriesPage = () => {
     }
     
     try {
+      console.log('Démarrage de l\'importation en masse pour:', bulkImportUrl);
+      
       setIsBulkImporting(true);
       setBulkImportStatus({
         progress: 0,
@@ -344,16 +354,29 @@ const RepositoriesPage = () => {
         finalTemplate = 'owner1 - owner2';
       }
       
+      console.log('Envoi de la requête d\'importation avec skipConfirmation:', true);
+      
       const response = await repositoriesApi.bulkImport({
         githubUrl: bulkImportUrl,
         projectCreationMode: projectCreationMode || 'none',
-        projectNameTemplate: finalTemplate || '{owner}'
+        projectNameTemplate: finalTemplate || '{owner}',
+        skipConfirmation: true,
+        repoLimit: 99999
       });
       
       if (response.data && response.data.bulkImportId) {
+        console.log('Importation démarrée avec ID:', response.data.bulkImportId);
         setBulkImportId(response.data.bulkImportId);
         toast.info(`Bulk import started for ${bulkImportUrl}`);
+        
+        // Mettre à jour immédiatement l'état pour refléter le démarrage
+        setBulkImportStatus({
+          progress: 5,
+          status: 'processing',
+          message: 'Importation en cours...'
+        });
       } else {
+        console.error('Réponse d\'importation sans ID:', response.data);
         toast.error('Failed to start bulk import: No import ID received');
         setIsBulkImporting(false);
       }

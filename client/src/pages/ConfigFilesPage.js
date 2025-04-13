@@ -42,7 +42,13 @@ import {
 import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils } from '../api/api';
 import { defaultSettings, settingsDescriptions } from '../shared/defaultGourceConfig';
-import { convertToCamelCase, convertToKebabCase } from '../utils/gourceUtils';
+import { 
+  convertToCamelCase, 
+  convertToKebabCase,
+  getCommonResolutions,
+  getCameraModes
+} from '../utils/gourceUtils';
+import { validateGourceConfig, fixGourceConfig } from '../utils/configValidator';
 
 // Import custom components
 import ColorPickerField from '../components/ColorPickerField';
@@ -71,18 +77,9 @@ function TabPanel(props) {
   );
 }
 
-const cameraModes = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'track', label: 'Track' },
-  { value: 'follow', label: 'Follow' }
-];
-
-const commonResolutions = [
-  '1280x720', 
-  '1920x1080', 
-  '2560x1440', 
-  '3840x2160'
-];
+// Utiliser les fonctions importées plutôt que de définir des constantes redondantes
+const cameraModes = getCameraModes();
+const commonResolutions = getCommonResolutions();
 
 // Convertir les descriptions des paramètres en camelCase
 const descriptionsInCamelCase = convertToCamelCase(settingsDescriptions);
@@ -162,13 +159,23 @@ const ConfigFilesPage = () => {
       return;
     }
 
+    // Valider et corriger les paramètres
+    const fixedSettings = fixGourceConfig(currentProfile.settings);
+    const validation = validateGourceConfig(fixedSettings);
+    
+    if (!validation.isValid) {
+      console.warn('Problèmes de configuration détectés, tentative de correction automatique:', validation.errors);
+      // Nous continuons avec les paramètres corrigés, mais nous affichons un avertissement
+      toast.warning('Certains paramètres ont été ajustés pour être compatibles avec Gource');
+    }
+
     try {
       setSavingProfile(true);
       
-      // Convertir les paramètres en kebab-case pour la sauvegarde
+      // Utiliser les paramètres corrigés
       const profileToSave = {
         ...currentProfile,
-        settings: convertToKebabCase(currentProfile.settings)
+        settings: convertToKebabCase(fixedSettings)
       };
       
       if (isEditing) {

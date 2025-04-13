@@ -1,44 +1,61 @@
 import React from 'react';
-import { 
-  TextField, 
-  InputAdornment, 
-  IconButton,
-  Tooltip
+import {
+  Box,
+  TextField,
+  InputAdornment,
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import { HelpOutline } from '@mui/icons-material';
 
-/**
- * A text field with a tooltip icon for additional information
- */
 const TooltipField = ({ 
   label, 
   value, 
   onChange, 
-  fullWidth = true, 
-  tooltip = null,
+  tooltip, 
   type = 'text',
-  ...props
+  placeholder = '',
+  multiline = false,
+  rows = 1,
+  InputProps = {},
+  inputProps = {},
+  disabled = false
 }) => {
+  
+  const handleChange = (e) => {
+    onChange(e.target.value);
+  };
+
   return (
-    <TextField
-      label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      fullWidth={fullWidth}
-      type={type}
-      InputProps={{
-        endAdornment: tooltip && (
-          <InputAdornment position="end">
-            <Tooltip title={tooltip}>
-              <IconButton size="small">
-                <HelpOutline fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </InputAdornment>
-        )
-      }}
-      {...props}
-    />
+    <Box sx={{ width: '100%' }}>
+      <TextField
+        fullWidth
+        label={label}
+        value={value || ''}
+        onChange={handleChange}
+        type={type}
+        placeholder={placeholder}
+        multiline={multiline}
+        rows={rows}
+        disabled={disabled}
+        inputProps={inputProps}
+        InputProps={{
+          ...InputProps,
+          endAdornment: (
+            <InputAdornment position="end">
+              {tooltip && (
+                <Tooltip title={tooltip}>
+                  <IconButton size="small">
+                    <HelpOutline fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {InputProps.endAdornment}
+            </InputAdornment>
+          ),
+        }}
+      />
+    </Box>
   );
 };
 

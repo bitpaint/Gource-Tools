@@ -1,89 +1,116 @@
-# Gource Tools
+# Gource-Tools
 
-<div align="center">
-  <img src="client/public/Gourcetools.png" alt="Gource Tools Logo" width="200">
-  <h3>A modern UI for creating and customizing Gource visualizations</h3>
-</div>
+Outils pour visualiser l'évolution des dépôts Git avec Gource.
 
-## 🚀 Overview
+## Modifications récentes
 
-**Gource-Tools** is a comprehensive application designed to simplify the creation of Gource visualizations for Git repositories. It provides a user-friendly interface to manage repositories, configure visualization parameters, and export high-quality video renderings.
+### Configuration Gource améliorée
 
-![Gource Tools Screenshot](https://github.com/bitpaint/Gource-Tools/raw/main/client/public/Gourcetools.png)
+Nous avons apporté plusieurs améliorations à la gestion des configurations Gource :
 
-## ✨ Features
+1. **Réduction de l'élasticité par défaut** : L'élasticité a été réduite de 0.5 à 0.3 pour une visualisation plus stable.
 
-* **Repository Management**  
-   * Clone and manage multiple Git repositories  
-   * Group repositories into projects  
-   * Sync repositories with remote sources  
-   * Organize with tags and search functionality
-* **Project Organization**  
-   * Create projects with multiple repositories  
-   * Configure project-specific visualization settings  
-   * Manage repository relationships
-* **Modern Architecture**  
-   * React + Material UI frontend  
-   * Node.js + Express backend  
-   * LowDB database for data persistence  
-   * Clean separation of concerns
+2. **Ajout de nouveaux paramètres** :
+   - `titleText` : Texte personnalisé pour le titre
+   - `showDates` : Affichage des dates dans la visualisation
+   - `disableProgress` : Option pour désactiver la barre de progression
+   - `disableAutoRotate` : Option pour désactiver la rotation automatique
+   - `showLines` : Option pour afficher/masquer les lignes fichier/utilisateur
+   - `followUsers` : Option pour que la caméra suive les utilisateurs
+   - `maxFilelag` : Délai maximal avant apparition des fichiers
+   - `multiSampling` : Anti-aliasing pour améliorer la qualité
+   - `bloom` : Effet de luminosité pour les éléments brillants
+   - `bloomIntensity` : Intensité de l'effet bloom
+   - `bloomMultiplier` : Multiplicateur de l'effet bloom
 
-## 🔧 Installation
+3. **Amélioration de l'interface utilisateur** :
+   - Ajout d'un sélecteur de couleur pour définir la couleur d'arrière-plan
+   - Ajout d'info-bulles explicatives pour chaque paramètre
+   - Organisation des paramètres en onglets thématiques (Vidéo, Visualisation, Apparence, Temps, Filtrage, Avancé)
+   - Ajout de curseurs pour ajuster facilement les valeurs numériques
 
-### Prerequisites
+4. **Documentation** :
+   - Documentation détaillée pour chaque paramètre
+   - Lien vers la documentation Gource pour les paramètres avancés
 
-* Node.js 16+
-* Git installed on your system
-* Gource installed (for rendering)
-* FFmpeg installed (for video generation)
+5. **Refactorisation** :
+   - Création de composants réutilisables (ColorPickerField, TooltipField, TooltipSlider, TooltipCheckbox)
+   - Utilitaires pour la conversion des formats de paramètres (camelCase <-> kebab-case)
+   - Génération de commandes Gource à partir des paramètres
 
-### Setup
+### Visualisation multi-dépôts
 
-```bash
-# Clone the repository
-git clone https://github.com/bitpaint/Gource-Tools.git
-cd Gource-Tools
+L'application prend en charge la visualisation de plusieurs dépôts Git dans une même animation :
 
-# Install dependencies
-npm install
+1. **Intégration transparente** : 
+   - Créez un projet contenant plusieurs dépôts Git
+   - L'application gère automatiquement la combinaison des logs
 
-# Start development servers
-npm run dev
-```
+2. **Rendu combiné** : 
+   - Tous les dépôts sont visualisés dans un même rendu Gource
+   - Conforme aux recommandations officielles de la [documentation Gource](https://github.com/acaudwell/Gource/wiki/Visualizing-Multiple-Repositories)
 
-This will start both the frontend and backend servers in development mode.
+3. **Distinction visuelle** : 
+   - Chaque dépôt est clairement identifié par son nom dans la visualisation
+   - Les fichiers de chaque dépôt sont préfixés par le nom du dépôt
 
-## 📦 Project Structure
+4. **Chronologie unifiée** : 
+   - Les activités de tous les dépôts sont combinées sur une timeline commune
+   - Tri chronologique de tous les événements pour une visualisation fluide
 
-```
-Gource-Tools/
-├── client/             # Frontend React application
-│   ├── public/         # Static assets
-│   └── src/            # React source code
-├── server/             # Backend Express application
-│   ├── routes/         # API routes
-│   └── index.js        # Main server file
-├── exports/            # Generated video outputs
-├── logs/               # Log files
-├── repos/              # Cloned repositories
-└── db/                 # Database files
-```
+Cette fonctionnalité est idéale pour visualiser :
+- Des projets modulaires avec plusieurs composants
+- L'évolution parallèle de projets liés
+- L'activité globale d'une équipe sur plusieurs projets
 
-## 🤝 Contributing
+### Correction des problèmes de configuration (Juin 2023)
 
-Contributions, issues and feature requests are welcome! Feel free to check the [issues page](https://github.com/bitpaint/Gource-Tools/issues).
+Nous avons résolu plusieurs problèmes liés aux configurations Gource personnalisées :
 
-## 📝 License
+1. **Uniformisation des paramètres** :
+   - Mappage complet entre les formats camelCase (côté client) et kebab-case (Gource)
+   - Tous les paramètres sont désormais correctement convertis dans les deux sens
 
-This project is [MIT](https://opensource.org/licenses/MIT) licensed.
+2. **Validation robuste** :
+   - Validation complète des paramètres numériques, booléens et textuels
+   - Détection et correction automatique des valeurs invalides
+   - Remplacement des valeurs undefined par des valeurs par défaut appropriées
 
----
+3. **Amélioration des profils prédéfinis** :
+   - Correction des profils "Last Week", "Last Month" et "Last Year"
+   - Calcul dynamique des dates sur le serveur pour la compatibilité Windows/Linux
+   - Meilleure gestion des formats de date et des plages temporelles
 
-<div align="center">
-  <p>
-    <a href="https://github.com/bitpaint/Gource-Tools">
-      <img src="https://img.shields.io/badge/GitHub-Gource%20Tools-blue?style=for-the-badge&logo=github" alt="GitHub - Gource Tools">
-    </a>
-  </p>
-  <p>Made with ❤️ for the Git visualization community</p>
-</div> 
+4. **Génération de fichiers de configuration améliorée** :
+   - Format précis respectant la syntaxe Gource
+   - Gestion correcte des paramètres booléens et flags
+   - Support complet des options de paramétrage Gource
+
+5. **Compatibilité multiplateforme** :
+   - Support complet sous Windows et Linux
+   - Élimination des dépendances spécifiques au système d'exploitation
+
+## Installation
+
+1. Cloner le dépôt
+2. Installer les dépendances du serveur : `cd server && npm install`
+3. Installer les dépendances du client : `cd client && npm install`
+4. Démarrer le serveur : `cd server && npm start`
+5. Démarrer le client : `cd client && npm start`
+
+## Prérequis
+
+- Node.js
+- Gource
+- Git
+
+## Utilisation
+
+1. Importez vos dépôts Git
+2. Créez ou modifiez une configuration Gource
+3. Générez des visualisations
+4. Exportez des vidéos
+
+## Licence
+
+MIT 

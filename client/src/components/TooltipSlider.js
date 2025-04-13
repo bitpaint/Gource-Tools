@@ -1,49 +1,87 @@
 import React from 'react';
-import { 
-  Box, 
-  Typography, 
-  Slider, 
+import {
+  Box,
+  Typography,
+  Slider,
   Tooltip,
-  IconButton
+  IconButton,
+  Grid,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import { HelpOutline } from '@mui/icons-material';
 
-/**
- * A slider with a tooltip icon for additional information
- */
-const TooltipSlider = ({ 
-  label, 
-  value, 
-  onChange, 
-  tooltip = null,
+const TooltipSlider = ({
+  label,
+  value,
+  onChange,
+  tooltip,
   min = 0,
-  max = 1,
-  step = 0.1,
+  max = 100,
+  step = 1,
   marks = [],
-  ...props
+  unit = '',
+  disabled = false
 }) => {
+  
+  const handleSliderChange = (event, newValue) => {
+    onChange(newValue);
+  };
+
+  const handleInputChange = (event) => {
+    const newValue = parseFloat(event.target.value);
+    if (!isNaN(newValue) && newValue >= min && newValue <= max) {
+      onChange(newValue);
+    }
+  };
+
   return (
     <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <Typography gutterBottom>{label}</Typography>
-        {tooltip && (
-          <Tooltip title={tooltip}>
-            <IconButton size="small">
-              <HelpOutline fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Box>
-      <Slider
-        value={value}
-        onChange={(e, newValue) => onChange(newValue)}
-        valueLabelDisplay="auto"
-        step={step}
-        marks={marks}
-        min={min}
-        max={max}
-        {...props}
-      />
+      <Grid container spacing={2} alignItems="center">
+        <Grid item xs>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body1" id={`${label.replace(/\s+/g, '-').toLowerCase()}-slider`}>
+              {label}
+            </Typography>
+            {tooltip && (
+              <Tooltip title={tooltip}>
+                <IconButton size="small" sx={{ ml: 0.5 }}>
+                  <HelpOutline fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+          <Slider
+            value={typeof value === 'number' ? value : 0}
+            onChange={handleSliderChange}
+            aria-labelledby={`${label.replace(/\s+/g, '-').toLowerCase()}-slider`}
+            valueLabelDisplay="auto"
+            step={step}
+            marks={marks}
+            min={min}
+            max={max}
+            disabled={disabled}
+            sx={{ mt: 1 }}
+          />
+        </Grid>
+        <Grid item xs={3}>
+          <TextField
+            value={value}
+            onChange={handleInputChange}
+            type="number"
+            InputProps={{
+              endAdornment: unit ? <InputAdornment position="end">{unit}</InputAdornment> : null,
+              inputProps: { 
+                min: min, 
+                max: max, 
+                step: step
+              }
+            }}
+            size="small"
+            disabled={disabled}
+          />
+        </Grid>
+      </Grid>
     </Box>
   );
 };

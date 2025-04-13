@@ -507,11 +507,52 @@ async function processRepositoriesAndGenerateLogs(repositories, logFilePath, ren
       console.log(`Log file sample (first 10 lines):\n${logSample}`);
     }
     
+    // Valider si le format est correct
+    try {
+      const validationResult = validateLogFormat(logFilePath);
+      console.log(`Log validation result: ${validationResult.valid ? 'Valid' : 'Invalid'}, ${validationResult.validLines} valid lines found`);
+      
+      if (!validationResult.valid) {
+        throw new Error(`Log file validation failed: ${validationResult.message}`);
+      }
+    } catch (validationError) {
+      console.error('Error validating log format:', validationError);
+      // Ne pas échouer, continuer car Gource peut encore fonctionner avec le fichier
+    }
+    
     updateRenderStatus(render.id, 'ready', 'Logs generated, ready to render', 20);
   } catch (error) {
     console.error('Error generating logs:', error);
     updateRenderStatus(render.id, 'failed', `Error generating logs: ${error.message}`, 0);
     throw error; // Re-throw pour propager l'erreur
+  }
+}
+
+// Fonction pour valider le format du fichier log
+function validateLogFormat(logFilePath) {
+  try {
+    const logContent = fs.readFileSync(logFilePath, 'utf-8');
+    const lines = logContent.split('\n').filter(line => line.trim());
+    const validLines = lines.filter(line => {
+      const parts = line.split('|');
+      return parts.length >= 4 && 
+             ['A', 'M', 'D'].includes(parts[2]) && 
+             !isNaN(parseFloat(parts[0])) &&
+             parts[1].trim() !== '' &&
+             parts[3].trim() !== '';
+    }).length;
+    
+    return {
+      valid: validLines > 0,
+      validLines,
+      message: validLines === 0 ? 'No valid lines found in log file' : 'Log file format is valid'
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      validLines: 0,
+      message: `Error validating log file: ${error.message}`
+    };
   }
 }
 
@@ -746,30 +787,121 @@ async function startRenderProcess(logFilePath, videoFilePath, settings, render) 
         // Sur Windows, utiliser le pipeline direct Gource -> ffmpeg comme dans le script render-4k.sh
         updateRenderStatus(render.id, 'rendering', 'Starting Gource rendering with direct pipeline to ffmpeg', 30);
         
-        // Créer un fichier de configuration valide pour Gource
-        const configFile = path.join(tempDir, 'gource-tools.conf');
+        // Créer un fichier de configuration valide pour Gource dans le dossier config
+        const configDir = path.join(__dirname, '../../config');
+        if (!fs.existsSync(configDir)) {
+          fs.mkdirSync(configDir, { recursive: true });
+        }
+        const configFile = path.join(configDir, `gource-config-${render.id}.conf`);
         
         // Format correct du fichier de configuration avec sections [display] et [gource]
-        const configContent = `[display]
-viewport=${width}x${height}
-output-framerate=${framerate}
-
-[gource]
-auto-skip-seconds=${autoSkipSeconds}
-seconds-per-day=${secondsPerDay}
-elasticity=${elasticity}
-background-colour=${background.replace('#', '')}
-camera-mode=${cameraMode}
-user-scale=${userScale}
-time-scale=${timeScale}
-font-scale=${fontScale}
-hide=mouse
-${hideRoot ? 'hide=root' : ''}
-${hideFilesRegex ? `file-filter=${hideFilesRegex}` : ''}
-${hideUsers ? `user-filter=${hideUsers}` : ''}
-${maxUserCount > 0 ? `max-user-count=${maxUserCount}` : ''}
-${highlightUsers ? 'highlight-users=1' : ''}
-`;
+        let configContent = `[display]\n`;
+        
+        // Section display
+        configContent += `viewport=${width}x${height}\n`;
+        configContent += `output-framerate=${framerate || 60}\n`;
+        
+        // Section gource avec gestion des valeurs undefined
+        configContent += `\n[gource]\n`;
+        
+        // Paramètres temporels (critiques pour le bon fonctionnement)
+        configContent += `seconds-per-day=${secondsPerDay !== undefined && !isNaN(secondsPerDay) ? secondsPerDay : 1}\n`;
+        configContent += `auto-skip-seconds=${autoSkipSeconds !== undefined && !isNaN(autoSkipSeconds) ? autoSkipSeconds : 0.1}\n`;
+        
+        // Générer dynamiquement les dates de début et fin si range-days est spécifié
+        if (settings['range-days'] && !isNaN(parseInt(settings['range-days']))) {
+          const rangeDays = parseInt(settings['range-days']);
+          const today = new Date();
+          
+          // Calculer la date de début (aujourd'hui moins range-days)
+          const startDate = new Date(today);
+          startDate.setDate(today.getDate() - rangeDays);
+          
+          // Formater les dates au format YYYY-MM-DD
+          const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          const formattedStartDate = formatDate(startDate);
+          const formattedEndDate = formatDate(today);
+          
+          // Ajouter les dates au fichier de configuration
+          configContent += `start-date=${formattedStartDate}\n`;
+          configContent += `stop-date=${formattedEndDate}\n`;
+          
+          // Si date-format est spécifié, l'ajouter aussi
+          if (settings['date-format']) {
+            configContent += `date-format=${settings['date-format']}\n`;
+          }
+          
+          // Ne pas inclure range-days dans la configuration (c'est notre paramètre personnalisé)
+          delete settings['range-days'];
+        } else {
+          // Inclure start-date et stop-date s'ils sont explicitement définis
+          if (settings['start-date']) {
+            configContent += `start-date=${settings['start-date']}\n`;
+          }
+          if (settings['stop-date']) {
+            configContent += `stop-date=${settings['stop-date']}\n`;
+          }
+          if (settings['date-format']) {
+            configContent += `date-format=${settings['date-format']}\n`;
+          }
+        }
+        
+        // Paramètres d'apparence
+        configContent += `elasticity=${elasticity !== undefined && !isNaN(elasticity) ? elasticity : 0.3}\n`;
+        configContent += `background-colour=${background ? background.replace('#', '') : '000000'}\n`;
+        
+        // Paramètres de caméra
+        // Le mode 'follow' de l'interface est en fait 'overview' dans la config Gource
+        if (cameraMode === 'follow') {
+          configContent += `camera-mode=overview\n`;
+          configContent += `follow-user=1\n`; // Activation du suivi utilisateur
+        } else {
+          configContent += `camera-mode=${cameraMode || 'overview'}\n`;
+        }
+        
+        // Échelles
+        configContent += `user-scale=${userScale !== undefined && !isNaN(userScale) ? userScale : 1.0}\n`;
+        configContent += `time-scale=${timeScale !== undefined && !isNaN(timeScale) ? timeScale : 1.0}\n`;
+        configContent += `font-scale=${fontScale !== undefined && !isNaN(fontScale) ? fontScale : 1.0}\n`;
+        
+        // Options standard toujours activées
+        configContent += `hide=mouse\n`;
+        
+        // Options conditionnelles
+        if (hideRoot) configContent += `hide=root\n`;
+        if (hideFilesRegex) configContent += `file-filter=${hideFilesRegex}\n`;
+        if (hideUsers) configContent += `user-filter=${hideUsers}\n`;
+        if (maxUserCount > 0) configContent += `max-user-count=${maxUserCount}\n`;
+        
+        // Options booléennes
+        if (highlightUsers) configContent += `highlight-users=1\n`;
+        if (settings['highlight-all-users']) configContent += `highlight-all-users=true\n`;
+        if (title === false) configContent += `hide=date\n`; // Date et titre sont liés
+        if (key === false) configContent += `key=false\n`;
+        
+        // Extras si définis
+        if (settings.extraArgs) {
+          // Convertir les arguments supplémentaires en paramètres individuels
+          const extraArgs = settings.extraArgs.split(/\s+/).filter(Boolean);
+          for (const arg of extraArgs) {
+            if (arg.startsWith('--')) {
+              const paramParts = arg.substring(2).split('=');
+              if (paramParts.length === 1) {
+                // Argument sans valeur (flag)
+                configContent += `${paramParts[0]}=true\n`;
+              } else if (paramParts.length >= 2) {
+                // Argument avec valeur
+                configContent += `${paramParts[0]}=${paramParts.slice(1).join('=')}\n`;
+              }
+            }
+          }
+        }
         
         fs.writeFileSync(configFile, configContent);
         
@@ -781,9 +913,41 @@ ${highlightUsers ? 'highlight-users=1' : ''}
         try {
           // Créer un fichier batch pour exécuter le pipeline complet
           const batchFilePath = path.join(tempDir, `${render.id}_pipeline.bat`);
+          
+          // Vérifier et diagnostiquer le fichier log avant de continuer
+          console.log("Diagnostiquant le format du fichier log avant de lancer Gource...");
+          const logContent = fs.readFileSync(logFilePath, 'utf-8');
+          const logLinesCount = logContent.trim().split('\n').length;
+          console.log(`Le fichier log contient ${logLinesCount} lignes`);
+          
+          // Afficher les premières lignes pour diagnostic
+          const firstLines = logContent.split('\n').slice(0, 5).join('\n');
+          console.log(`Premières lignes du fichier log:\n${firstLines}`);
+          
+          // Corriger le format du log si nécessaire pour être compatible avec Gource
+          let correctedLogPath = logFilePath;
+          const logParts = logContent.split('\n')[0].split('|');
+          if (logParts.length >= 4) {
+            // Vérifier les slashs doubles dans les chemins de fichiers qui peuvent causer des problèmes
+            if (logParts[3].includes('//')) {
+              console.log("Détection de double slashes dans les chemins, correction du fichier log...");
+              const correctedContent = logContent.replace(/\/\//g, '/');
+              correctedLogPath = path.join(tempDir, `${render.id}_corrected.log`);
+              fs.writeFileSync(correctedLogPath, correctedContent);
+              console.log(`Fichier log corrigé créé: ${correctedLogPath}`);
+            }
+          }
+          
+          // Utiliser le fichier log corrigé
+          const normLogFilePath = correctedLogPath.replace(/\\/g, '/');
+          
           const batchContent = `@echo off
 echo Starting Gource with direct pipeline to ffmpeg...
-gource "${normLogFilePath}" --load-config "${normConfigFilePath}" --log-format custom --stop-at-end --disable-progress --output-framerate ${framerate} --viewport ${width}x${height} ${title ? '--title' : ''} ${key ? '--key' : ''} -o - | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 "${normVideoFilePath}"
+echo Using log format: custom
+echo Log file: ${normLogFilePath}
+echo Config file: ${normConfigFilePath}
+
+gource "${normLogFilePath}" --load-config "${normConfigFilePath}" --log-format custom --stop-at-end --disable-progress -o - | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 "${normVideoFilePath}"
 if %ERRORLEVEL% NEQ 0 exit /b 1
 echo Rendering completed successfully!
 exit /b 0
@@ -816,8 +980,9 @@ exit /b 0
           // Nettoyer les fichiers temporaires
           try {
             fs.unlinkSync(batchFilePath);
+            fs.unlinkSync(configFile);
           } catch (e) {
-            console.warn(`Couldn't delete batch file: ${e.message}`);
+            console.warn(`Couldn't delete temporary files: ${e.message}`);
           }
           
           updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
@@ -833,7 +998,7 @@ exit /b 0
             const psScriptPath = path.join(tempDir, `${render.id}_render.ps1`);
             const psScriptContent = `
 # Exécuter Gource avec pipeline direct vers ffmpeg
-$gourceCommand = "gource \\"${normLogFilePath}\\" --load-config \\"${normConfigFilePath}\\" --log-format custom --stop-at-end --output-framerate ${framerate} --viewport ${width}x${height} ${title ? '--title' : ''} ${key ? '--key' : ''} -o -"
+$gourceCommand = "gource \\"${normLogFilePath}\\" --log-format custom --stop-at-end --output-framerate ${framerate} --viewport ${width}x${height} ${title ? '--title' : ''} ${key ? '--key' : ''} -o -"
 $ffmpegCommand = "ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 \\"${normVideoFilePath}\\""
 
 # Exécuter la commande complète
@@ -870,8 +1035,9 @@ if ($process.ExitCode -ne 0) {
             // Nettoyer les fichiers temporaires
             try {
               fs.unlinkSync(psScriptPath);
+              fs.unlinkSync(configFile);
             } catch (e) {
-              console.warn(`Couldn't delete PowerShell script: ${e.message}`);
+              console.warn(`Couldn't delete temporary files: ${e.message}`);
             }
             
             updateRenderStatus(render.id, 'completed', 'Render completed successfully with PowerShell method', 100);
@@ -879,15 +1045,17 @@ if ($process.ExitCode -ne 0) {
           } catch (psError) {
             console.error('PowerShell method failed:', psError.message);
             
-            // Dernière tentative: exécuter la commande comme indiquée par l'utilisateur
-            updateRenderStatus(render.id, 'rendering', 'Trying manual method from user example...', 50);
+            // Dernière tentative: exécuter la commande simplifiée sans fichier de configuration
+            updateRenderStatus(render.id, 'rendering', 'Trying simplified approach...', 50);
             
             try {
-              // Créer un script batch final avec la syntaxe exacte de l'exemple utilisateur
+              // Créer un script batch final avec une commande simplifiée
               const finalBatchPath = path.join(tempDir, `${render.id}_final.bat`);
               const finalBatchContent = `@echo off
-echo Running Gource with user-specified method...
-gource "${normLogFilePath}" -${width}x${height} --stop-at-end --disable-progress --output-framerate ${framerate} --camera-mode ${cameraMode} ${title ? '--title' : ''} ${key ? '--key' : ''} --hide mouse --seconds-per-day ${secondsPerDay} -o - | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 "${normVideoFilePath}"
+echo Running Gource with simplified approach...
+echo Log file: ${normLogFilePath}
+
+gource "${normLogFilePath}" -${width}x${height} --stop-at-end --seconds-per-day ${secondsPerDay} --auto-skip-seconds ${autoSkipSeconds} --camera-mode overview --user-scale ${userScale} --disable-progress --log-format custom -o - | ffmpeg -y -r ${framerate} -f image2pipe -vcodec ppm -i - -vcodec libx264 -preset ultrafast -pix_fmt yuv420p -crf 25 -threads 0 "${normVideoFilePath}"
 `;
               
               fs.writeFileSync(finalBatchPath, finalBatchContent);
@@ -911,12 +1079,13 @@ gource "${normLogFilePath}" -${width}x${height} --stop-at-end --disable-progress
               // Nettoyer le fichier temporaire
               try {
                 fs.unlinkSync(finalBatchPath);
+                fs.unlinkSync(configFile);
               } catch (e) {
-                console.warn(`Couldn't delete final batch file: ${e.message}`);
+                console.warn(`Couldn't delete temporary files: ${e.message}`);
               }
               
-              updateRenderStatus(render.id, 'completed', 'Render completed successfully with user method', 100);
-              resolve({ success: true, message: 'Render completed successfully with user method' });
+              updateRenderStatus(render.id, 'completed', 'Render completed successfully with simplified approach', 100);
+              resolve({ success: true, message: 'Render completed successfully with simplified approach' });
             } catch (finalError) {
               console.error('All methods failed:', finalError.message);
               updateRenderStatus(render.id, 'failed', `Render failed after multiple attempts: ${finalError.message}`, 0);
@@ -927,30 +1096,121 @@ gource "${normLogFilePath}" -${width}x${height} --stop-at-end --disable-progress
       } else {
         // Sur Linux/Mac, utiliser une commande avec pipe
         
-        // Créer un fichier de configuration valide pour Gource
-        const configFile = path.join(tempDir, 'gource-tools.conf');
+        // Créer un fichier de configuration valide pour Gource dans le dossier config
+        const configDir = path.join(__dirname, '../../config');
+        if (!fs.existsSync(configDir)) {
+          fs.mkdirSync(configDir, { recursive: true });
+        }
+        const configFile = path.join(configDir, `gource-config-${render.id}.conf`);
         
         // Format correct du fichier de configuration avec sections [display] et [gource]
-        const configContent = `[display]
-viewport=${width}x${height}
-output-framerate=${framerate}
-
-[gource]
-auto-skip-seconds=${autoSkipSeconds}
-seconds-per-day=${secondsPerDay}
-elasticity=${elasticity}
-background-colour=${background.replace('#', '')}
-camera-mode=${cameraMode}
-user-scale=${userScale}
-time-scale=${timeScale}
-font-scale=${fontScale}
-hide=mouse
-${hideRoot ? 'hide=root' : ''}
-${hideFilesRegex ? `file-filter=${hideFilesRegex}` : ''}
-${hideUsers ? `user-filter=${hideUsers}` : ''}
-${maxUserCount > 0 ? `max-user-count=${maxUserCount}` : ''}
-${highlightUsers ? 'highlight-users=1' : ''}
-`;
+        let configContent = `[display]\n`;
+        
+        // Section display
+        configContent += `viewport=${width}x${height}\n`;
+        configContent += `output-framerate=${framerate || 60}\n`;
+        
+        // Section gource avec gestion des valeurs undefined
+        configContent += `\n[gource]\n`;
+        
+        // Paramètres temporels (critiques pour le bon fonctionnement)
+        configContent += `seconds-per-day=${secondsPerDay !== undefined && !isNaN(secondsPerDay) ? secondsPerDay : 1}\n`;
+        configContent += `auto-skip-seconds=${autoSkipSeconds !== undefined && !isNaN(autoSkipSeconds) ? autoSkipSeconds : 0.1}\n`;
+        
+        // Générer dynamiquement les dates de début et fin si range-days est spécifié
+        if (settings['range-days'] && !isNaN(parseInt(settings['range-days']))) {
+          const rangeDays = parseInt(settings['range-days']);
+          const today = new Date();
+          
+          // Calculer la date de début (aujourd'hui moins range-days)
+          const startDate = new Date(today);
+          startDate.setDate(today.getDate() - rangeDays);
+          
+          // Formater les dates au format YYYY-MM-DD
+          const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          const formattedStartDate = formatDate(startDate);
+          const formattedEndDate = formatDate(today);
+          
+          // Ajouter les dates au fichier de configuration
+          configContent += `start-date=${formattedStartDate}\n`;
+          configContent += `stop-date=${formattedEndDate}\n`;
+          
+          // Si date-format est spécifié, l'ajouter aussi
+          if (settings['date-format']) {
+            configContent += `date-format=${settings['date-format']}\n`;
+          }
+          
+          // Ne pas inclure range-days dans la configuration (c'est notre paramètre personnalisé)
+          delete settings['range-days'];
+        } else {
+          // Inclure start-date et stop-date s'ils sont explicitement définis
+          if (settings['start-date']) {
+            configContent += `start-date=${settings['start-date']}\n`;
+          }
+          if (settings['stop-date']) {
+            configContent += `stop-date=${settings['stop-date']}\n`;
+          }
+          if (settings['date-format']) {
+            configContent += `date-format=${settings['date-format']}\n`;
+          }
+        }
+        
+        // Paramètres d'apparence
+        configContent += `elasticity=${elasticity !== undefined && !isNaN(elasticity) ? elasticity : 0.3}\n`;
+        configContent += `background-colour=${background ? background.replace('#', '') : '000000'}\n`;
+        
+        // Paramètres de caméra
+        // Le mode 'follow' de l'interface est en fait 'overview' dans la config Gource
+        if (cameraMode === 'follow') {
+          configContent += `camera-mode=overview\n`;
+          configContent += `follow-user=1\n`; // Activation du suivi utilisateur
+        } else {
+          configContent += `camera-mode=${cameraMode || 'overview'}\n`;
+        }
+        
+        // Échelles
+        configContent += `user-scale=${userScale !== undefined && !isNaN(userScale) ? userScale : 1.0}\n`;
+        configContent += `time-scale=${timeScale !== undefined && !isNaN(timeScale) ? timeScale : 1.0}\n`;
+        configContent += `font-scale=${fontScale !== undefined && !isNaN(fontScale) ? fontScale : 1.0}\n`;
+        
+        // Options standard toujours activées
+        configContent += `hide=mouse\n`;
+        
+        // Options conditionnelles
+        if (hideRoot) configContent += `hide=root\n`;
+        if (hideFilesRegex) configContent += `file-filter=${hideFilesRegex}\n`;
+        if (hideUsers) configContent += `user-filter=${hideUsers}\n`;
+        if (maxUserCount > 0) configContent += `max-user-count=${maxUserCount}\n`;
+        
+        // Options booléennes
+        if (highlightUsers) configContent += `highlight-users=1\n`;
+        if (settings['highlight-all-users']) configContent += `highlight-all-users=true\n`;
+        if (title === false) configContent += `hide=date\n`; // Date et titre sont liés
+        if (key === false) configContent += `key=false\n`;
+        
+        // Extras si définis
+        if (settings.extraArgs) {
+          // Convertir les arguments supplémentaires en paramètres individuels
+          const extraArgs = settings.extraArgs.split(/\s+/).filter(Boolean);
+          for (const arg of extraArgs) {
+            if (arg.startsWith('--')) {
+              const paramParts = arg.substring(2).split('=');
+              if (paramParts.length === 1) {
+                // Argument sans valeur (flag)
+                configContent += `${paramParts[0]}=true\n`;
+              } else if (paramParts.length >= 2) {
+                // Argument avec valeur
+                configContent += `${paramParts[0]}=${paramParts.slice(1).join('=')}\n`;
+              }
+            }
+          }
+        }
         
         fs.writeFileSync(configFile, configContent);
         
@@ -985,6 +1245,13 @@ ${highlightUsers ? 'highlight-users=1' : ''}
           .then(() => {
             if (!fs.existsSync(videoFilePath) || fs.statSync(videoFilePath).size === 0) {
               throw new Error('Failed to generate video file');
+            }
+            
+            // Nettoyer les fichiers temporaires
+            try {
+              fs.unlinkSync(configFile);
+            } catch (e) {
+              console.warn(`Couldn't delete config file: ${e.message}`);
             }
             
             updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);

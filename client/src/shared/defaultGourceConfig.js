@@ -7,109 +7,35 @@
 
 // Default settings for Gource
 const defaultSettings = {
-  // Display settings
   resolution: '1920x1080',
   framerate: 60,
+  secondsPerDay: 1,
+  autoSkipSeconds: 0.1,
+  elasticity: 0.3,
   title: true,
-  'title-text': '', // Custom title text (empty = use project name)
   key: true,
   background: '#000000',
-  
-  // Time settings
-  'seconds-per-day': 1,
-  'auto-skip-seconds': 0.1,
-  'time-scale': 1.0,
-  'start-date': '',
-  'stop-date': '',
-  
-  // Camera and movement
-  elasticity: 0.0, // Reduced from 0.5 to 0.0
-  'camera-mode': 'overview', // overview, track, follow
-  
-  // Visual scaling
-  'font-scale': 1.0,
-  'user-scale': 1.0,
-  'file-scale': 1.0,
-  'dir-size': 1.0,
-  
-  // Font settings
-  'font-size': 16,
-  'filename-font-size': 14,
-  'dirname-font-size': 14,
-  'user-font-size': 14,
-  
-  // Color settings
-  'font-color': '#ffffff',
-  'title-color': '#ffffff',
-  'dir-color': '#ffffff',
-  'highlight-color': '#ffffff',
-  'selection-color': '#ffffff',
-  
-  // Users and files settings
-  'highlight-users': false,
-  'hide-users': '',
-  'hide-files-regex': '',
-  'hide-root': false,
-  'max-user-count': 0,
-  'user-image-dir': '', // Directory for user avatar images
-  'date-format': '%Y-%m-%d %H:%M:%S',
-  
-  // Special features
-  'show-lines': false, // Show connections between users and files
-  'disable-auto-rotate': false,
-  'swap-title-date': false,
-  
-  // Advanced
-  'extra-args': ''
-};
-
-// Description for each setting to display in UI tooltips
-const settingsDescriptions = {
-  resolution: "Video output resolution (width x height)",
-  framerate: "Frames per second in output video",
-  title: "Show title at the top of the visualization",
-  'title-text': "Custom title text (if empty, project name is used)",
-  key: "Display file extension color reference",
-  background: "Background color of the visualization",
-  
-  'seconds-per-day': "How many seconds represent one day in the visualization",
-  'auto-skip-seconds': "Skip periods of inactivity longer than this value",
-  'time-scale': "Speed multiplier for time progression",
-  'start-date': "Start visualization from this date (YYYY-MM-DD format)",
-  'stop-date': "End visualization at this date (YYYY-MM-DD format)",
-  
-  elasticity: "Elasticity of connections between files and directories (0.0 = none)",
-  'camera-mode': "Camera behavior: overview (entire tree), track (move to active area), follow (follow most active user)",
-  
-  'font-scale': "Global font size scaling factor",
-  'user-scale': "Size of user avatars",
-  'file-scale': "Size of file nodes",
-  'dir-size': "Size of directory nodes",
-  
-  'font-size': "Default font size",
-  'filename-font-size': "Font size for file names",
-  'dirname-font-size': "Font size for directory names",
-  'user-font-size': "Font size for user names",
-  
-  'font-color': "Default text color",
-  'title-color': "Title text color",
-  'dir-color': "Directory text and node color",
-  'highlight-color': "Color used for highlighting active elements",
-  'selection-color': "Color used for selected elements",
-  
-  'highlight-users': "Highlight specific users in the visualization",
-  'hide-users': "Comma-separated list of users to hide",
-  'hide-files-regex': "Regular expression for files to hide",
-  'hide-root': "Hide the root directory",
-  'max-user-count': "Maximum number of users to show (0 = no limit)",
-  'user-image-dir': "Directory containing user avatar images",
-  'date-format': "Format for displayed dates",
-  
-  'show-lines': "Show connections between users and files",
-  'disable-auto-rotate': "Disable automatic camera rotation",
-  'swap-title-date': "Swap positions of title and date in the visualization",
-  
-  'extra-args': "Additional command-line arguments to pass to Gource"
+  fontScale: 1.0,
+  cameraMode: 'overview',
+  userScale: 1.0,
+  timeScale: 1.0,
+  highlightUsers: false,
+  hideUsers: '',
+  hideFilesRegex: '',
+  hideRoot: false,
+  maxUserCount: 0,
+  titleText: '',
+  showDates: true,
+  disableProgress: false,
+  disableAutoRotate: false,
+  showLines: true,
+  followUsers: false,
+  maxFilelag: 0.5,
+  multiSampling: true,
+  bloom: false,
+  bloomIntensity: 0.4,
+  bloomMultiplier: 0.7,
+  extraArgs: ''
 };
 
 // Default configuration profile
@@ -121,6 +47,39 @@ const defaultGourceConfig = {
   isDefault: true,
   dateCreated: new Date().toISOString(),
   lastModified: new Date().toISOString()
+};
+
+// Descriptions for each setting with detailed explanations
+const settingsDescriptions = {
+  resolution: "Définit la résolution de la vidéo au format LARGEURxHAUTEUR (ex: 1920x1080)",
+  framerate: "Nombre d'images par seconde dans la vidéo exportée",
+  secondsPerDay: "Nombre de secondes à consacrer à chaque journée d'activité",
+  autoSkipSeconds: "Saute automatiquement les périodes d'inactivité supérieures à cette valeur (en secondes)",
+  elasticity: "Contrôle l'élasticité des connexions entre fichiers et utilisateurs (0.0-1.0)",
+  title: "Affiche le titre du projet en haut de la visualisation",
+  key: "Affiche la légende des types de fichiers",
+  background: "Couleur d'arrière-plan de la visualisation",
+  fontScale: "Taille relative des textes dans la visualisation",
+  cameraMode: "Mode de caméra: 'overview' (vue d'ensemble), 'track' (suit l'activité), 'follow' (suit les utilisateurs)",
+  userScale: "Taille relative des avatars utilisateurs",
+  timeScale: "Vitesse relative du temps dans la visualisation",
+  highlightUsers: "Met en évidence les utilisateurs durant leur activité",
+  hideUsers: "Masque certains utilisateurs (séparés par des virgules)",
+  hideFilesRegex: "Expression régulière pour masquer certains fichiers",
+  hideRoot: "Masque le répertoire racine dans la visualisation",
+  maxUserCount: "Limite le nombre maximal d'utilisateurs affichés (0 = pas de limite)",
+  titleText: "Texte personnalisé du titre (vide = utiliser le nom du projet)",
+  showDates: "Affiche les dates dans la visualisation",
+  disableProgress: "Désactive la barre de progression",
+  disableAutoRotate: "Désactive la rotation automatique de la caméra",
+  showLines: "Affiche les lignes reliant les fichiers aux utilisateurs",
+  followUsers: "La caméra suit les utilisateurs actifs",
+  maxFilelag: "Délai maximal avant que les fichiers n'apparaissent (en secondes)",
+  multiSampling: "Active l'anti-aliasing pour une meilleure qualité d'image",
+  bloom: "Ajoute un effet de luminosité (bloom) aux éléments brillants",
+  bloomIntensity: "Intensité de l'effet de bloom (0.0-1.0)",
+  bloomMultiplier: "Multiplicateur de l'effet de bloom (0.0-1.0)",
+  extraArgs: "Arguments supplémentaires à passer directement à Gource"
 };
 
 // Export for ES modules (client-side)
