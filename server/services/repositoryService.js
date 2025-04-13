@@ -9,7 +9,6 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const RenderService = require('./renderService');
 
 class RepositoryService {
   constructor() {
@@ -260,39 +259,99 @@ class RepositoryService {
   }
 
   /**
-   * Génère le log Git pour un dépôt donné
-   * Optimisé pour Windows 11 Pro en utilisant PowerShell
-   * @param {string} repoPath - Chemin du dépôt
-   * @returns {string} Chemin du fichier de log généré
+   * Génère un fichier de log git pour un dépôt au format Gource
+   * @param {Object} repository - Objet dépôt
+   * @param {string} outputPath - Chemin du fichier de sortie
+   * @param {Object} options - Options de génération
+   * @returns {Promise<Object>} - Informations sur le log généré
    */
-  generateGitLog(repoPath) {
+  async generateGitLog(repository, outputPath, options = {}) {
+    if (!repository) {
+      throw new Error('Dépôt invalide ou non spécifié');
+    }
+
+    // Déterminer le chemin du dépôt (peut être dans path ou localPath selon la structure)
+    const repoPath = repository.path || repository.localPath;
+    
+    if (!repoPath) {
+      throw new Error('Chemin du dépôt non spécifié');
+    }
+
+    if (!fs.existsSync(repoPath)) {
+      throw new Error(`Le chemin du dépôt n'existe pas: ${repoPath}`);
+    }
+
+    // Créer le répertoire de sortie s'il n'existe pas
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
     try {
-      if (!this.isValidGitRepository(repoPath)) {
-        throw new Error(`Le chemin ${repoPath} ne contient pas un dépôt Git valide`);
+      // Utiliser git pour générer un fichier de log et le transformer au format Gource
+      // Format: timestamp|auteur|action|fichier
+      // Actions: A (ajout), M (modification), D (suppression)
+      const gitCommand = `cd "${repoPath}" && git log --pretty=format:"%at|%an|%s" --name-status --reverse`;
+      const gitLogOutput = execSync(gitCommand, { encoding: 'utf8' });
+      
+      // Transformer la sortie git en format Gource
+      let currentCommit = null;
+      let currentTime = null;
+      let currentAuthor = null;
+      
+      const gourceLines = [];
+      
+      const lines = gitLogOutput.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        if (line === '') continue;
+        
+        // Si la ligne contient des |, c'est une ligne de commit
+        if (line.includes('|')) {
+          const parts = line.split('|');
+          if (parts.length >= 2) {
+            currentTime = parts[0];
+            currentAuthor = parts[1];
+          }
+        } 
+        // Sinon, c'est une ligne de fichier avec son statut
+        else if (currentTime && currentAuthor) {
+          // Format git: A/M/D     chemin/du/fichier
+          const fileMatch = line.match(/^([AMD])\s+(.+)$/);
+          if (fileMatch) {
+            const action = fileMatch[1]; // A, M ou D
+            const filePath = fileMatch[2];
+            
+            // Format Gource: timestamp|username|action|filepath
+            gourceLines.push(`${currentTime}|${currentAuthor}|${action}|/${repository.name}/${filePath}`);
+          }
+        }
       }
       
-      // Créer un fichier temporaire pour le log
-      const tempDir = path.join(__dirname, '../../../temp');
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
+      // Écrire le fichier au format Gource
+      fs.writeFileSync(outputPath, gourceLines.join('\n'), 'utf8');
+      
+      // Vérifier si le fichier a été créé et n'est pas vide
+      if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+        console.warn(`Aucun log généré pour le dépôt ${repository.name}`);
+        return {
+          path: outputPath,
+          name: repository.name,
+          id: repository.id,
+          isEmpty: true
+        };
       }
-      
-      const logFile = path.join(tempDir, `git_log_${Date.now()}.txt`);
-      
-      // Exécuter la commande git log avec le format adapté à Gource
-      const cmd = `git log --pretty=format:"%at|%an|%h|%s" --all --date-order --reverse --no-merges --encoding=UTF-8 > "${logFile}"`;
-      
-      execSync(cmd, {
-        cwd: repoPath,
-        shell: 'powershell.exe',
-        stdio: ['ignore', 'pipe', 'pipe'],
-        encoding: 'utf8'
-      });
-      
-      return logFile;
+
+      return {
+        path: outputPath,
+        name: repository.name,
+        id: repository.id,
+        isEmpty: false
+      };
     } catch (error) {
-      console.error(`Erreur lors de la génération du log Git pour ${repoPath}:`, error.message);
-      throw new Error(`Échec de la génération du log Git: ${error.message}`);
+      console.error(`Erreur lors de la génération du log pour ${repository.name}:`, error.message);
+      throw new Error(`Échec de la génération du log Gource: ${error.message}`);
     }
   }
 

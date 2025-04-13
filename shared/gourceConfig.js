@@ -248,7 +248,14 @@ function convertToGourceArgs(settings) {
       continue;
     }
 
-    // Obtenir le nom d'option Gource
+    // Cas spécial pour les arguments supplémentaires
+    if (key === 'extraArgs') {
+      // Ajouter directement les arguments supplémentaires
+      args += `${value} `;
+      continue;
+    }
+
+    // Obtenir l'option Gource correspondante
     const gourceOption = paramMap[key] || key;
 
     // Traitement spécial pour les couleurs (enlever le #)

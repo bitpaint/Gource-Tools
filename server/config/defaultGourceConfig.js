@@ -35,6 +35,7 @@ const defaultSettings = {
   bloom: false,
   bloomIntensity: 0.4,
   bloomMultiplier: 0.7,
+  filenameTime: 4.0,
   extraArgs: ''
 };
 

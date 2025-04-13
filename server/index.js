@@ -4,30 +4,28 @@ const path = require('path');
 const dotenv = require('dotenv');
 const fs = require('fs');
 const { execSync } = require('child_process');
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
+const Database = require('./utils/Database');
+const Logger = require('./utils/Logger');
 const { defaultGourceConfig } = require('./config/defaultGourceConfig');
 const initCustomRenderProfiles = require('./config/initRenderProfiles');
 
+// Create a logger for the server
+const logger = Logger.createComponentLogger('Server');
+
 // Initialize environment variables
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+logger.info('Environment variables loaded');
 
 // Initialize database
 const dbPath = path.join(__dirname, '../db');
 if (!fs.existsSync(dbPath)) {
   fs.mkdirSync(dbPath, { recursive: true });
+  logger.info('Created database directory');
 }
 
-const adapter = new FileSync(path.join(dbPath, 'db.json'));
-const db = low(adapter);
-
-// Set default values for database
-db.defaults({ 
-  repositories: [], 
-  projects: [], 
-  renderProfiles: [],
-  renders: []
-}).write();
+// Initialize database with required collections
+const db = Database.initializeDatabase();
+logger.info('Database initialized');
 
 // Create default config file if it doesn't exist
 const defaultProfileExists = db.get('renderProfiles')
@@ -35,16 +33,17 @@ const defaultProfileExists = db.get('renderProfiles')
   .value();
 
 if (!defaultProfileExists) {
-  // Importer la configuration par défaut depuis le fichier externe
+  // Import default configuration from external file
   db.get('renderProfiles')
     .push(defaultGourceConfig)
     .write();
     
-  console.log('✅ Created default Gource config file');
+  logger.info('Created default Gource config file');
 }
 
 // Initialize custom render profiles (Last Week, Last Month, Last Year)
 initCustomRenderProfiles();
+logger.info('Custom render profiles initialized');
 
 // Initialize API routes
 const repositoriesRouter = require('./routes/repositories');
@@ -63,16 +62,16 @@ app.use(express.json());
 // Check if Gource and ffmpeg are installed
 try {
   execSync('gource --help', { stdio: 'ignore' });
-  console.log('✅ Gource is installed');
+  logger.info('Gource is installed');
 } catch (error) {
-  console.error('❌ Gource is not installed or not in PATH. Please install Gource to use this application.');
+  logger.error('Gource is not installed or not in PATH', error);
 }
 
 try {
   execSync('ffmpeg -version', { stdio: 'ignore' });
-  console.log('✅ ffmpeg is installed');
+  logger.info('ffmpeg is installed');
 } catch (error) {
-  console.error('❌ ffmpeg is not installed or not in PATH. Please install ffmpeg to use this application.');
+  logger.error('ffmpeg is not installed or not in PATH', error);
 }
 
 // API Routes
@@ -82,7 +81,7 @@ app.use('/api/renderProfiles', configFilesRouter);
 app.use('/api/renders', rendersRouter);
 app.use('/api/settings', settingsRouter);
 
-// Endpoint pour vérifier l'état de l'application
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   const healthStatus = {
     status: 'ok',
@@ -99,7 +98,7 @@ app.get('/api/health', (req, res) => {
     }
   };
 
-  // Vérifier les logiciels requis
+  // Check required software
   try {
     execSync('gource --help', { stdio: 'ignore' });
   } catch (error) {
@@ -114,7 +113,7 @@ app.get('/api/health', (req, res) => {
     healthStatus.status = 'warning';
   }
 
-  // Vérifier les répertoires
+  // Check directories
   const reposDir = path.join(__dirname, '../repos');
   try {
     fs.accessSync(reposDir, fs.constants.W_OK);
@@ -150,16 +149,16 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Servir les fichiers statiques du répertoire exports
+// Serve static files from exports directory
 app.use('/exports', express.static(path.join(__dirname, '../exports')));
 
-// Servir les fichiers de prévisualisation du répertoire temp/previews
+// Serve preview files from temp/previews directory
 app.use('/temp/previews', express.static(path.join(__dirname, '../temp/previews')));
 
-// Servir les fichiers audio pour FFmpeg
+// Serve audio files for FFmpeg
 app.use('/temp/music', express.static(path.join(__dirname, '../temp/music')));
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Access the application at http://localhost:${PORT}`);
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Access the application at http://localhost:${PORT}`);
 }); 

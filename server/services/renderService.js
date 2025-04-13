@@ -1,7 +1,7 @@
 /**
- * Service de rendu Gource
- * Responsable de l'exécution et de la gestion du processus de rendu
- * Optimisé exclusivement pour Windows 11 Pro
+ * Gource Rendering Service
+ * Responsible for executing and managing the rendering process
+ * Optimized exclusively for Windows 11 Pro
  */
 
 const path = require('path');
@@ -11,7 +11,9 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const { convertToGourceArgs } = require('../../shared/gourceConfig');
 const GourceConfigService = require('./GourceConfigService');
-const RepositoryService = require('./RepositoryService');
+const config = require('../config/config');
+// Import RepositoryService after this service's declaration to avoid circular dependency
+let RepositoryService;
 const ProjectService = require('./ProjectService');
 
 class RenderService {
@@ -21,25 +23,25 @@ class RenderService {
     this.tempDir = path.join(__dirname, '../../temp');
     this.logsDir = path.join(__dirname, '../../logs');
     
-    // Créer les répertoires nécessaires s'ils n'existent pas
+    // Create necessary directories if they don't exist
     this.createDirectories();
     this.init();
   }
 
   /**
-   * Initialise la base de données
+   * Initialize the database
    */
   init() {
     const db = this.getDatabase();
     
-    // Vérifier si la collection renders existe
+    // Check if the renders collection exists
     if (!db.has('renders').value()) {
       db.set('renders', []).write();
     }
   }
 
   /**
-   * Crée les répertoires nécessaires
+   * Create necessary directories
    */
   createDirectories() {
     const dirs = [this.exportsDir, this.tempDir, this.logsDir];
@@ -52,8 +54,8 @@ class RenderService {
   }
 
   /**
-   * Récupère une instance fraîche de la base de données
-   * @returns {Object} Instance de la base de données
+   * Get a fresh instance of the database
+   * @returns {Object} Database instance
    */
   getDatabase() {
     const adapter = new FileSync(this.dbPath);
@@ -61,8 +63,8 @@ class RenderService {
   }
 
   /**
-   * Récupère tous les rendus
-   * @returns {Array} Liste des rendus
+   * Get all renders
+   * @returns {Array} List of renders
    */
   getAllRenders() {
     const db = this.getDatabase();
@@ -70,9 +72,9 @@ class RenderService {
   }
 
   /**
-   * Récupère un rendu par son ID
-   * @param {string} id - ID du rendu à récupérer
-   * @returns {Object|null} Rendu ou null si non trouvé
+   * Get a render by its ID
+   * @param {string} id - ID of the render to retrieve
+   * @returns {Object|null} Render or null if not found
    */
   getRenderById(id) {
     if (!id) return null;
@@ -84,12 +86,12 @@ class RenderService {
   }
 
   /**
-   * Met à jour le statut d'un rendu
-   * @param {string} renderId - ID du rendu
-   * @param {string} status - Nouveau statut
-   * @param {string} message - Message optionnel
-   * @param {number} progress - Progrès en pourcentage
-   * @returns {Object|null} Rendu mis à jour ou null si non trouvé
+   * Update a render's status
+   * @param {string} renderId - Render ID
+   * @param {string} status - New status
+   * @param {string} message - Optional message
+   * @param {number} progress - Progress percentage
+   * @returns {Object|null} Updated render or null if not found
    */
   updateRenderStatus(renderId, status, message = null, progress = null) {
     if (!renderId) return null;
@@ -111,12 +113,12 @@ class RenderService {
       updates.progress = Math.min(Math.max(progress, 0), 100);
     }
     
-    // Si le statut est 'completed' ou 'failed', ajouter la date de fin
+    // If status is 'completed' or 'failed', add end time
     if (status === 'completed' || status === 'failed') {
       updates.endTime = new Date().toISOString();
     }
     
-    // Mettre à jour le rendu dans la base de données
+    // Update render in database
     db.get('renders')
       .find({ id: renderId.toString() })
       .assign(updates)
@@ -128,30 +130,30 @@ class RenderService {
   }
 
   /**
-   * Démarre un nouveau processus de rendu
-   * @param {string} projectId - ID du projet à rendre
-   * @param {string} customName - Nom personnalisé pour le rendu (optionnel)
-   * @returns {Object} Information sur le rendu créé
+   * Start a new render process
+   * @param {string} projectId - ID of the project to render
+   * @param {string} customName - Custom name for the render (optional)
+   * @returns {Object} Information about the created render
    */
   async startRender(projectId, customName = null) {
     if (!projectId) {
-      throw new Error('ID de projet requis');
+      throw new Error('Project ID is required');
     }
     
-    // Récupérer les détails du projet
+    // Get project details
     const project = ProjectService.getProjectWithDetails(projectId);
     if (!project) {
-      throw new Error('Projet non trouvé');
+      throw new Error('Project not found');
     }
     
     if (!project.repositories || project.repositories.length === 0 || !project.repositoryDetails || project.repositoryDetails.length === 0) {
-      throw new Error('Le projet ne contient aucun dépôt valide');
+      throw new Error('Project does not contain any valid repositories');
     }
     
-    // Générer un ID unique pour le rendu
+    // Generate a unique ID for the render
     const id = Date.now().toString();
     
-    // Générer le nom de fichier
+    // Generate filename
     const timestamp = new Date().toISOString().replace(/[:]/g, '-').replace('T', '_').slice(0, 19);
     const projectName = project.name.replace(/[\\/:*?"<>|]/g, '_');
     const fileName = customName
@@ -161,7 +163,7 @@ class RenderService {
     const videoFilePath = path.join(this.exportsDir, fileName);
     const logFilePath = path.join(this.tempDir, `${id}.log`);
     
-    // Créer l'enregistrement de rendu initial
+    // Create initial render record
     const render = {
       id,
       projectId,
@@ -170,369 +172,521 @@ class RenderService {
       filePath: videoFilePath,
       status: 'preparing',
       progress: 0,
-      message: 'Préparation du rendu...',
+      message: 'Preparing render...',
       startTime: new Date().toISOString(),
       endTime: null,
       error: null
     };
     
-    // Ajouter le rendu à la base de données
+    // Add render to database
     const db = this.getDatabase();
     db.get('renders')
       .push(render)
       .write();
     
     try {
-      // Démarrer le processus de rendu de manière asynchrone
-      this.processRender(render, project, logFilePath);
+      // Start the render process asynchronously
+      this.processRender(project, render);
       
       return render;
     } catch (error) {
-      // En cas d'erreur, mettre à jour le statut
-      this.updateRenderStatus(id, 'failed', `Erreur lors du démarrage du rendu: ${error.message}`, 0);
+      // In case of error, update status
+      this.updateRenderStatus(id, 'failed', `Error starting render: ${error.message}`, 0);
       throw error;
     }
   }
 
   /**
-   * Traite le rendu de manière asynchrone
-   * @param {Object} render - Informations sur le rendu
-   * @param {Object} project - Informations sur le projet
-   * @param {string} logFilePath - Chemin du fichier de log
+   * Traite un rendu
+   * @param {Object} project - Le projet associé au rendu
+   * @param {Object} render - L'objet de rendu à traiter
+   * @param {Object} options - Options supplémentaires pour le rendu
+   * @returns {Object} - L'objet de rendu mis à jour
    */
-  async processRender(render, project, logFilePath) {
+  async processRender(project, render, options = {}) {
+    console.log(`Début du traitement du rendu ${render.id}`);
+    
+    // Mettre à jour le statut du rendu
+    render.status = 'processing';
+    await this.updateRenderStatus(render.id, 'processing', 'Traitement du rendu en cours...', 0);
+    
     try {
-      // Mise à jour du statut
-      this.updateRenderStatus(render.id, 'preparing', 'Préparation des fichiers de log...', 5);
+      // Vérifier si le projet a des dépôts assignés
+      if (!project.repositoryDetails || project.repositoryDetails.length === 0) {
+        throw new Error('Aucun dépôt assigné au projet');
+      }
       
-      // Générer les logs Git combinés
-      await this.generateCombinedLogs(project.repositoryDetails, logFilePath, render);
+      // Créer les répertoires de sortie pour le rendu et les logs
+      const outputDir = path.join(this.exportsDir, render.id.toString());
+      const logsDir = path.join(this.logsDir, render.id.toString());
       
-      // Démarrer le rendu Gource
-      await this.executeGourceRender(logFilePath, render.filePath, project.renderProfile.settings, render);
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
       
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+      
+      console.log(`Génération des logs combinés pour le rendu ${render.id}`);
+      await this.updateRenderStatus(render.id, 'generating_logs', 'Génération des logs Gource...', 10);
+      
+      // Générer les logs combinés
+      const logOptions = {
+        startDate: render.startDate,
+        endDate: render.endDate,
+        ...options
+      };
+      
+      const combinedLogPath = await this.generateCombinedLogs(project.repositoryDetails, logOptions);
+      render.logPath = combinedLogPath;
+      await this.updateRenderStatus(render.id, 'generating_logs', 'Logs Gource générés', 20);
+      
+      // Exécuter le rendu Gource
+      console.log(`Exécution du rendu Gource pour ${render.id}`);
+      await this.updateRenderStatus(render.id, 'rendering', 'Génération de la vidéo en cours...', 30);
+      
+      const outputPath = path.join(outputDir, 'output.mp4');
+      
+      // Obtenir le profil de rendu associé au projet
+      const db = this.getDatabase();
+      const renderProfileId = project.renderProfileId;
+      const renderProfile = renderProfileId 
+        ? db.get('renderProfiles').find({ id: renderProfileId }).value() 
+        : null;
+      
+      // Utiliser les paramètres du profil de rendu ou des paramètres par défaut
+      const renderSettings = renderProfile?.settings || {};
+      
+      await this.executeGourceRender(combinedLogPath, render, outputPath, renderSettings);
+      
+      // Mettre à jour le rendu avec le chemin de sortie
+      render.outputPath = outputPath;
+      render.status = 'completed';
+      render.completedAt = new Date();
+      await this.updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
+      
+      console.log(`Rendu ${render.id} terminé avec succès`);
+      return render;
     } catch (error) {
-      console.error('Erreur lors du processus de rendu:', error);
-      this.updateRenderStatus(render.id, 'failed', `Erreur: ${error.message}`, 0);
+      console.error(`Erreur lors du rendu ${render.id}:`, error);
+      render.status = 'failed';
+      render.error = error.message;
+      await this.updateRenderStatus(render.id, 'failed', error.message, 0);
+      throw error;
     }
   }
 
   /**
-   * Génère un fichier de log combiné à partir de plusieurs dépôts
-   * @param {Array} repositories - Liste des dépôts
-   * @param {string} outputLogFile - Chemin du fichier de log de sortie
-   * @param {Object} render - Informations sur le rendu
+   * Start the Gource render process
+   * @param {Object} render - Render object
+   * @param {string} logFilePath - Path to the combined log file
+   * @param {string} outputDir - Directory for output files
+   * @returns {Promise<void>} - Promise resolving when render completes
    */
-  async generateCombinedLogs(repositories, outputLogFile, render) {
+  async startGourceRender(render, logFilePath, outputDir) {
     try {
-      // Mise à jour du statut
-      this.updateRenderStatus(render.id, 'preparing', 'Génération des logs Git...', 10);
+      // Get project and render profile
+      const db = this.getDatabase();
+      const project = db.get('projects')
+        .find({ id: render.projectId })
+        .value();
       
-      // Créer le fichier de log combiné
-      if (fs.existsSync(outputLogFile)) {
-        fs.unlinkSync(outputLogFile);
+      if (!project) {
+        throw new Error(`Project not found for render: ${render.id}`);
       }
       
-      fs.writeFileSync(outputLogFile, '', 'utf8');
+      // Get render profile settings
+      const renderProfileId = project.renderProfileId;
+      const renderProfile = renderProfileId 
+        ? db.get('renderProfiles').find({ id: renderProfileId }).value() 
+        : null;
+        
+      if (!renderProfile) {
+        throw new Error(`Render profile not found for project: ${project.id}`);
+      }
       
-      let combinedLogEntries = [];
-      let processedRepos = 0;
-      const totalRepos = repositories.length;
+      // Execute Gource render
+      await this.executeGourceRender(logFilePath, render, render.filePath, renderProfile.settings);
       
-      // Traiter chaque dépôt
-      for (const repo of repositories) {
+      return true;
+    } catch (error) {
+      console.error(`Error in startGourceRender: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Génère un fichier log combiné à partir de plusieurs dépôts
+   * @param {Array} repositories - Liste des dépôts
+   * @param {Object} options - Options pour la génération du log
+   * @returns {string} - Chemin vers le fichier log combiné
+   */
+  async generateCombinedLogs(repositories, options = {}) {
+    console.log(`Génération des logs combinés pour ${repositories.length} dépôts`);
+    
+    if (!repositories || repositories.length === 0) {
+      throw new Error('Aucun dépôt fourni pour la génération de logs');
+    }
+
+    // Charger RepositoryService si nécessaire pour éviter la dépendance circulaire
+    if (!RepositoryService) {
+      RepositoryService = require('./repositoryService');
+    }
+
+    // Créer un répertoire temporaire pour les logs individuels
+    const tempLogsDir = path.join(this.logsDir, 'temp', Date.now().toString());
+    if (!fs.existsSync(tempLogsDir)) {
+      fs.mkdirSync(tempLogsDir, { recursive: true });
+    }
+
+    // Créer le chemin de sortie pour le log combiné
+    const outputPath = path.join(tempLogsDir, 'combined.log');
+
+    // Générer les logs individuels pour chaque dépôt
+    const logFiles = [];
+    const failedRepos = [];
+
+    for (const repo of repositories) {
+      try {
+        const logFilePath = path.join(tempLogsDir, `${repo.id || repo.name}.log`);
+
+        console.log(`Génération du log Gource pour ${repo.name || repo.id}`);
+        
+        // Vérifier si le dépôt a un chemin local
+        if (!repo.localPath && !repo.path) {
+          console.warn(`Le dépôt ${repo.name || repo.id} n'a pas de chemin local défini`);
+          failedRepos.push(repo.name || repo.id);
+          continue;
+        }
+        
+        // Utiliser generateGitLog de RepositoryService directement avec l'objet repo
+        const result = await RepositoryService.generateGitLog(repo, logFilePath, options);
+        
+        if (result && !result.isEmpty) {
+          logFiles.push(result);
+        } else {
+          console.warn(`Le fichier log pour ${repo.name || repo.id} est vide`);
+          failedRepos.push(repo.name || repo.id);
+        }
+      } catch (error) {
+        console.error(`Erreur lors de la génération du log Gource pour ${repo.name || repo.id}:`, error.message);
+        failedRepos.push(repo.name || repo.id);
+      }
+    }
+
+    if (logFiles.length === 0) {
+      // Nettoyer le répertoire temporaire
+      if (fs.existsSync(tempLogsDir)) {
+        fs.rmSync(tempLogsDir, { recursive: true, force: true });
+      }
+      throw new Error('Aucune entrée de log valide générée pour les dépôts');
+    }
+
+    // Fusionner les logs individuels en un seul fichier
+    await this.mergeLogs(logFiles, outputPath);
+
+    console.log(`Logs combinés générés avec succès: ${outputPath}`);
+    return outputPath;
+  }
+
+  /**
+   * Fusionne les fichiers de logs pour générer un fichier de log combiné
+   * @param {Array} logFiles - Tableau d'objets contenant les chemins des fichiers log
+   * @param {string} outputPath - Chemin du fichier de sortie
+   * @returns {Promise<string>} - Chemin du fichier de log combiné
+   */
+  async mergeLogs(logFiles, outputPath) {
+    if (!logFiles || logFiles.length === 0) {
+      throw new Error('Aucun fichier de log à fusionner');
+    }
+
+    // Filtrer les fichiers vides
+    const validLogFiles = logFiles.filter(log => !log.isEmpty);
+    
+    if (validLogFiles.length === 0) {
+      throw new Error('Tous les fichiers de log sont vides');
+    }
+
+    // Créer le répertoire de sortie s'il n'existe pas
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    try {
+      // Alternative: utiliser fs directement pour fusionner les fichiers
+      let allLines = [];
+      
+      // Lire tous les fichiers logs
+      for (const logFile of validLogFiles) {
+        if (!fs.existsSync(logFile.path)) {
+          console.warn(`Le fichier ${logFile.path} n'existe pas, ignoré`);
+          continue;
+        }
+        
         try {
-          // Mise à jour du statut
-          const progress = 10 + Math.round((processedRepos / totalRepos) * 20);
-          this.updateRenderStatus(
-            render.id, 
-            'preparing', 
-            `Traitement du dépôt ${processedRepos + 1}/${totalRepos}: ${repo.name}...`, 
-            progress
-          );
-          
-          // Générer le log Git pour ce dépôt
-          const repoLogFile = await RepositoryService.generateGitLog(repo.path);
-          
-          // Lire le contenu du log
-          const logContent = fs.readFileSync(repoLogFile, 'utf8').split('\n');
-          
-          // Formater chaque ligne en ajoutant le nom du dépôt
-          const formattedLog = logContent
-            .filter(line => line.trim() !== '')
-            .map(line => {
-              const parts = line.split('|');
-              if (parts.length >= 3) {
-                return `${parts[0]}|${parts[1]}|${repo.name}/${parts[2] || ''}|${parts[3] || ''}`;
-              }
-              return null;
-            })
-            .filter(line => line !== null);
-          
-          // Ajouter aux entrées combinées
-          combinedLogEntries = combinedLogEntries.concat(formattedLog);
-          
-          // Nettoyer le fichier temporaire
-          if (fs.existsSync(repoLogFile)) {
-            fs.unlinkSync(repoLogFile);
-          }
-          
-          processedRepos++;
-        } catch (error) {
-          console.error(`Erreur lors du traitement du dépôt ${repo.name}:`, error);
-          // Continuer avec les autres dépôts
+          const content = fs.readFileSync(logFile.path, 'utf8');
+          const lines = content.split('\n').filter(line => line.trim() !== '');
+          allLines = allLines.concat(lines);
+        } catch (err) {
+          console.warn(`Erreur lors de la lecture du fichier ${logFile.path}: ${err.message}`);
         }
       }
       
-      // Tri des entrées par timestamp
-      combinedLogEntries.sort((a, b) => {
+      // Trier toutes les lignes numériquement par timestamp (premier champ)
+      allLines.sort((a, b) => {
         const timestampA = parseInt(a.split('|')[0], 10);
         const timestampB = parseInt(b.split('|')[0], 10);
         return timestampA - timestampB;
       });
       
-      // Écrire le log combiné dans le fichier
-      fs.writeFileSync(outputLogFile, combinedLogEntries.join('\n'), 'utf8');
-      
-      // Vérifier que le fichier n'est pas vide
-      if (combinedLogEntries.length === 0) {
-        throw new Error('Aucune entrée de log valide générée pour les dépôts');
+      // Supprimer les lignes en double
+      const uniqueLines = [];
+      for (let i = 0; i < allLines.length; i++) {
+        if (i === 0 || allLines[i] !== allLines[i-1]) {
+          uniqueLines.push(allLines[i]);
+        }
       }
       
-      // Mise à jour du statut
-      this.updateRenderStatus(render.id, 'prepared', 'Logs préparés avec succès', 30);
-      
-      return outputLogFile;
+      // Écrire le fichier de sortie
+      fs.writeFileSync(outputPath, uniqueLines.join('\n'), 'utf8');
+
+      // Vérifier si le fichier a été créé et n'est pas vide
+      if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+        throw new Error('Échec de la fusion des logs: aucun résultat généré');
+      }
+
+      return outputPath;
     } catch (error) {
-      console.error('Erreur lors de la génération des logs combinés:', error);
-      throw error;
+      console.error(`Erreur lors de la fusion des logs: ${error.message}`);
+      throw new Error(`Échec de la fusion des logs: ${error.message}`);
     }
   }
 
   /**
-   * Calcule le nombre de secondes par jour pour un rendu d'une minute
-   * @param {string} logFilePath - Chemin du fichier de log
-   * @returns {number} Nombre de secondes par jour
+   * Calculate the number of seconds per day for a one-minute render
+   * @param {string} logFilePath - Path to log file
+   * @returns {number} Number of seconds per day
    */
   calculateSecondsPerDay(logFilePath) {
     try {
-      // Lire le fichier de log
+      // Read log file
       const logContent = fs.readFileSync(logFilePath, 'utf8').split('\n')
         .filter(line => line.trim() !== '');
       
       if (logContent.length === 0) {
-        console.warn('Fichier de log vide, utilisation de la valeur par défaut de 1 seconde par jour');
+        console.warn('Empty log file, using default value of 1 second per day');
         return 1;
       }
       
-      // Extraire les timestamps (premier champ de chaque ligne, séparé par |)
+      // Extract timestamps (first field of each line, separated by |)
       const timestamps = logContent.map(line => {
         const parts = line.split('|');
         return parts.length > 0 ? parseInt(parts[0], 10) : 0;
       }).filter(ts => !isNaN(ts) && ts > 0);
       
       if (timestamps.length === 0) {
-        console.warn('Aucun timestamp valide trouvé, utilisation de la valeur par défaut de 1 seconde par jour');
+        console.warn('No valid timestamps found, using default value of 1 second per day');
         return 1;
       }
       
-      // Trouver le premier et le dernier timestamp
+      // Find first and last timestamp
       const firstTimestamp = Math.min(...timestamps);
       const lastTimestamp = Math.max(...timestamps);
       
-      // Calculer la durée totale en secondes
+      // Calculate total duration in seconds
       const totalDurationSeconds = (lastTimestamp - firstTimestamp);
       
-      // Convertir en jours (86400 secondes = 1 jour)
+      // Convert to days (86400 seconds = 1 day)
       const totalDays = totalDurationSeconds / 86400;
       
       if (totalDays <= 0) {
-        console.warn('Durée du projet trop courte, utilisation de la valeur par défaut de 1 seconde par jour');
+        console.warn('Project duration too short, using default value of 1 second per day');
         return 1;
       }
       
-      // Pour une visualisation d'une minute (60 secondes), calculer secondsPerDay
-      // 60 secondes / nombre de jours total = secondes par jour
+      // For a one-minute visualization (60 seconds), calculate secondsPerDay
+      // 60 seconds / total days = seconds per day
       const secondsPerDay = 60 / totalDays;
       
-      console.log(`Calcul dynamique du temps: ${totalDays} jours au total, ${secondsPerDay.toFixed(3)} secondes par jour pour un rendu d'une minute`);
+      console.log(`Dynamic time calculation: ${totalDays} days total, ${secondsPerDay.toFixed(3)} seconds per day for a one-minute render`);
       
       return secondsPerDay;
     } catch (error) {
-      console.error('Erreur lors du calcul du nombre de secondes par jour:', error);
-      return 1; // Valeur par défaut en cas d'erreur
+      console.error('Error calculating seconds per day:', error);
+      return 1; // Default value in case of error
     }
   }
 
   /**
-   * Exécute le rendu Gource vers un fichier vidéo
-   * Optimisé exclusivement pour Windows 11 Pro
-   * @param {string} logFilePath - Chemin du fichier de log
-   * @param {string} outputFilePath - Chemin du fichier vidéo de sortie
-   * @param {Object} settings - Paramètres de configuration Gource
-   * @param {Object} render - Informations sur le rendu
+   * Execute Gource render to video file
+   * Optimized exclusively for Windows 11 Pro
+   * @param {string} logFilePath - Path to log file
+   * @param {string} outputFilePath - Path to output video file
+   * @param {Object} settings - Gource configuration parameters
+   * @param {Object} render - Information about the render
    */
-  async executeGourceRender(logFilePath, outputFilePath, settings, render) {
+  async executeGourceRender(logFilePath, render, outputFilePath, settings) {
     try {
-      // Mise à jour du statut
-      this.updateRenderStatus(render.id, 'rendering', 'Démarrage du rendu Gource...', 35);
+      // Ensure settings is defined with default values
+      settings = settings || {};
+      const defaultSettings = {
+        'seconds-per-day': 10,
+        'resolution': '1920x1080',
+        'framerate': 60
+      };
       
-      // Vérifier si le profil nécessite un calcul dynamique du temps
+      // Apply default settings if not defined
+      settings = { ...defaultSettings, ...settings };
+      
+      // Update status
+      this.updateRenderStatus(render.id, 'rendering', 'Starting Gource render...', 35);
+      
+      // Check if profile requires dynamic time calculation
       const db = this.getDatabase();
       const project = db.get('projects')
         .find({ id: render.projectId })
         .value();
       
-      // Récupérer le profil de rendu complet
+      // Get complete render profile
       const renderProfileId = project?.renderProfileId;
       const renderProfile = renderProfileId 
         ? db.get('renderProfiles').find({ id: renderProfileId }).value() 
         : null;
       
       if (renderProfile && renderProfile.dynamicTimeCalculation === true) {
-        // Calculer dynamiquement le nombre de secondes par jour
+        // Dynamically calculate seconds per day
         const calculatedSecondsPerDay = this.calculateSecondsPerDay(logFilePath);
         
-        // Mettre à jour le paramètre dans les settings
+        // Update parameter in settings
         settings['seconds-per-day'] = calculatedSecondsPerDay;
         
-        // Mise à jour du statut pour indiquer le calcul
+        // Update status to indicate calculation
         this.updateRenderStatus(
           render.id, 
           'rendering', 
-          `Calcul du temps: ${calculatedSecondsPerDay.toFixed(3)} secondes par jour pour un rendu d'une minute`, 
+          `Calculating time: ${calculatedSecondsPerDay.toFixed(3)} seconds per day for a one-minute render`, 
           36
         );
       } else if (settings['seconds-per-day'] === 'auto') {
-        // Si seconds-per-day est défini sur 'auto', faire le calcul dynamique
+        // If seconds-per-day is set to 'auto', do dynamic calculation
         const calculatedSecondsPerDay = this.calculateSecondsPerDay(logFilePath);
         settings['seconds-per-day'] = calculatedSecondsPerDay;
       }
       
-      // Créer le fichier de config Gource temporaire
+      // Create temporary Gource config file
       const tempConfigPath = path.join(this.tempDir, `gource_config_${render.id}.txt`);
       
-      // Convertir les paramètres en arguments de ligne de commande
+      // Convert parameters to command line arguments
       const gourceArgs = convertToGourceArgs(settings);
       
-      // Créer le fichier temporaire
+      // Create temporary file
       fs.writeFileSync(tempConfigPath, gourceArgs, 'utf8');
       
-      // Déterminer la résolution
-      const resolution = settings.resolution || '1920x1080';
-      const framerate = settings.framerate || 60;
+      // Determine resolution and framerate
+      const resolution = settings.resolution;
+      const framerate = settings.framerate;
       
-      // Créer le répertoire temporaire pour le pipe
+      // Create temporary directory for pipe
       const pipePath = path.join(this.tempDir, `gource_pipe_${render.id}`);
       if (fs.existsSync(pipePath)) {
         try {
           fs.unlinkSync(pipePath);
         } catch (err) {
-          console.warn(`Impossible de supprimer le fichier de pipe existant: ${err.message}`);
+          console.warn(`Unable to delete existing pipe file: ${err.message}`);
         }
       }
       
-      // Générer le script PowerShell pour le rendu
+      // Génération du script PowerShell pour le rendu vidéo
       const powerShellScriptPath = path.join(this.tempDir, `render_script_${render.id}.ps1`);
       
-      const scriptContent = `
-# Script de rendu Gource optimisé pour Windows 11 Pro
-$ErrorActionPreference = "Stop"
-
-# Chemins des fichiers
-$logFile = "${logFilePath.replace(/\\/g, '\\\\')}"
-$pipeFile = "${pipePath.replace(/\\/g, '\\\\')}"
-$outputFile = "${outputFilePath.replace(/\\/g, '\\\\')}"
-$configFile = "${tempConfigPath.replace(/\\/g, '\\\\')}"
-
-# Lire les arguments Gource depuis le fichier de config
-$gourceArgs = Get-Content -Path $configFile
-
-# Vérifier l'existence du log
-if (-not (Test-Path $logFile)) {
-    Write-Error "Fichier de log non trouvé: $logFile"
-    exit 1
-}
-
-# Créer le pipe nommé si non existant
-if (-not (Test-Path $pipeFile)) {
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pipeFile) | Out-Null
-    $null = New-Item -ItemType File -Path $pipeFile -Force
-}
-
-# Construire la commande Gource
-$gourceCmd = "gource --log-format custom $logFile --output-custom-log - $gourceArgs --output-ppm-stream - > $pipeFile"
-
-# Construire la commande ffmpeg
-$resolution = "${resolution}"
-$framerate = ${framerate}
-$ffmpegCmd = "ffmpeg -y -r $framerate -f image2pipe -vcodec ppm -i $pipeFile -vcodec libx264 -preset fast -pix_fmt yuv420p -crf 22 -threads 0 -bf 0 \`"$outputFile\`""
-
-# Exécuter Gource et ffmpeg en parallèle
-Write-Host "Démarrage du rendu Gource..."
-$gourceProcess = Start-Process -FilePath "powershell" -ArgumentList "-Command", $gourceCmd -PassThru -NoNewWindow
-
-Start-Sleep -Seconds 2
-
-# Démarrer ffmpeg après que Gource ait commencé à générer des images
-Write-Host "Démarrage de l'encodage ffmpeg..."
-$ffmpegProcess = Start-Process -FilePath "powershell" -ArgumentList "-Command", $ffmpegCmd -PassThru -NoNewWindow
-
-# Attendre que les processus terminent
-Write-Host "Processus en cours..."
-$gourceProcess.WaitForExit()
-$gourceExitCode = $gourceProcess.ExitCode
-
-$ffmpegProcess.WaitForExit()
-$ffmpegExitCode = $ffmpegProcess.ExitCode
-
-Write-Host "Gource exit code: $gourceExitCode"
-Write-Host "ffmpeg exit code: $ffmpegExitCode"
-
-# Nettoyer les fichiers temporaires
-Remove-Item -Path $pipeFile -Force -ErrorAction SilentlyContinue
-Remove-Item -Path $configFile -Force -ErrorAction SilentlyContinue
-
-if ($gourceExitCode -ne 0 -or $ffmpegExitCode -ne 0) {
-    Write-Error "Erreur durant le rendu. Gource: $gourceExitCode, ffmpeg: $ffmpegExitCode"
-    exit 1
-}
-
-Write-Host "Rendu terminé avec succès!"
-exit 0
-`;
+      // Préparer les chemins avec double backslashes pour PowerShell
+      const psLogFilePath = logFilePath.replace(/\\/g, '\\\\');
+      const psOutputFilePath = outputFilePath.replace(/\\/g, '\\\\');
+      const psTempPPM = path.join(this.tempDir, `temp_${render.id}.ppm`).replace(/\\/g, '\\\\');
+      
+      // Générer le contenu du script ligne par ligne
+      const scriptLines = [
+        '# Script simplifié de rendu Gource',
+        '$ErrorActionPreference = "Stop"',
+        '',
+        '# File paths',
+        `$logFile = "${psLogFilePath}"`,
+        `$outputFile = "${psOutputFilePath}"`,
+        `$tempPPM = "${psTempPPM}"`,
+        '',
+        '# Check log file existence',
+        'if (-not (Test-Path $logFile)) {',
+        '    Write-Error "Log file not found: $logFile"',
+        '    exit 1',
+        '}',
+        '',
+        '# Execute Gource with minimal params',
+        'Write-Host "Starting Gource render..."',
+        'gource --log-format custom "$logFile" --viewport 1920x1080 --output-framerate 60 --seconds-per-day 10 --output-ppm-stream "$tempPPM"',
+        '',
+        '# Check if PPM was created',
+        'if (-not (Test-Path $tempPPM)) {',
+        '    Write-Error "Gource failed to create PPM output"',
+        '    exit 1',
+        '}',
+        '',
+        '# Execute FFmpeg conversion',
+        'Write-Host "Starting FFmpeg conversion..."',
+        'ffmpeg -y -r 60 -f image2pipe -vcodec ppm -i "$tempPPM" -vcodec libx264 -preset fast -pix_fmt yuv420p -crf 22 -threads 0 -bf 0 "$outputFile"',
+        '',
+        '# Clean up temporary files',
+        'Remove-Item -Path $tempPPM -Force -ErrorAction SilentlyContinue',
+        '',
+        'Write-Host "Render completed successfully!"',
+        'exit 0'
+      ];
+      
+      // Joindre les lignes avec des sauts de ligne
+      const scriptContent = scriptLines.join('\r\n');
       
       // Écrire le script PowerShell
       fs.writeFileSync(powerShellScriptPath, scriptContent, 'utf8');
       
-      // Mise à jour du statut
+      // Mettre à jour le statut
       this.updateRenderStatus(render.id, 'rendering', 'Exécution du processus de rendu...', 40);
       
-      // Exécuter le script PowerShell
-      const logOutputStream = fs.createWriteStream(path.join(this.logsDir, `render_${render.id}.log`));
+      // Créer un flux de journalisation
+      const renderLogPath = path.join(this.logsDir, `render_${render.id}.log`);
+      const logOutputStream = fs.createWriteStream(renderLogPath);
       
-      // Lance PowerShell avec le script
-      const psProcess = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', powerShellScriptPath], {
-        stdio: 'pipe',
-        detached: true
+      // Lancer PowerShell avec le script
+      const powershellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      const psProcess = spawn(powershellPath, ['-ExecutionPolicy', 'Bypass', '-File', powerShellScriptPath], {
+        stdio: 'pipe'
       });
       
-      // Redirection des flux
+      // Rediriger les flux de sortie
       psProcess.stdout.pipe(logOutputStream);
       psProcess.stderr.pipe(logOutputStream);
       
-      // Mettre périodiquement à jour le statut du rendu
+      // Journaliser la sortie pour le débogage
+      psProcess.stdout.on('data', (data) => {
+        console.log(`[Gource] ${data.toString().trim()}`);
+      });
+      
+      psProcess.stderr.on('data', (data) => {
+        console.error(`[Gource Error] ${data.toString().trim()}`);
+      });
+
+      // Mettre à jour périodiquement le statut du rendu
       const statusUpdater = setInterval(() => {
         if (fs.existsSync(outputFilePath)) {
           try {
             const stats = fs.statSync(outputFilePath);
             if (stats.size > 0) {
-              // Calculer la progression basée sur le temps écoulé (estimation)
+              // Calculer la progression en fonction du temps écoulé (estimation)
               const currentTime = new Date();
-              const startTime = new Date(render.startTime);
+              const startTime = new Date(render.startTime || render.dateCreated);
               const elapsedSeconds = (currentTime - startTime) / 1000;
               
-              // Estimer la progression (max 95% jusqu'à ce que le rendu soit terminé)
+              // Estimer la progression (maximum 95% jusqu'à ce que le rendu soit terminé)
               const estimatedProgress = Math.min(40 + (elapsedSeconds / 3), 95);
               
               this.updateRenderStatus(render.id, 'rendering', 'Rendu en cours...', estimatedProgress);
@@ -551,24 +705,23 @@ exit 0
           if (code === 0) {
             // Rendu réussi
             this.updateRenderStatus(render.id, 'completed', 'Rendu terminé avec succès', 100);
+            console.log(`Rendu ${render.id} terminé avec succès, fichier: ${outputFilePath}`);
             resolve();
           } else {
-            // Erreur lors du rendu
-            const errorMsg = `Erreur lors du rendu (code ${code})`;
+            // Erreur de rendu
+            const errorMsg = `Erreur de rendu (code ${code})`;
             this.updateRenderStatus(render.id, 'failed', errorMsg, 0);
+            console.error(`Erreur lors du rendu ${render.id}, code: ${code}`);
             reject(new Error(errorMsg));
           }
           
-          // Nettoyage des fichiers temporaires
+          // Nettoyer les fichiers temporaires
           try {
             if (fs.existsSync(powerShellScriptPath)) {
               fs.unlinkSync(powerShellScriptPath);
             }
             if (fs.existsSync(tempConfigPath)) {
               fs.unlinkSync(tempConfigPath);
-            }
-            if (fs.existsSync(pipePath)) {
-              fs.unlinkSync(pipePath);
             }
           } catch (error) {
             console.error('Erreur lors du nettoyage des fichiers temporaires:', error);
@@ -577,54 +730,54 @@ exit 0
         
         psProcess.on('error', (error) => {
           clearInterval(statusUpdater);
-          const errorMsg = `Erreur lors du lancement du processus: ${error.message}`;
+          const errorMsg = `Erreur lors du démarrage du processus: ${error.message}`;
           this.updateRenderStatus(render.id, 'failed', errorMsg, 0);
+          console.error(`Erreur lors du démarrage du processus pour le rendu ${render.id}:`, error);
           reject(error);
         });
       });
     } catch (error) {
-      console.error('Erreur lors de l\'exécution du rendu Gource:', error);
-      this.updateRenderStatus(render.id, 'failed', `Erreur: ${error.message}`, 0);
+      console.error('Error executing Gource render:', error);
+      this.updateRenderStatus(render.id, 'failed', `Error: ${error.message}`, 0);
       throw error;
     }
   }
 
   /**
-   * Supprime un rendu et son fichier vidéo associé
-   * @param {string} id - ID du rendu à supprimer
-   * @returns {boolean} true si supprimé, false sinon
+   * Delete a render
+   * @param {String} id - ID of the render to delete
+   * @returns {Boolean} - True if successful
    */
   deleteRender(id) {
-    if (!id) return false;
-    
+    // Get render details
     const db = this.getDatabase();
-    const render = db.get('renders')
-      .find({ id: id.toString() })
-      .value();
+    const render = db.get('renders').find({ id: id.toString() }).value();
     
-    if (!render) return false;
+    if (!render) {
+      return false;
+    }
     
-    // Supprimer le fichier vidéo si existant
+    // Delete output file if it exists
     if (render.filePath && fs.existsSync(render.filePath)) {
       try {
         fs.unlinkSync(render.filePath);
       } catch (error) {
-        console.error(`Erreur lors de la suppression du fichier ${render.filePath}:`, error);
-        // Continuer même si le fichier ne peut pas être supprimé
+        console.error(`Error deleting file ${render.filePath}:`, error);
+        // Continue even if file cannot be deleted
       }
     }
     
-    // Supprimer les fichiers de log associés
+    // Delete associated log files
     const logFile = path.join(this.logsDir, `render_${id}.log`);
     if (fs.existsSync(logFile)) {
       try {
         fs.unlinkSync(logFile);
       } catch (error) {
-        console.error(`Erreur lors de la suppression du log ${logFile}:`, error);
+        console.error(`Error deleting log ${logFile}:`, error);
       }
     }
     
-    // Supprimer l'enregistrement de la base de données
+    // Delete database record
     db.get('renders')
       .remove({ id: id.toString() })
       .write();
@@ -633,4 +786,4 @@ exit 0
   }
 }
 
-module.exports = new RenderService(); 
+module.exports = new RenderService();

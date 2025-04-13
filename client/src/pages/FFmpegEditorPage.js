@@ -39,13 +39,10 @@ const FFmpegEditorPage = () => {
   
   // Filtres FFmpeg
   const [filters, setFilters] = useState({
-    fadeIn: {
+    fade: {
       enabled: false,
-      duration: 3 // secondes
-    },
-    fadeOut: {
-      enabled: false,
-      duration: 3 // secondes
+      durationIn: 3, // secondes pour le fade in
+      durationOut: 3 // secondes pour le fade out
     },
     music: {
       enabled: false,
@@ -79,13 +76,10 @@ const FFmpegEditorPage = () => {
     
     // Reset filters when selecting a new video
     setFilters({
-      fadeIn: {
+      fade: {
         enabled: false,
-        duration: 3
-      },
-      fadeOut: {
-        enabled: false,
-        duration: 3
+        durationIn: 3,
+        durationOut: 3
       },
       music: {
         enabled: false,
@@ -168,10 +162,10 @@ const FFmpegEditorPage = () => {
     <Container maxWidth="xl">
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          FFmpeg Video Editor
+          Éditeur Vidéo FFmpeg
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          Apply simple filters to your Gource videos without losing quality
+          Appliquez des filtres simples à vos vidéos Gource sans perdre de qualité
         </Typography>
       </Box>
 
@@ -181,7 +175,7 @@ const FFmpegEditorPage = () => {
           <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
               <VideoLibraryIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              Your Renders
+              Vos Rendus
             </Typography>
             
             {loading ? (
@@ -190,7 +184,7 @@ const FFmpegEditorPage = () => {
               </Box>
             ) : videos.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>
-                No videos available. Render a Gource visualization first.
+                Aucune vidéo disponible. Rendez une visualisation Gource d'abord.
               </Typography>
             ) : (
               <List sx={{ maxHeight: '70vh', overflow: 'auto' }}>
@@ -201,8 +195,24 @@ const FFmpegEditorPage = () => {
                       onClick={() => handleVideoSelect(video)}
                     >
                       <ListItemText 
-                        primary={video.name || `Render ${video.id}`}
-                        secondary={new Date(video.createdAt).toLocaleString()}
+                        primary={
+                          <Box>
+                            <Typography variant="subtitle1" component="span" sx={{ fontWeight: 'bold' }}>
+                              {video.fileName || `Render ${video.id}`}
+                            </Typography>
+                          </Box>
+                        }
+                        secondary={
+                          <Box>
+                            <Typography variant="body2" component="span" color="text.secondary">
+                              Projet: {video.projectName || 'N/A'}
+                            </Typography>
+                            <br />
+                            <Typography variant="caption" component="span" color="text.secondary">
+                              Rendu le: {video.endTime ? new Date(video.endTime).toLocaleString() : 'Date inconnue'}
+                            </Typography>
+                          </Box>
+                        }
                       />
                     </ListItemButton>
                   </ListItem>
@@ -218,36 +228,44 @@ const FFmpegEditorPage = () => {
             {!selectedVideo ? (
               <Box sx={{ textAlign: 'center', p: 5 }}>
                 <Typography variant="h6" color="text.secondary">
-                  Select a video to start editing
+                  Sélectionnez une vidéo pour commencer l'édition
                 </Typography>
               </Box>
             ) : (
               <>
                 <Typography variant="h6" gutterBottom>
-                  Edit: {selectedVideo.name || `Render ${selectedVideo.id}`}
+                  Édition: {selectedVideo.fileName || `Render ${selectedVideo.id}`}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  Projet: {selectedVideo.projectName || 'Non spécifié'} | 
+                  {selectedVideo.endTime ? ` Rendu le ${new Date(selectedVideo.endTime).toLocaleString()}` : ''}
                 </Typography>
                 <Divider sx={{ mb: 3 }} />
 
-                {/* Fade In Controls */}
+                {/* Fade Controls - Combined */}
                 <Box sx={{ mb: 4 }}>
                   <FormControlLabel
                     control={
                       <Switch
-                        checked={filters.fadeIn.enabled}
-                        onChange={(e) => handleFilterChange('fadeIn', 'enabled', e.target.checked)}
+                        checked={filters.fade.enabled}
+                        onChange={(e) => handleFilterChange('fade', 'enabled', e.target.checked)}
                       />
                     }
-                    label="Fade In"
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        Fondus vidéo et audio
+                      </Box>
+                    }
                   />
                   
-                  {filters.fadeIn.enabled && (
+                  {filters.fade.enabled && (
                     <Box sx={{ pl: 2 }}>
                       <Typography id="fade-in-duration-slider" gutterBottom>
-                        Duration: {filters.fadeIn.duration} seconds
+                        Durée du fondu d'ouverture: {filters.fade.durationIn} secondes
                       </Typography>
                       <Slider
-                        value={filters.fadeIn.duration}
-                        onChange={(_, newValue) => handleFilterChange('fadeIn', 'duration', newValue)}
+                        value={filters.fade.durationIn}
+                        onChange={(_, newValue) => handleFilterChange('fade', 'durationIn', newValue)}
                         aria-labelledby="fade-in-duration-slider"
                         valueLabelDisplay="auto"
                         step={0.5}
@@ -255,30 +273,13 @@ const FFmpegEditorPage = () => {
                         min={0.5}
                         max={5}
                       />
-                    </Box>
-                  )}
-                </Box>
 
-                {/* Fade Out Controls */}
-                <Box sx={{ mb: 4 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={filters.fadeOut.enabled}
-                        onChange={(e) => handleFilterChange('fadeOut', 'enabled', e.target.checked)}
-                      />
-                    }
-                    label="Fade Out"
-                  />
-                  
-                  {filters.fadeOut.enabled && (
-                    <Box sx={{ pl: 2 }}>
-                      <Typography id="fade-out-duration-slider" gutterBottom>
-                        Duration: {filters.fadeOut.duration} seconds
+                      <Typography id="fade-out-duration-slider" gutterBottom sx={{ mt: 2 }}>
+                        Durée du fondu de fermeture: {filters.fade.durationOut} secondes
                       </Typography>
                       <Slider
-                        value={filters.fadeOut.duration}
-                        onChange={(_, newValue) => handleFilterChange('fadeOut', 'duration', newValue)}
+                        value={filters.fade.durationOut}
+                        onChange={(_, newValue) => handleFilterChange('fade', 'durationOut', newValue)}
                         aria-labelledby="fade-out-duration-slider"
                         valueLabelDisplay="auto"
                         step={0.5}
@@ -286,6 +287,9 @@ const FFmpegEditorPage = () => {
                         min={0.5}
                         max={5}
                       />
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        Le fondu s'appliquera à la vidéo et à l'audio si présent
+                      </Typography>
                     </Box>
                   )}
                 </Box>
@@ -302,7 +306,7 @@ const FFmpegEditorPage = () => {
                     label={
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <MusicNoteIcon sx={{ mr: 1 }} />
-                        Add Background Music
+                        Ajouter une musique de fond
                       </Box>
                     }
                   />
@@ -314,7 +318,7 @@ const FFmpegEditorPage = () => {
                         component="label"
                         sx={{ mb: 2, mt: 1 }}
                       >
-                        {filters.music.file ? 'Change Music File' : 'Upload Music File'}
+                        {filters.music.file ? 'Changer de musique' : 'Télécharger une musique'}
                         <input
                           type="file"
                           accept="audio/*"
@@ -325,7 +329,7 @@ const FFmpegEditorPage = () => {
                       
                       {filters.music.file && (
                         <Typography variant="body2" sx={{ mb: 2 }}>
-                          Selected: {filters.music.file.split('/').pop()}
+                          Sélectionné: {filters.music.file.split('/').pop()}
                         </Typography>
                       )}
                       
@@ -349,17 +353,17 @@ const FFmpegEditorPage = () => {
                 {/* Quality Controls */}
                 <Box sx={{ mb: 4 }}>
                   <FormControl fullWidth>
-                    <InputLabel id="quality-select-label">Output Quality</InputLabel>
+                    <InputLabel id="quality-select-label">Qualité de sortie</InputLabel>
                     <Select
                       labelId="quality-select-label"
                       id="quality-select"
                       value={filters.quality}
-                      label="Output Quality"
+                      label="Qualité de sortie"
                       onChange={(e) => setFilters(prev => ({ ...prev, quality: e.target.value }))}
                     >
-                      <MenuItem value="low">Low (Faster processing)</MenuItem>
-                      <MenuItem value="medium">Medium</MenuItem>
-                      <MenuItem value="high">High (Slower processing)</MenuItem>
+                      <MenuItem value="low">Basse (Traitement plus rapide)</MenuItem>
+                      <MenuItem value="medium">Moyenne</MenuItem>
+                      <MenuItem value="high">Haute (Traitement plus lent)</MenuItem>
                     </Select>
                   </FormControl>
                 </Box>
@@ -371,7 +375,7 @@ const FFmpegEditorPage = () => {
                     onClick={generatePreview}
                     disabled={processing}
                   >
-                    Generate Preview
+                    Générer un aperçu
                   </Button>
                   
                   <Button
@@ -381,7 +385,7 @@ const FFmpegEditorPage = () => {
                     onClick={applyFilters}
                     disabled={processing}
                   >
-                    Apply and Save
+                    Appliquer et enregistrer
                   </Button>
                 </Box>
                 
@@ -399,12 +403,12 @@ const FFmpegEditorPage = () => {
         <Grid item xs={12} md={3}>
           <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
             <Typography variant="h6" gutterBottom>
-              Preview
+              Aperçu
             </Typography>
             <Box sx={{ textAlign: 'center' }}>
               {!selectedVideo ? (
                 <Typography variant="body2" color="text.secondary">
-                  Select a video and generate a preview
+                  Sélectionnez une vidéo et générez un aperçu
                 </Typography>
               ) : preview ? (
                 <Box>
@@ -415,12 +419,12 @@ const FFmpegEditorPage = () => {
                     style={{ maxHeight: '70vh' }}
                   />
                   <Typography variant="caption" color="text.secondary">
-                    This is a low-resolution preview. The final output will be in full quality.
+                    Ceci est un aperçu en basse résolution. La sortie finale sera en qualité maximale.
                   </Typography>
                 </Box>
               ) : (
                 <Typography variant="body2" color="text.secondary">
-                  Click "Generate Preview" to see your changes
+                  Cliquez sur "Générer un aperçu" pour voir vos modifications
                 </Typography>
               )}
             </Box>
