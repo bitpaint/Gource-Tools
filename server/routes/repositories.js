@@ -11,6 +11,9 @@ const FileSync = require('lowdb/adapters/FileSync');
 const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
 const db = low(adapter);
 
+// Maximum length of file paths for Windows
+const MAX_PATH_LENGTH_WINDOWS = 240; // Windows limite est à ~260, mais gardons une marge
+
 // Fonction pour recharger la base de données
 function reloadDatabase() {
   // Recharger explicitement la base de données pour avoir les données les plus récentes
@@ -1308,25 +1311,33 @@ router.post('/bulk-import', async (req, res) => {
                       `gource --output-custom-log - "${repoPath}"`,
                       { 
                         encoding: 'utf-8',
-                        maxBuffer: 200 * 1024 * 1024
+                        maxBuffer: 500 * 1024 * 1024 // 500MB buffer (increased for large repos)
                       }
                     );
                   } catch (execError) {
                     console.error(`[BULK IMPORT] Error generating Gource log for ${repoName}, trying alternate method:`, execError.message);
                     
-                    // Alternative method
+                    // Alternative method with temporary log file
                     const tempLogFile = path.join(logsDir, `${id}_temp.log`);
-                    execSync(
-                      `gource --output-custom-log "${tempLogFile}" "${repoPath}"`,
-                      { 
-                        stdio: 'ignore',
-                        maxBuffer: 200 * 1024 * 1024
+                    try {
+                      execSync(
+                        `gource --output-custom-log "${tempLogFile}" "${repoPath}"`,
+                        { 
+                          stdio: 'ignore',
+                          maxBuffer: 500 * 1024 * 1024, // 500MB buffer
+                          timeout: 120000 // 2 minute timeout
+                        }
+                      );
+                      
+                      if (fs.existsSync(tempLogFile)) {
+                        gourceLog = fs.readFileSync(tempLogFile, 'utf-8');
+                        fs.unlinkSync(tempLogFile);
+                        console.log(`[BULK IMPORT] Successfully generated Gource log with alternative method for ${repoName}`);
+                      } else {
+                        console.error(`[BULK IMPORT] Failed to generate Gource log with alternative method for ${repoName}`);
                       }
-                    );
-                    
-                    if (fs.existsSync(tempLogFile)) {
-                      gourceLog = fs.readFileSync(tempLogFile, 'utf-8');
-                      fs.unlinkSync(tempLogFile);
+                    } catch (altError) {
+                      console.error(`[BULK IMPORT] Alternative Gource log generation also failed for ${repoName}:`, altError.message);
                     }
                   }
                   
@@ -1409,46 +1420,83 @@ router.post('/bulk-import', async (req, res) => {
             }
             
             // If we get here, the folder doesn't exist, so clone the repository
+            
+            // Prepare the clone URL with token if needed
+            let cloneUrl = repoUrl;
+            if (process.env.GITHUB_TOKEN) {
+              cloneUrl = repoUrl.replace('https://', `https://${process.env.GITHUB_TOKEN}@`);
+            }
+            
+            // Check if we're on Windows and should use the path length workaround
+            const isWindows = process.platform === 'win32';
+            
+            // Clone options
+            const cloneOptions = {};
+            
+            // For Windows, add options to handle long paths if the repo name suggests it could have long paths
+            // Repositories like 'hadoop', 'kubernetes', etc. have been known to have very long paths
+            const riskyRepoKeywords = ['hadoop', 'kubernetes', 'spark', 'android', 'tensorflow'];
+            const isRiskyRepo = riskyRepoKeywords.some(keyword => repoName.toLowerCase().includes(keyword));
+            
+            if (isWindows && isRiskyRepo) {
+              console.log(`[BULK IMPORT] Repository ${repoName} might have long paths, applying mitigation for Windows`);
+              // On Windows, try to use a shorter base path if possible
+              // Also use depth=1 to reduce clone size and speed up the process
+              cloneOptions.depth = 1;
+            }
+            
+            // Clone the repository
+            console.log(`[BULK IMPORT] Cloning ${repoName} from ${repoUrl.replace(
+              process.env.GITHUB_TOKEN || '', '[TOKEN]'
+            )}`);
+            
             try {
-              // Prepare the clone URL with token if needed
-              let cloneUrl = repoUrl;
-              if (process.env.GITHUB_TOKEN) {
-                cloneUrl = repoUrl.replace('https://', `https://${process.env.GITHUB_TOKEN}@`);
-              }
-              
-              // Clone the repository
-              console.log(`[BULK IMPORT] Cloning ${repoName} from ${repoUrl.replace(
-                process.env.GITHUB_TOKEN || '', '[TOKEN]'
-              )}`);
-              
-              await simpleGit().clone(cloneUrl, repoPath);
+              await simpleGit().clone(cloneUrl, repoPath, cloneOptions);
               console.log(`[BULK IMPORT] Clone of ${repoName} completed successfully`);
-              
-              // Generate Gource log
-              const id = Date.now().toString() + Math.floor(Math.random() * 1000);
-              const logFilePath = path.join(logsDir, `${id}.log`);
-              
-              console.log(`[BULK IMPORT] Generating Gource log for ${repoName}`);
-              let gourceLog = '';
-              try {
-                gourceLog = execSync(
-                  `gource --output-custom-log - "${repoPath}"`,
-                  { 
-                    encoding: 'utf-8',
-                    maxBuffer: 200 * 1024 * 1024 // 200MB buffer (increased for large repos)
-                  }
-                );
-                console.log(`[BULK IMPORT] Successfully generated Gource log for ${repoName}`);
-              } catch (execError) {
-                console.error(`[BULK IMPORT] Error generating Gource log for ${repoName}, trying alternate method:`, execError.message);
+            } catch (cloneError) {
+              // Check if the error is related to long file names
+              if (isWindows && cloneError.message && (
+                  cloneError.message.includes('Filename too long') || 
+                  cloneError.message.includes('unable to create file')
+              )) {
+                console.log(`[BULK IMPORT] Detected long filename error for ${repoName}, trying shallow clone`);
                 
-                // Alternative method with temporary log file
-                const tempLogFile = path.join(logsDir, `${id}_temp.log`);
+                // Try a shallow clone as a workaround
+                await simpleGit().clone(cloneUrl, repoPath, ['--depth=1', '--single-branch']);
+                console.log(`[BULK IMPORT] Shallow clone of ${repoName} completed as a workaround for long filenames`);
+              } else {
+                // Re-throw the error if it's not a long filename issue
+                throw cloneError;
+              }
+            }
+            
+            // Generate Gource log
+            const id = Date.now().toString() + Math.floor(Math.random() * 1000);
+            const logFilePath = path.join(logsDir, `${id}.log`);
+            
+            console.log(`[BULK IMPORT] Generating Gource log for ${repoName}`);
+            let gourceLog = '';
+            try {
+              gourceLog = execSync(
+                `gource --output-custom-log - "${repoPath}"`,
+                { 
+                  encoding: 'utf-8',
+                  maxBuffer: 500 * 1024 * 1024 // 500MB buffer (increased for large repos)
+                }
+              );
+              console.log(`[BULK IMPORT] Successfully generated Gource log for ${repoName}`);
+            } catch (execError) {
+              console.error(`[BULK IMPORT] Error generating Gource log for ${repoName}, trying alternate method:`, execError.message);
+              
+              // Alternative method with temporary log file
+              const tempLogFile = path.join(logsDir, `${id}_temp.log`);
+              try {
                 execSync(
                   `gource --output-custom-log "${tempLogFile}" "${repoPath}"`,
                   { 
                     stdio: 'ignore',
-                    maxBuffer: 200 * 1024 * 1024
+                    maxBuffer: 500 * 1024 * 1024, // 500MB buffer
+                    timeout: 120000 // 2 minute timeout
                   }
                 );
                 
@@ -1459,89 +1507,63 @@ router.post('/bulk-import', async (req, res) => {
                 } else {
                   console.error(`[BULK IMPORT] Failed to generate Gource log with alternative method for ${repoName}`);
                 }
+              } catch (altError) {
+                console.error(`[BULK IMPORT] Alternative Gource log generation also failed for ${repoName}:`, altError.message);
               }
-              
-              if (gourceLog) {
-                fs.writeFileSync(logFilePath, gourceLog);
-                console.log(`[BULK IMPORT] Saved Gource log for ${repoName} to ${logFilePath}`);
-              } else {
-                console.warn(`[BULK IMPORT] No Gource log content generated for ${repoName}`);
-              }
-              
-              // Add the repository to the database
-              const newRepo = {
-                id,
-                url: repoUrl,
-                name: repoName,
-                owner: ownerName,
-                description: repoDescription,
-                path: repoPath,
-                logPath: logFilePath,
-                dateAdded: new Date().toISOString(),
-                lastUpdated: new Date().toISOString()
-              };
-              
-              freshDb.get('repositories')
-                .push(newRepo)
-                .write();
-                
-              console.log(`[BULK IMPORT] Added ${repoName} to database with ID: ${id}`);
-              
-              // Add to list of successful repos for project creation
-              if (mode !== 'none') {
-                successfulRepoIds.push(id);
-                
-                // Also add to per-owner list
-                if (successfulRepoIdsByOwner[ownerName]) {
-                  successfulRepoIdsByOwner[ownerName].push(id);
-                }
-                
-                // Update repo ID in the repositoriesByOwner structure
-                if (repositoriesByOwner[ownerName]) {
-                  const repoIndex = repositoriesByOwner[ownerName].repositories.findIndex(r => r.url === repoUrl);
-                  if (repoIndex !== -1) {
-                    repositoriesByOwner[ownerName].repositories[repoIndex].id = id;
-                  }
-                }
-              }
-                
-              // Update status for this repository
-              const updatedStatus = cloneStatuses.get(bulkImportId);
-              const newUpdatedRepos = updatedStatus.repositories.map(r => 
-                r.name === repoName && r.owner === ownerName ? 
-                  { ...r, status: 'completed', message: 'Repository imported successfully', id } : r
-              );
-              
-              updateCloneStatus(bulkImportId, {
-                repositories: newUpdatedRepos,
-                completedRepos: updatedStatus.completedRepos + 1
-              });
-              
-              return {
-                success: true,
-                id
-              };
-            } catch (error) {
-              console.error(`[BULK IMPORT] Error cloning repository ${repoName}:`, error);
-              
-              // Update status to show the error
-              const failedStatus = cloneStatuses.get(bulkImportId);
-              const failedRepos = failedStatus.repositories.map(r => 
-                r.name === repoName && r.owner === ownerName ? 
-                  { ...r, status: 'failed', message: `Failed to import: ${error.message}` } : r
-              );
-              
-              updateCloneStatus(bulkImportId, {
-                repositories: failedRepos,
-                failedRepos: failedStatus.failedRepos + 1,
-                completedRepos: failedStatus.completedRepos + 1
-              });
-              
-              return {
-                success: false,
-                error: error.message
-              };
             }
+            
+            if (gourceLog) {
+              fs.writeFileSync(logFilePath, gourceLog);
+              console.log(`[BULK IMPORT] Saved Gource log for ${repoName} to ${logFilePath}`);
+            } else {
+              console.warn(`[BULK IMPORT] No Gource log content generated for ${repoName}`);
+            }
+            
+            // Add the repository to the database
+            const newRepo = {
+              id,
+              url: repoUrl,
+              name: repoName,
+              owner: ownerName,
+              description: repoDescription,
+              path: repoPath,
+              logPath: logFilePath,
+              dateAdded: new Date().toISOString(),
+              lastUpdated: new Date().toISOString()
+            };
+            
+            freshDb.get('repositories')
+              .push(newRepo)
+              .write();
+              
+            console.log(`[BULK IMPORT] Added ${repoName} to database with ID: ${id}`);
+            
+            // Add to list of successful repos for project creation
+            if (mode !== 'none') {
+              successfulRepoIds.push(id);
+              
+              // Also add to per-owner list
+              if (successfulRepoIdsByOwner[ownerName]) {
+                successfulRepoIdsByOwner[ownerName].push(id);
+              }
+            }
+              
+            // Update status for this repository
+            const updatedStatus = cloneStatuses.get(bulkImportId);
+            const newUpdatedRepos = updatedStatus.repositories.map(r => 
+              r.name === repoName && r.owner === ownerName ? 
+                { ...r, status: 'completed', message: 'Repository imported successfully', id } : r
+            );
+            
+            updateCloneStatus(bulkImportId, {
+              repositories: newUpdatedRepos,
+              completedRepos: updatedStatus.completedRepos + 1
+            });
+            
+            return {
+              success: true,
+              id
+            };
           } catch (error) {
             console.error(`[BULK IMPORT] Error cloning repository ${repoName}:`, error);
             
@@ -1582,11 +1604,39 @@ router.post('/bulk-import', async (req, res) => {
           // Process repositories in this chunk in parallel
           const promises = chunk.map((repo, chunkIndex) => 
             processRepository(repo, (i * MAX_CONCURRENT_CLONES) + chunkIndex)
+              .catch(error => {
+                // Catch errors at the individual repository level to prevent the entire chunk from failing
+                console.error(`[BULK IMPORT] Error processing repository ${repo.name}:`, error);
+                return {
+                  success: false,
+                  error: error.message,
+                  name: repo.name,
+                  owner: repo.ownerName
+                };
+              })
           );
           
           // Wait for all repositories in this chunk to complete
-          const results = await Promise.all(promises);
+          let results;
+          try {
+            results = await Promise.all(promises);
+          } catch (chunkError) {
+            console.error(`[BULK IMPORT] Critical error processing chunk ${i + 1}:`, chunkError);
+            results = chunk.map(repo => ({
+              success: false,
+              error: `Chunk processing failed: ${chunkError.message}`,
+              name: repo.name,
+              owner: repo.ownerName
+            }));
+          }
+          
           completed += results.length;
+          
+          // Log failures but continue processing
+          const failedInChunk = results.filter(r => !r.success);
+          if (failedInChunk.length > 0) {
+            console.warn(`[BULK IMPORT] ${failedInChunk.length}/${results.length} repositories failed in chunk ${i + 1}`);
+          }
           
           console.log(`[BULK IMPORT] Completed ${completed}/${allRepositories.length} repositories`);
           
@@ -1595,6 +1645,12 @@ router.post('/bulk-import', async (req, res) => {
           updateCloneStatus(bulkImportId, {
             progress: 10 + Math.floor(completed / allRepositories.length * 80)
           });
+          
+          // Add a timeout between chunks to let the system recover
+          if (i < chunks.length - 1) {
+            console.log(`[BULK IMPORT] Pausing for 5 seconds before next chunk to prevent system overload`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
         }
         
         // Create projects based on the specified mode
