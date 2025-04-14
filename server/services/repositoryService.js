@@ -1,38 +1,46 @@
 /**
- * Repository management service
- * Responsible for access to repositories and clone operations
+ * Git Repository Management Service
+ * Responsible for access, validation and management of repositories
+ * Optimized for Windows 11 Pro
  */
 
 const path = require('path');
-const fs = require('fs-extra');
+const fs = require('fs');
+const { execSync } = require('child_process');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
-const simpleGit = require('simple-git');
-const uniqid = require('uniqid');
-const os = require('os');
-const { execSync } = require('child_process');
 
 class RepositoryService {
   constructor() {
     this.dbPath = path.join(__dirname, '../../db/db.json');
-    this.reposDir = path.join(__dirname, '../../repos');
+    this.baseRepoDir = path.join(__dirname, '../../repos');
+    this.logsDir = path.join(__dirname, '../../logs');
     this.init();
   }
 
   /**
-   * Initialize the service
+   * Initialize the database and create repository folder if needed
    */
   init() {
-    // Ensure repos directory exists
-    if (!fs.existsSync(this.reposDir)) {
-      fs.mkdirSync(this.reposDir, { recursive: true });
+    const dbDir = path.dirname(this.dbPath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
     }
-
+    
+    if (!fs.existsSync(this.logsDir)) {
+      fs.mkdirSync(this.logsDir, { recursive: true });
+    }
+    
     const db = this.getDatabase();
     
     // Check if repositories collection exists
     if (!db.has('repositories').value()) {
       db.set('repositories', []).write();
+    }
+    
+    // Check that the repository folder exists
+    if (!fs.existsSync(this.baseRepoDir)) {
+      fs.mkdirSync(this.baseRepoDir, { recursive: true });
     }
   }
 
@@ -69,38 +77,43 @@ class RepositoryService {
   }
 
   /**
-   * Check if a git repository is valid
-   * @param {string} repoUrl - URL of the repository to check
-   * @returns {Promise<boolean>} True if the repository is valid
+   * Check if a path contains a valid Git repository
+   * @param {string} repoPath - Path of the repository to check
+   * @returns {boolean} true if valid, false otherwise
    */
-  async isValidRepository(repoUrl) {
-    if (!repoUrl) return false;
-    
+  isValidGitRepository(repoPath) {
     try {
-      // We use a temporary directory to check if the repository is valid
-      const tmpDir = path.join(os.tmpdir(), uniqid('gource_repo_check_'));
-      fs.ensureDirSync(tmpDir);
+      if (!fs.existsSync(repoPath)) {
+        return false;
+      }
       
-      // Try to list remote refs without cloning
-      await simpleGit()
-        .listRemote(['--heads', repoUrl]);
-      
-      // Clean up the temporary directory
-      fs.removeSync(tmpDir);
+      // Check if .git folder exists
+      const gitDir = path.join(repoPath, '.git');
+      if (!fs.existsSync(gitDir)) {
+        return false;
+      }
+
+      // On Windows, use PowerShell to execute git status
+      const gitStatus = execSync('git status', { 
+        cwd: repoPath,
+        shell: 'powershell.exe',
+        stdio: ['ignore', 'pipe', 'ignore'],
+        encoding: 'utf8'
+      });
       
       return true;
     } catch (error) {
-      console.error('Error checking repository validity:', error.message);
+      console.error(`Error checking Git repository: ${repoPath}`, error.message);
       return false;
     }
   }
 
   /**
-   * Create a new repository
+   * Create a new repository in the database
    * @param {Object} repoData - Repository data to create
-   * @returns {Promise<Object>} Created repository
+   * @returns {Object} Created repository
    */
-  async createRepository(repoData) {
+  createRepository(repoData) {
     const db = this.getDatabase();
     
     // Validate required data
@@ -108,8 +121,16 @@ class RepositoryService {
       throw new Error('Repository name is required');
     }
     
-    if (!repoData.url) {
-      throw new Error('Repository URL is required');
+    if (!repoData.path) {
+      throw new Error('Repository path is required');
+    }
+    
+    // Normalize path for Windows
+    const normalizedPath = repoData.path.replace(/[\/\\]+/g, path.sep);
+    
+    // Check if repository is valid
+    if (!this.isValidGitRepository(normalizedPath)) {
+      throw new Error(`Path ${normalizedPath} does not contain a valid Git repository`);
     }
     
     // Check if a repository with the same name already exists
@@ -118,37 +139,28 @@ class RepositoryService {
       .value();
     
     if (existingRepo) {
-      throw new Error(`A repository with the name "${repoData.name}" already exists`);
+      throw new Error(`A repository with name "${repoData.name}" already exists`);
     }
     
-    // Check if the repository URL is valid
-    const isValid = await this.isValidRepository(repoData.url);
-    if (!isValid) {
-      throw new Error(`The repository URL "${repoData.url}" is not valid or not accessible`);
-    }
+    // Generate a unique ID
+    const id = Date.now().toString();
     
-    // Generate a unique ID and path
-    const id = uniqid('repo_');
-    const repoPath = path.join(this.reposDir, id);
-    
-    // Create the repository object
-    const newRepo = {
+    // Create the repository
+    const newRepository = {
       id,
       name: repoData.name,
-      url: repoData.url,
       description: repoData.description || '',
-      localPath: repoPath,
+      path: normalizedPath,
       dateAdded: new Date().toISOString(),
-      lastUpdated: null,
-      cloned: false
+      lastUpdated: new Date().toISOString()
     };
     
-    // Add the repository to the database
+    // Add repository to database
     db.get('repositories')
-      .push(newRepo)
+      .push(newRepository)
       .write();
     
-    return newRepo;
+    return newRepository;
   }
 
   /**
@@ -161,38 +173,54 @@ class RepositoryService {
     if (!id) return null;
     
     const db = this.getDatabase();
-    const repo = db.get('repositories')
+    const repository = db.get('repositories')
       .find({ id: id.toString() })
       .value();
     
-    if (!repo) return null;
+    if (!repository) return null;
+    
+    let updatedPath = repository.path;
+    
+    // If path is modified, validate it
+    if (repoData.path && repoData.path !== repository.path) {
+      // Normalize path for Windows
+      updatedPath = repoData.path.replace(/[\/\\]+/g, path.sep);
+      
+      // Check if repository is valid
+      if (!this.isValidGitRepository(updatedPath)) {
+        throw new Error(`Path ${updatedPath} does not contain a valid Git repository`);
+      }
+    }
     
     // Check if another repository with the same name already exists
-    if (repoData.name && repoData.name !== repo.name) {
+    if (repoData.name && repoData.name !== repository.name) {
       const existingRepo = db.get('repositories')
         .find({ name: repoData.name })
         .value();
       
       if (existingRepo && existingRepo.id !== id) {
-        throw new Error(`A repository with the name "${repoData.name}" already exists`);
+        throw new Error(`A repository with name "${repoData.name}" already exists`);
       }
     }
     
-    // Prepare data to update
-    const updatedRepo = {
-      ...repo,
-      ...repoData,
-      // If URL changes, repo needs to be cloned again
-      cloned: repoData.url && repoData.url !== repo.url ? false : repo.cloned
+    // Update the repository
+    const updatedRepository = {
+      ...repository,
+      name: repoData.name || repository.name,
+      description: repoData.description !== undefined 
+        ? repoData.description 
+        : repository.description,
+      path: updatedPath,
+      lastUpdated: new Date().toISOString()
     };
     
     // Update the repository in the database
     db.get('repositories')
       .find({ id: id.toString() })
-      .assign(updatedRepo)
+      .assign(updatedRepository)
       .write();
     
-    return updatedRepo;
+    return updatedRepository;
   }
 
   /**
@@ -204,15 +232,22 @@ class RepositoryService {
     if (!id) return false;
     
     const db = this.getDatabase();
-    const repo = db.get('repositories')
+    
+    // Check if repository exists
+    const repository = db.get('repositories')
       .find({ id: id.toString() })
       .value();
     
-    if (!repo) return false;
+    if (!repository) return false;
     
-    // Remove the repository folder if it exists
-    if (repo.localPath && fs.existsSync(repo.localPath)) {
-      fs.removeSync(repo.localPath);
+    // Before deleting, check if repository is used in projects
+    const projects = db.get('projects').value() || [];
+    const usedInProjects = projects.filter(project => 
+      project.repositories && project.repositories.includes(id.toString())
+    );
+    
+    if (usedInProjects.length > 0) {
+      throw new Error(`This repository is used in ${usedInProjects.length} project(s) and cannot be deleted.`);
     }
     
     // Delete the repository from the database
@@ -220,161 +255,222 @@ class RepositoryService {
       .remove({ id: id.toString() })
       .write();
     
-    // Also remove repository from any projects
-    db.get('projects')
-      .forEach(project => {
-        if (project.repositories && project.repositories.includes(id.toString())) {
-          project.repositories = project.repositories.filter(repoId => repoId !== id.toString());
-        }
-      })
-      .write();
-    
     return true;
   }
 
   /**
-   * Clone a repository
-   * @param {string} id - ID of the repository to clone
-   * @returns {Promise<Object>} Cloned repository info
+   * Generate a git log file for a repository in Gource format
+   * @param {Object} repository - Repository object
+   * @param {string} outputPath - Output file path
+   * @param {Object} options - Generation options
+   * @returns {Promise<Object>} - Generated log information
    */
-  async cloneRepository(id) {
-    const repo = this.getRepositoryById(id);
-    if (!repo) {
-      throw new Error(`Repository with ID ${id} not found`);
+  async generateGitLog(repository, outputPath, options = {}) {
+    if (!repository) {
+      throw new Error('Invalid repository or not specified');
     }
+
+    // Determine repository path (may be in path or localPath depending on structure)
+    const repoPath = repository.path || repository.localPath;
     
-    // Create the local directory if it doesn't exist
-    if (!fs.existsSync(repo.localPath)) {
-      fs.mkdirSync(repo.localPath, { recursive: true });
-    } else {
-      // Clean the directory if it exists
-      fs.emptyDirSync(repo.localPath);
+    if (!repoPath) {
+      throw new Error('Repository path not specified');
     }
-    
+
+    if (!fs.existsSync(repoPath)) {
+      throw new Error(`Repository path does not exist: ${repoPath}`);
+    }
+
+    // Create output directory if it doesn't exist
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
     try {
-      // Clone the repository
-      await simpleGit()
-        .clone(repo.url, repo.localPath);
+      // Use git to generate a log file and transform it to Gource format
+      // Format: timestamp|author|action|file
+      // Actions: A (addition), M (modification), D (deletion)
+      const gitCommand = `cd "${repoPath}" && git log --pretty=format:"%at|%an|%s" --name-status --reverse`;
+      const gitLogOutput = execSync(gitCommand, { encoding: 'utf8' });
       
-      // Update the repository status
-      const updatedRepo = this.updateRepository(id, {
-        cloned: true,
-        lastUpdated: new Date().toISOString()
-      });
+      // Transform git output to Gource format
+      let currentCommit = null;
+      let currentTime = null;
+      let currentAuthor = null;
       
-      return updatedRepo;
-    } catch (error) {
-      console.error(`Error cloning repository ${repo.name}:`, error.message);
+      const gourceLines = [];
       
-      // Clean up on failure
-      if (fs.existsSync(repo.localPath)) {
-        fs.removeSync(repo.localPath);
+      const lines = gitLogOutput.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        if (line === '') continue;
+        
+        // If line contains |, it's a commit line
+        if (line.includes('|')) {
+          const parts = line.split('|');
+          if (parts.length >= 2) {
+            currentTime = parts[0];
+            currentAuthor = parts[1];
+          }
+        } 
+        // Otherwise, it's a file line with its status
+        else if (currentTime && currentAuthor) {
+          // Format git: A/M/D     path/to/file
+          const fileMatch = line.match(/^([AMD])\s+(.+)$/);
+          if (fileMatch) {
+            const action = fileMatch[1]; // A, M or D
+            const filePath = fileMatch[2];
+            
+            // Format Gource: timestamp|username|action|filepath
+            gourceLines.push(`${currentTime}|${currentAuthor}|${action}|/${repository.name}/${filePath}`);
+          }
+        }
       }
       
-      throw new Error(`Failed to clone repository: ${error.message}`);
-    }
-  }
+      // Write file to Gource format
+      fs.writeFileSync(outputPath, gourceLines.join('\n'), 'utf8');
+      
+      // Check if file was created and is not empty
+      if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+        console.warn(`No log generated for repository ${repository.name}`);
+        return {
+          path: outputPath,
+          name: repository.name,
+          id: repository.id,
+          isEmpty: true
+        };
+      }
 
-  /**
-   * Update (pull) a repository
-   * @param {string} id - ID of the repository to update
-   * @returns {Promise<Object>} Updated repository info
-   */
-  async updateRepositoryCode(id) {
-    const repo = this.getRepositoryById(id);
-    if (!repo) {
-      throw new Error(`Repository with ID ${id} not found`);
-    }
-    
-    if (!repo.cloned || !fs.existsSync(repo.localPath)) {
-      return await this.cloneRepository(id);
-    }
-    
-    try {
-      // Pull latest changes
-      await simpleGit(repo.localPath)
-        .pull();
-      
-      // Update the repository status
-      const updatedRepo = this.updateRepository(id, {
-        lastUpdated: new Date().toISOString()
-      });
-      
-      return updatedRepo;
-    } catch (error) {
-      console.error(`Error updating repository ${repo.name}:`, error.message);
-      throw new Error(`Failed to update repository: ${error.message}`);
-    }
-  }
-
-  /**
-   * Get the commit log for a repository
-   * @param {string} id - ID of the repository
-   * @param {Object} options - Options for the log
-   * @returns {Promise<Array>} List of commits
-   */
-  async getRepositoryLog(id, options = {}) {
-    const repo = this.getRepositoryById(id);
-    if (!repo) {
-      throw new Error(`Repository with ID ${id} not found`);
-    }
-    
-    if (!repo.cloned || !fs.existsSync(repo.localPath)) {
-      throw new Error(`Repository is not cloned yet`);
-    }
-    
-    try {
-      const git = simpleGit(repo.localPath);
-      
-      // Get log with options
-      const logOptions = {
-        '--max-count': options.maxCount || 100,
-        '--all': options.all || true,
-        '--date': 'iso',
-        ...options.extraOptions
+      return {
+        path: outputPath,
+        name: repository.name,
+        id: repository.id,
+        isEmpty: false
       };
-      
-      const log = await git.log(logOptions);
-      return log.all || [];
     } catch (error) {
-      console.error(`Error getting repository log for ${repo.name}:`, error.message);
-      throw new Error(`Failed to get repository log: ${error.message}`);
+      console.error(`Error generating log for ${repository.name}:`, error.message);
+      throw new Error(`Gource log generation failed: ${error.message}`);
     }
   }
 
   /**
-   * Generate Gource custom log for repository
-   * @param {string} id - ID of the repository
-   * @param {string} outputPath - Path to save the log
-   * @returns {Promise<string>} Path to the generated log file
+   * Import multiple repositories found in a directory
+   * @param {string} baseDirectoryPath - Path of the directory containing repositories
+   * @param {boolean} skipConfirmation - If true, skip additional checks
+   * @returns {Promise<Object>} Import results
    */
-  async generateGourceLog(id, outputPath) {
-    const repo = this.getRepositoryById(id);
-    if (!repo) {
-      throw new Error(`Repository with ID ${id} not found`);
-    }
-    
-    if (!repo.cloned || !fs.existsSync(repo.localPath)) {
-      throw new Error(`Repository is not cloned yet`);
-    }
-    
-    if (!outputPath) {
-      outputPath = path.join(__dirname, '../../logs', `${id}_gource.log`);
-    }
-    
-    // Make sure the output directory exists
-    fs.ensureDirSync(path.dirname(outputPath));
-    
-    try {
-      // Create gource log
-      const command = `cd "${repo.localPath}" && gource --output-custom-log "${outputPath}"`;
-      execSync(command, { stdio: 'inherit' });
-      
-      return outputPath;
-    } catch (error) {
-      console.error(`Error generating Gource log for ${repo.name}:`, error.message);
-      throw new Error(`Failed to generate Gource log: ${error.message}`);
-    }
+  bulkImport(baseDirectoryPath, skipConfirmation = false) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        if (!baseDirectoryPath) {
+          throw new Error('Repository directory path is required');
+        }
+
+        // Normalize path for Windows
+        const normalizedPath = baseDirectoryPath.replace(/[\/\\]+/g, path.sep);
+        
+        // Check if directory exists
+        if (!fs.existsSync(normalizedPath)) {
+          throw new Error(`Directory ${normalizedPath} does not exist`);
+        }
+        
+        // Check if it's a directory
+        const stats = fs.statSync(normalizedPath);
+        if (!stats.isDirectory()) {
+          throw new Error(`${normalizedPath} is not a directory`);
+        }
+        
+        console.time('bulkImport');
+        
+        // Read subdirectories (kept synchronous for simplicity of implementation)
+        const dirents = fs.readdirSync(normalizedPath, { withFileTypes: true })
+          .filter(dirent => dirent.isDirectory());
+          
+        // Parallel check of valid Git repositories
+        const dirs = await Promise.all(
+          dirents.map(async dirent => {
+            const dirPath = path.join(normalizedPath, dirent.name);
+            return {
+              name: dirent.name,
+              path: dirPath,
+              isGitRepo: this.isValidGitRepository(dirPath)
+            };
+          })
+        );
+        
+        // Filter valid Git repositories
+        const validRepos = dirs.filter(dir => dir.isGitRepo);
+        if (validRepos.length === 0) {
+          throw new Error('No valid Git repositories found in the specified directory');
+        }
+        
+        // Get existing repositories to avoid duplicates
+        const existingRepos = this.getAllRepositories();
+        
+        // Create Set for O(1) search instead of O(n)
+        const existingPathsSet = new Set(existingRepos.map(repo => repo.path.toLowerCase()));
+        const existingNamesSet = new Set(existingRepos.map(repo => repo.name.toLowerCase()));
+        
+        // Filter already imported repositories with Set for O(1) performance
+        const newRepos = validRepos.filter(repo => 
+          !existingPathsSet.has(repo.path.toLowerCase()) && 
+          !existingNamesSet.has(repo.name.toLowerCase())
+        );
+        
+        if (newRepos.length === 0) {
+          throw new Error('All valid Git repositories have already been imported');
+        }
+        
+        // List of results
+        const results = {
+          totalFound: validRepos.length,
+          totalImported: 0,
+          skipped: validRepos.length - newRepos.length,
+          imported: [],
+          errors: []
+        };
+        
+        // Import repositories in parallel
+        const importPromises = newRepos.map(repo => {
+          return new Promise(resolve => {
+            try {
+              const newRepo = this.createRepository({
+                name: repo.name,
+                description: `Imported automatically from ${normalizedPath}`,
+                path: repo.path
+              });
+              
+              results.imported.push({
+                id: newRepo.id,
+                name: newRepo.name,
+                path: newRepo.path
+              });
+              
+              results.totalImported++;
+              resolve();
+            } catch (error) {
+              results.errors.push({
+                name: repo.name,
+                path: repo.path,
+                error: error.message
+              });
+              resolve();
+            }
+          });
+        });
+        
+        // Wait for all imports to complete
+        await Promise.all(importPromises);
+        
+        console.timeEnd('bulkImport');
+        resolve(results);
+      } catch (error) {
+        console.error('Error during bulk import:', error);
+        reject(error);
+      }
+    });
   }
 }
 

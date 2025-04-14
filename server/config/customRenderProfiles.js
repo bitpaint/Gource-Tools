@@ -5,6 +5,25 @@
  */
 const { defaultSettings } = require('./defaultGourceConfig');
 
+// Fonction pour calculer les dates relatives
+function getRelativeDates(daysAgo) {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  
+  const pastDate = new Date(now);
+  pastDate.setDate(pastDate.getDate() - daysAgo);
+  
+  return {
+    start: pastDate.toISOString().split('T')[0],
+    end: today
+  };
+}
+
+// Dates pour chaque période
+const weekDates = getRelativeDates(7);
+const monthDates = getRelativeDates(30);
+const yearDates = getRelativeDates(365);
+
 // Profil pour visualiser la dernière semaine en 1 minute
 const lastWeekProfile = {
   id: 'last_week_1m',
@@ -34,11 +53,15 @@ const lastWeekProfile = {
     'show-files': true,
     'multi-sampling': true,
     'date-format': '%d %b',
-    'range-days': 7, // Nombre de jours à visualiser
+    // Les dates seront calculées dynamiquement au moment du rendu
+    'range-days': 7, // Utilisé comme indicateur pour le calcul dynamique des dates
     'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),
-  lastModified: new Date().toISOString()
+  lastModified: new Date().toISOString(),
+  // Indicateur explicite pour le service de rendu
+  isTemporalProfile: true,
+  daysToInclude: 7
 };
 
 // Profil pour visualiser le dernier mois en 1 minute
@@ -70,11 +93,15 @@ const lastMonthProfile = {
     'show-files': true,
     'multi-sampling': true,
     'date-format': '%d %b',
-    'range-days': 30, // Nombre de jours à visualiser
+    // Les dates seront calculées dynamiquement au moment du rendu
+    'range-days': 30, // Utilisé comme indicateur pour le calcul dynamique des dates
     'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),
-  lastModified: new Date().toISOString()
+  lastModified: new Date().toISOString(),
+  // Indicateur explicite pour le service de rendu
+  isTemporalProfile: true,
+  daysToInclude: 30
 };
 
 // Profil pour visualiser la dernière année en 1 minute
@@ -106,11 +133,15 @@ const lastYearProfile = {
     'show-files': true,
     'multi-sampling': true,
     'date-format': '%b %Y',
-    'range-days': 365, // Nombre de jours à visualiser
+    // Les dates seront calculées dynamiquement au moment du rendu
+    'range-days': 365, // Utilisé comme indicateur pour le calcul dynamique des dates
     'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),
-  lastModified: new Date().toISOString()
+  lastModified: new Date().toISOString(),
+  // Indicateur explicite pour le service de rendu
+  isTemporalProfile: true,
+  daysToInclude: 365
 };
 
 // Profil pour visualiser tout le projet en 1 minute
@@ -142,7 +173,7 @@ const everythingProfile = {
     'show-files': true,
     'multi-sampling': true,
     'date-format': '%b %Y',
-    'range-days': 'all', // Tous les jours du projet
+    // Pas de range-days pour ce profil qui doit afficher tout l'historique
     'extra-args': '--padding 1.3 -a 0.5 --hide mouse,filenames,progress --file-idle-time 0 --filename-time 2.0 --user-font-size 20'
   },
   dateCreated: new Date().toISOString(),

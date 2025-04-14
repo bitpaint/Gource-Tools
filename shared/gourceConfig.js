@@ -1,10 +1,10 @@
 /**
  * Shared module for Gource configurations
  * Used by both client and server
- * This file serves as a single source of truth for Gource default parameters
+ * This file serves as a single source of truth for Gource default settings
  */
 
-// Default parameters for Gource
+// Default settings for Gource
 const defaultSettings = {
   resolution: '1920x1080',
   framerate: 60,
@@ -50,7 +50,7 @@ const defaultGourceConfig = {
 
 // Descriptions for each setting with detailed explanations
 const settingsDescriptions = {
-  resolution: "Sets the video resolution in WIDTHxHEIGHT format (e.g., 1920x1080)",
+  resolution: "Sets the video resolution in WIDTHxHEIGHT format (e.g. 1920x1080)",
   framerate: "Number of frames per second in the exported video",
   secondsPerDay: "Number of seconds allocated to each day of activity",
   autoSkipSeconds: "Automatically skips periods of inactivity longer than this value (in seconds)",
@@ -82,9 +82,9 @@ const settingsDescriptions = {
 };
 
 /**
- * Converts configuration parameters into command line arguments for Gource
+ * Converts configuration parameters to arguments for the Gource command line
  * @param {Object} settings - Configuration parameters
- * @returns {string} Command line arguments for Gource
+ * @returns {string} Arguments for Gource in command line format
  */
 function convertToGourceArgs(settings) {
   if (!settings) {
@@ -131,16 +131,18 @@ function convertToGourceArgs(settings) {
     'date-format': 'dateFormat',
     'highlight-all-users': 'highlightAllUsers',
     'range-days': 'rangeDays',
-    'background-colour': 'background'
+    'background-colour': 'background',
+    'start-date': 'startDate',
+    'stop-date': 'stopDate'
   };
   
-  // Generate reverse mapping camelToKebab
+  // Generate the inverse camelToKebab mapping
   const camelToKebab = {};
   Object.entries(kebabToCamel).forEach(([kebab, camel]) => {
     camelToKebab[camel] = kebab;
   });
   
-  // PHASE 1: First, get all camelCase parameters (default parameters)
+  // PHASE 1: First, retrieve all parameters in camelCase (default parameters)
   for (const [key, value] of Object.entries(settings)) {
     // Ignore kebab-case parameters for this phase
     if (key.includes('-')) continue;
@@ -165,7 +167,7 @@ function convertToGourceArgs(settings) {
     normalizedSettings[key] = normalizedValue;
   }
   
-  // PHASE 2: Then, apply kebab-case parameters (which have priority as they probably come from the UI)
+  // PHASE 2: Then, apply kebab-case parameters (which have priority as they likely come from the UI)
   for (const [key, value] of Object.entries(settings)) {
     // Ignore null/undefined values
     if (value === null || value === undefined) continue;
@@ -190,7 +192,7 @@ function convertToGourceArgs(settings) {
       normalizedValue = value.startsWith('#') ? value : `#${value}`;
     }
     
-    // Add a log to see which parameter is being replaced
+    // Add a log to see which parameter is replaced
     if (normalizedSettings[camelKey] !== undefined) {
       console.log(`Priority: ${key}=${normalizedValue} replaces ${camelKey}=${normalizedSettings[camelKey]}`);
     }
@@ -199,7 +201,7 @@ function convertToGourceArgs(settings) {
     normalizedSettings[camelKey] = normalizedValue;
   }
   
-  // STEP 2: Convert normalized parameters to Gource command line arguments
+  // STEP 2: Convert normalized parameters to Gource arguments
   // ==========================================================
   
   // Map of conversion from JS parameter names to Gource options
@@ -232,11 +234,13 @@ function convertToGourceArgs(settings) {
     background: 'background-colour',
     dateFormat: 'date-format',
     highlightAllUsers: 'highlight-all-users',
-    rangeDays: 'range-days'
+    rangeDays: 'range-days',
+    startDate: 'start-date',
+    stopDate: 'stop-date'
   };
 
-  // Debug: display final normalized parameters
-  console.log("Final normalized parameters:", JSON.stringify(normalizedSettings, null, 2));
+  // Debug: display normalized parameters
+  console.log("FINAL NORMALIZED PARAMETERS:", JSON.stringify(normalizedSettings, null, 2));
 
   // Generate arguments
   let args = '';
@@ -258,11 +262,19 @@ function convertToGourceArgs(settings) {
     // Get the corresponding Gource option
     const gourceOption = paramMap[key] || key;
 
-    // Special handling for colors (remove #)
+    // Special handling for colors (remove the #)
     if (typeof value === 'string' && 
         (key.includes('Color') || key === 'background')) {
       const colorValue = value.replace(/^#/, '');
       args += `--${gourceOption} ${colorValue} `;
+      continue;
+    }
+
+    // Special handling for date values to ensure format is YYYY-MM-DD
+    if ((key === 'startDate' || key === 'stopDate') && value) {
+      // Ensure date is in YYYY-MM-DD format
+      const dateValue = typeof value === 'object' ? value.toISOString().split('T')[0] : value;
+      args += `--${gourceOption} ${dateValue} `;
       continue;
     }
 

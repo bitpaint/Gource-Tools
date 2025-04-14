@@ -1,6 +1,6 @@
 /**
- * Gource Utilities
- * Conversion and helper functions for Gource parameters
+ * Utilities for Gource
+ * Functions for conversion and help with Gource parameters
  */
 
 /**
@@ -115,7 +115,7 @@ export function convertToKebabCase(obj) {
     
     // Special handling for secondsPerDay which must be a valid number ≥ 1
     if (key === 'secondsPerDay') {
-      // Ensure value is a valid number and at least 1
+      // Ensure the value is a valid number and at least 1
       const numValue = parseFloat(value);
       result[kebabKey] = isNaN(numValue) || numValue < 1 ? 1 : numValue;
       continue;
@@ -123,11 +123,11 @@ export function convertToKebabCase(obj) {
     
     // Don't include empty, null or undefined values
     if (value === undefined || value === null || value === '') {
-      // For strict numeric values that became undefined, initialize to 0
+      // For strict numeric values that have become undefined, initialize them to 0
       if (['auto-skip-seconds', 'elasticity', 'font-scale', 
            'user-scale', 'time-scale', 'file-scale', 'dir-size', 
            'max-file-lag', 'bloom-intensity', 'bloom-multiplier'].includes(kebabKey)) {
-        // For numeric parameters, initialize with default value
+        // For numeric parameters, initialize with a default value
         result[kebabKey] = 0;
       } else {
         // Omit other undefined/null/empty values
@@ -137,7 +137,7 @@ export function convertToKebabCase(obj) {
       // For booleans, use the text format that Gource accepts
       result[kebabKey] = value;
     } else {
-      // For other types, copy value as is
+      // For other types, copy the value as is
       result[kebabKey] = value;
     }
   }
@@ -190,7 +190,7 @@ export const generateGourceCommand = (settings, logPath) => {
       if (value === true) {
         command += ` --${key}`;
       } else if (key.startsWith('disable-') || key.startsWith('hide-')) {
-        // If it's a disable parameter set to false, ignore
+        // If it's a disable parameter set to false, ignore it
         return;
       } else {
         // For other booleans set to false, invert if possible
@@ -251,8 +251,8 @@ export function getAllGourceParameters() {
  */
 
 /**
- * Converts UI form parameters to the format expected by the API
- * @param {Object} formData - Data from the edit form
+ * Converts UI parameters to the format expected by the API
+ * @param {Object} formData - Edit form data
  * @returns {Object} Parameters formatted for the API
  */
 export function convertFormToApiParams(formData) {
@@ -290,7 +290,7 @@ export function convertFormToApiParams(formData) {
 }
 
 /**
- * Converts API parameters to the format for display in the UI
+ * Converts API parameters to UI display format
  * @param {Object} apiParams - API parameters
  * @returns {Object} Parameters formatted for the UI
  */

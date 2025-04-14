@@ -1,102 +1,102 @@
 /**
- * Validateur de configurations Gource
- * Utilitaires pour valider les configurations avant de les envoyer au serveur
+ * Gource Configuration Validator
+ * Utilities to validate configurations before sending them to the server
  */
 
 /**
- * Valide une configuration Gource et retourne les erreurs trouvées
- * @param {Object} config - Configuration Gource à valider
- * @returns {Object} Résultat de validation avec les erreurs
+ * Validates a Gource configuration and returns any errors found
+ * @param {Object} config - Gource configuration to validate
+ * @returns {Object} Validation result with errors
  */
 export function validateGourceConfig(config) {
   if (!config) {
-    return { isValid: false, errors: ['Configuration invalide ou manquante'] };
+    return { isValid: false, errors: ['Invalid or missing configuration'] };
   }
   
   const errors = [];
   
-  // Vérifications des paramètres numériques
+  // Numeric parameter validations
   if (config.secondsPerDay !== undefined && (isNaN(config.secondsPerDay) || config.secondsPerDay <= 0)) {
-    errors.push(`"seconds-per-day" doit être un nombre positif (actuel: ${config.secondsPerDay})`);
+    errors.push(`"seconds-per-day" must be a positive number (current: ${config.secondsPerDay})`);
   }
   
   if (config.autoSkipSeconds !== undefined && (isNaN(config.autoSkipSeconds) || config.autoSkipSeconds < 0)) {
-    errors.push(`"auto-skip-seconds" doit être un nombre positif ou nul (actuel: ${config.autoSkipSeconds})`);
+    errors.push(`"auto-skip-seconds" must be a non-negative number (current: ${config.autoSkipSeconds})`);
   }
   
   if (config.elasticity !== undefined && (isNaN(config.elasticity) || config.elasticity < 0 || config.elasticity > 1)) {
-    errors.push(`"elasticity" doit être un nombre entre 0 et 1 (actuel: ${config.elasticity})`);
+    errors.push(`"elasticity" must be a number between 0 and 1 (current: ${config.elasticity})`);
   }
   
   if (config.fontScale !== undefined && (isNaN(config.fontScale) || config.fontScale <= 0)) {
-    errors.push(`"font-scale" doit être un nombre positif (actuel: ${config.fontScale})`);
+    errors.push(`"font-scale" must be a positive number (current: ${config.fontScale})`);
   }
   
   if (config.userScale !== undefined && (isNaN(config.userScale) || config.userScale <= 0)) {
-    errors.push(`"user-scale" doit être un nombre positif (actuel: ${config.userScale})`);
+    errors.push(`"user-scale" must be a positive number (current: ${config.userScale})`);
   }
   
   if (config.timeScale !== undefined && (isNaN(config.timeScale) || config.timeScale <= 0)) {
-    errors.push(`"time-scale" doit être un nombre positif (actuel: ${config.timeScale})`);
+    errors.push(`"time-scale" must be a positive number (current: ${config.timeScale})`);
   }
   
   if (config.maxUserCount !== undefined && (isNaN(config.maxUserCount) || config.maxUserCount < 0)) {
-    errors.push(`"max-user-count" doit être un nombre positif ou nul (actuel: ${config.maxUserCount})`);
+    errors.push(`"max-user-count" must be a non-negative number (current: ${config.maxUserCount})`);
   }
   
   if (config.framerate !== undefined && (isNaN(config.framerate) || config.framerate < 24 || config.framerate > 120)) {
-    errors.push(`"framerate" doit être un nombre entre 24 et 120 (actuel: ${config.framerate})`);
+    errors.push(`"framerate" must be a number between 24 and 120 (current: ${config.framerate})`);
   }
   
   if (config.bloomIntensity !== undefined && (isNaN(config.bloomIntensity) || config.bloomIntensity < 0 || config.bloomIntensity > 1)) {
-    errors.push(`"bloom-intensity" doit être un nombre entre 0 et 1 (actuel: ${config.bloomIntensity})`);
+    errors.push(`"bloom-intensity" must be a number between 0 and 1 (current: ${config.bloomIntensity})`);
   }
   
   if (config.bloomMultiplier !== undefined && (isNaN(config.bloomMultiplier) || config.bloomMultiplier < 0 || config.bloomMultiplier > 1)) {
-    errors.push(`"bloom-multiplier" doit être un nombre entre 0 et 1 (actuel: ${config.bloomMultiplier})`);
+    errors.push(`"bloom-multiplier" must be a number between 0 and 1 (current: ${config.bloomMultiplier})`);
   }
   
-  // Vérification du format de résolution
+  // Resolution format validation
   if (config.resolution && !/^\d+x\d+$/.test(config.resolution)) {
-    errors.push(`"resolution" doit être au format LARGEURxHAUTEUR (actuel: ${config.resolution})`);
+    errors.push(`"resolution" must be in WIDTHxHEIGHT format (current: ${config.resolution})`);
   }
   
-  // Vérification du mode de caméra
+  // Camera mode validation
   if (config.cameraMode && !['overview', 'track', 'follow'].includes(config.cameraMode)) {
-    errors.push(`"camera-mode" doit être 'overview', 'track' ou 'follow' (actuel: ${config.cameraMode})`);
+    errors.push(`"camera-mode" must be 'overview', 'track', or 'follow' (current: ${config.cameraMode})`);
   }
   
-  // Vérification des couleurs (format hexadécimal)
+  // Color validation (hexadecimal format)
   if (config.background && !/^#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(config.background)) {
-    errors.push(`"background" doit être une couleur au format hexadécimal (actuel: ${config.background})`);
+    errors.push(`"background" must be a hexadecimal color (current: ${config.background})`);
   }
   
-  // Vérification des dates (si présentes)
+  // Date validation (if present)
   if (config.startDate && !/^\d{4}-\d{2}-\d{2}$/.test(config.startDate)) {
-    errors.push(`"start-date" doit être au format YYYY-MM-DD (actuel: ${config.startDate})`);
+    errors.push(`"start-date" must be in YYYY-MM-DD format (current: ${config.startDate})`);
   }
   
   if (config.stopDate && !/^\d{4}-\d{2}-\d{2}$/.test(config.stopDate)) {
-    errors.push(`"stop-date" doit être au format YYYY-MM-DD (actuel: ${config.stopDate})`);
+    errors.push(`"stop-date" must be in YYYY-MM-DD format (current: ${config.stopDate})`);
   }
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors: errors
   };
 }
 
 /**
- * Corrige une configuration Gource pour s'assurer qu'elle est valide
- * @param {Object} config - Configuration Gource à corriger
- * @returns {Object} Configuration corrigée
+ * Fixes a Gource configuration to ensure it is valid
+ * @param {Object} config - Gource configuration to fix
+ * @returns {Object} Fixed configuration
  */
 export function fixGourceConfig(config) {
   if (!config) return {};
   
   const fixedConfig = { ...config };
   
-  // Correction des paramètres numériques
+  // Fix numeric parameters
   if (fixedConfig.secondsPerDay === undefined || isNaN(fixedConfig.secondsPerDay) || fixedConfig.secondsPerDay <= 0) {
     fixedConfig.secondsPerDay = 1;
   }
@@ -137,17 +137,17 @@ export function fixGourceConfig(config) {
     fixedConfig.bloomMultiplier = 0.7;
   }
   
-  // Correction de la résolution
+  // Fix resolution
   if (!fixedConfig.resolution || !/^\d+x\d+$/.test(fixedConfig.resolution)) {
     fixedConfig.resolution = '1920x1080';
   }
   
-  // Correction du mode de caméra
+  // Fix camera mode
   if (!fixedConfig.cameraMode || !['overview', 'track', 'follow'].includes(fixedConfig.cameraMode)) {
     fixedConfig.cameraMode = 'overview';
   }
   
-  // Correction des couleurs
+  // Fix colors
   if (fixedConfig.background) {
     if (!fixedConfig.background.startsWith('#')) {
       fixedConfig.background = `#${fixedConfig.background}`;
@@ -160,36 +160,33 @@ export function fixGourceConfig(config) {
     fixedConfig.background = '#000000';
   }
   
-  // S'assurer que toutes les autres couleurs ont le format correct (avec #)
+  // Make sure all other colors have the correct format (with #)
   const colorParams = ['fontColor', 'titleColor', 'dirColor', 'highlightColor', 'selectionColor'];
   
   colorParams.forEach(param => {
     if (fixedConfig[param]) {
-      // Ajouter le # si manquant
+      // Add # if missing
       if (!fixedConfig[param].startsWith('#')) {
         fixedConfig[param] = `#${fixedConfig[param]}`;
       }
       
-      // Valider le format et remplacer par défaut si invalide
+      // Validate format and replace with default if invalid
       if (!/^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$/.test(fixedConfig[param])) {
-        fixedConfig[param] = '#FFFFFF'; // Blanc par défaut pour la plupart des couleurs
+        fixedConfig[param] = '#FFFFFF'; // White by default for most colors
       }
     }
   });
   
-  // Définir par défaut les options booléennes importantes
+  // Set default values for important boolean options
   if (fixedConfig.title === undefined) fixedConfig.title = true;
   if (fixedConfig.key === undefined) fixedConfig.key = true;
   if (fixedConfig.showLines === undefined) fixedConfig.showLines = true;
   if (fixedConfig.disableAutoRotate === undefined) fixedConfig.disableAutoRotate = false;
-  if (fixedConfig.swapTitleDate === undefined) fixedConfig.swapTitleDate = false;
-  if (fixedConfig.highlightUsers === undefined) fixedConfig.highlightUsers = false;
-  if (fixedConfig.hideRoot === undefined) fixedConfig.hideRoot = false;
   
   return fixedConfig;
 }
 
-// Créer un objet nommé pour l'export par défaut (pour résoudre l'avertissement ESLint)
+// Create a named object for default export (to resolve ESLint warning)
 const configValidator = {
   validateGourceConfig,
   fixGourceConfig

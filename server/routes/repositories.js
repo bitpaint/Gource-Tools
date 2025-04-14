@@ -25,16 +25,16 @@ router.post('/bulk-import', RepositoryController.bulkImport);
 
 /**
  * @route DELETE /api/repositories/:id
- * @desc Delete a repository
+ * @desc Supprimer un dépôt
  * @access Public
  */
 router.delete('/:id', async (req, res) => {
   try {
     const deleted = await RepositoryController.deleteRepository(req.params.id);
     if (deleted) {
-      res.json({ success: true, message: 'Repository successfully deleted' });
+      res.json({ success: true, message: 'Dépôt supprimé avec succès' });
     } else {
-      res.status(404).json({ success: false, message: 'Repository not found' });
+      res.status(404).json({ success: false, message: 'Dépôt non trouvé' });
     }
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });

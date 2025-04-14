@@ -1,6 +1,6 @@
 /**
- * Project management service
- * Responsible for access and operations on projects
+ * Service de gestion des projets
+ * Responsable de l'accès et des opérations sur les projets
  */
 
 const path = require('path');
@@ -15,20 +15,20 @@ class ProjectService {
   }
 
   /**
-   * Initialize the database
+   * Initialise la base de données
    */
   init() {
     const db = this.getDatabase();
     
-    // Check if projects collection exists
+    // Vérifier si la collection projects existe
     if (!db.has('projects').value()) {
       db.set('projects', []).write();
     }
   }
 
   /**
-   * Get a fresh instance of the database
-   * @returns {Object} Database instance
+   * Récupère une instance fraîche de la base de données
+   * @returns {Object} Instance de la base de données
    */
   getDatabase() {
     const adapter = new FileSync(this.dbPath);
@@ -36,8 +36,8 @@ class ProjectService {
   }
 
   /**
-   * Get all projects
-   * @returns {Array} List of projects
+   * Récupère tous les projets
+   * @returns {Array} Liste des projets
    */
   getAllProjects() {
     const db = this.getDatabase();
@@ -45,9 +45,9 @@ class ProjectService {
   }
 
   /**
-   * Get a project by its ID
-   * @param {string} id - ID of the project to retrieve
-   * @returns {Object|null} Project or null if not found
+   * Récupère un projet par son ID
+   * @param {string} id - ID du projet à récupérer
+   * @returns {Object|null} Projet ou null si non trouvé
    */
   getProjectById(id) {
     if (!id) return null;
@@ -59,19 +59,19 @@ class ProjectService {
   }
 
   /**
-   * Get a project with all its details (repositories and render profile)
-   * @param {string} projectId - ID of the project to retrieve
-   * @returns {Object|null} Project with details or null if not found
+   * Récupère un projet avec tous ses détails (référentiels et profil de rendu)
+   * @param {string} projectId - ID du projet à récupérer
+   * @returns {Object|null} Projet avec détails ou null si non trouvé
    */
   getProjectWithDetails(projectId) {
     if (!projectId) return null;
     
-    // Retrieve the project
+    // Récupérer le projet
     const project = this.getProjectById(projectId);
     
     if (!project) return null;
     
-    // Retrieve repository details
+    // Récupérer les détails des référentiels
     const db = this.getDatabase();
     const repositoryDetails = project.repositories.map(repoId => {
       return db.get('repositories')
@@ -79,7 +79,7 @@ class ProjectService {
         .value();
     }).filter(repo => repo !== undefined);
     
-    // Retrieve render profile
+    // Récupérer le profil de rendu
     let renderProfile = null;
     if (project.renderProfileId) {
       renderProfile = db.get('renderProfiles')
@@ -88,7 +88,7 @@ class ProjectService {
     }
     
     if (!renderProfile) {
-      // Use default profile if no profile is specified
+      // Utiliser le profil par défaut si aucun profil n'est spécifié
       renderProfile = db.get('renderProfiles')
         .find({ isDefault: true })
         .value();
@@ -102,31 +102,31 @@ class ProjectService {
   }
 
   /**
-   * Create a new project
-   * @param {Object} projectData - Project data to create
-   * @returns {Object} Created project
+   * Crée un nouveau projet
+   * @param {Object} projectData - Données du projet à créer
+   * @returns {Object} Projet créé
    */
   createProject(projectData) {
     const db = this.getDatabase();
     
-    // Validate required data
+    // Valider les données requises
     if (!projectData.name) {
-      throw new Error('Project name is required');
+      throw new Error('Le nom du projet est requis');
     }
     
-    // Check if a project with the same name already exists
+    // Vérifier si un projet avec le même nom existe déjà
     const existingProject = db.get('projects')
       .find({ name: projectData.name })
       .value();
     
     if (existingProject) {
-      throw new Error(`A project with the name "${projectData.name}" already exists`);
+      throw new Error(`Un projet avec le nom "${projectData.name}" existe déjà`);
     }
     
-    // Generate a unique ID
+    // Générer un ID unique
     const id = Date.now().toString();
     
-    // Create the project
+    // Créer le projet
     const newProject = {
       id,
       name: projectData.name,
@@ -137,7 +137,7 @@ class ProjectService {
       lastModified: new Date().toISOString()
     };
     
-    // Add the project to the database
+    // Ajouter le projet à la base de données
     db.get('projects')
       .push(newProject)
       .write();
@@ -146,10 +146,10 @@ class ProjectService {
   }
 
   /**
-   * Update an existing project
-   * @param {string} id - ID of the project to update
-   * @param {Object} projectData - New project data
-   * @returns {Object|null} Updated project or null if not found
+   * Met à jour un projet existant
+   * @param {string} id - ID du projet à mettre à jour
+   * @param {Object} projectData - Nouvelles données du projet
+   * @returns {Object|null} Projet mis à jour ou null si non trouvé
    */
   updateProject(id, projectData) {
     if (!id) return null;
@@ -161,25 +161,25 @@ class ProjectService {
     
     if (!project) return null;
     
-    // Check if another project with the same name already exists
+    // Vérifier si un autre projet avec le même nom existe déjà
     if (projectData.name && projectData.name !== project.name) {
       const existingProject = db.get('projects')
         .find({ name: projectData.name })
         .value();
       
       if (existingProject && existingProject.id !== id) {
-        throw new Error(`A project with the name "${projectData.name}" already exists`);
+        throw new Error(`Un projet avec le nom "${projectData.name}" existe déjà`);
       }
     }
     
-    // Prepare data to update
+    // Préparer les données à mettre à jour
     const updatedProject = {
       ...project,
       ...projectData,
       lastModified: new Date().toISOString()
     };
     
-    // Update the project in the database
+    // Mettre à jour le projet dans la base de données
     db.get('projects')
       .find({ id: id.toString() })
       .assign(updatedProject)
@@ -189,9 +189,9 @@ class ProjectService {
   }
 
   /**
-   * Delete a project
-   * @param {string} id - ID of the project to delete
-   * @returns {boolean} true if deleted, false otherwise
+   * Supprime un projet
+   * @param {string} id - ID du projet à supprimer
+   * @returns {boolean} true si supprimé, false sinon
    */
   deleteProject(id) {
     if (!id) return false;
@@ -203,7 +203,7 @@ class ProjectService {
     
     if (!project) return false;
     
-    // Delete the project from the database
+    // Supprimer le projet de la base de données
     db.get('projects')
       .remove({ id: id.toString() })
       .write();

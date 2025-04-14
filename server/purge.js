@@ -1,11 +1,11 @@
 /**
- * Purge script for Gource-Tools
+ * Script de purge pour Gource-Tools
  * 
- * This script:
- * 1. Cleans the database (repos, projects, renders)
- * 2. Deletes repository folders
- * 3. Removes logs and exports
- * 4. Preserves API keys and settings
+ * Ce script:
+ * 1. Nettoie la base de données (repos, projets, rendus)
+ * 2. Supprime les dossiers de dépôts
+ * 3. Supprime les logs et exports
+ * 4. Préserve les API keys et paramètres
  */
 
 const fs = require('fs');
@@ -14,9 +14,9 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig } = require('./config/defaultGourceConfig');
 
-console.log('🧹 Starting Gource-Tools purge...');
+console.log('🧹 Démarrage de la purge de Gource-Tools...');
 
-// Paths to folders that need cleaning
+// Chemins des dossiers à nettoyer
 const basePath = path.resolve(__dirname, '../');
 const reposDir = path.join(basePath, 'repos');
 const logsDir = path.join(basePath, 'logs');
@@ -24,52 +24,52 @@ const exportsDir = path.join(basePath, 'exports');
 const tempDir = path.join(basePath, 'temp');
 const dbPath = path.join(basePath, 'db/db.json');
 
-// Function to delete a folder and all its contents recursively
+// Fonction pour supprimer un dossier et tout son contenu récursivement
 function cleanDirectory(directory) {
   if (!fs.existsSync(directory)) {
-    console.log(`📂 Directory ${directory} doesn't exist, creating...`);
+    console.log(`📂 Le dossier ${directory} n'existe pas, création...`);
     fs.mkdirSync(directory, { recursive: true });
     return;
   }
 
   try {
-    // Read directory contents
+    // Lire le contenu du dossier
     const files = fs.readdirSync(directory);
     
-    // Loop through and delete each file/folder
+    // Parcourir et supprimer chaque fichier/dossier
     for (const file of files) {
       const fullPath = path.join(directory, file);
       const stat = fs.statSync(fullPath);
       
       if (stat.isDirectory()) {
-        // Delete the folder and its contents recursively
+        // Supprimer le dossier et son contenu récursivement
         fs.rmSync(fullPath, { recursive: true, force: true });
-        console.log(`🗑️ Directory deleted: ${fullPath}`);
+        console.log(`🗑️ Dossier supprimé: ${fullPath}`);
       } else {
-        // Delete the file
+        // Supprimer le fichier
         fs.unlinkSync(fullPath);
-        console.log(`🗑️ File deleted: ${fullPath}`);
+        console.log(`🗑️ Fichier supprimé: ${fullPath}`);
       }
     }
     
-    console.log(`✅ Directory cleaned: ${directory}`);
+    console.log(`✅ Dossier nettoyé: ${directory}`);
   } catch (error) {
-    console.error(`❌ Error cleaning directory ${directory}:`, error);
+    console.error(`❌ Erreur lors du nettoyage du dossier ${directory}:`, error);
   }
 }
 
-// Clean the database while preserving settings
+// Nettoyer la base de données tout en préservant les paramètres
 function cleanDatabase() {
   if (!fs.existsSync(dbPath)) {
-    console.log(`📄 Database file doesn't exist: ${dbPath}`);
+    console.log(`📄 Le fichier de base de données n'existe pas: ${dbPath}`);
     
-    // Ensure directory exists
+    // S'assurer que le répertoire existe
     const dbDir = path.dirname(dbPath);
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
     
-    // Create an empty DB file with basic structure
+    // Créer un fichier DB vide avec structure de base
     const emptyDb = {
       repositories: [],
       projects: [],
@@ -79,53 +79,53 @@ function cleanDatabase() {
     };
     
     fs.writeFileSync(dbPath, JSON.stringify(emptyDb, null, 2));
-    console.log(`✅ New database created with default configuration`);
+    console.log(`✅ Nouvelle base de données créée avec configuration par défaut`);
     return;
   }
 
   try {
-    // Load the database
+    // Charger la base de données
     const adapter = new FileSync(dbPath);
     const db = low(adapter);
     
-    // Save settings and API keys
+    // Sauvegarder les paramètres et API keys
     const settings = db.get('settings').value() || {};
     
-    // Get default profile if it exists
+    // Récupérer le profil par défaut s'il existe
     const defaultProfile = db.get('renderProfiles')
       .find({ isDefault: true })
       .value();
     
-    // Reset the database
+    // Réinitialiser la base de données
     db.set('repositories', [])
       .set('projects', [])
       .set('renders', [])
       .set('renderProfiles', defaultProfile ? [defaultProfile] : [defaultGourceConfig])
       .write();
     
-    // Restore settings
+    // Restaurer les paramètres
     db.set('settings', settings).write();
     
-    console.log(`✅ Database cleaned, ${Object.keys(settings).length} settings preserved`);
+    console.log(`✅ Base de données nettoyée, ${Object.keys(settings).length} paramètres préservés`);
     
-    // Display preserved API keys
+    // Afficher les clés API préservées
     if (settings.githubToken) {
-      console.log(`🔑 GitHub token preserved: ${settings.githubToken.substring(0, 4)}...${settings.githubToken.substring(settings.githubToken.length - 4)}`);
+      console.log(`🔑 Token GitHub préservé: ${settings.githubToken.substring(0, 4)}...${settings.githubToken.substring(settings.githubToken.length - 4)}`);
     }
   } catch (error) {
-    console.error(`❌ Error cleaning database:`, error);
+    console.error(`❌ Erreur lors du nettoyage de la base de données:`, error);
   }
 }
 
-// Execute cleanup
-console.log('🔄 Cleaning directories...');
+// Exécuter le nettoyage
+console.log('🔄 Nettoyage des dossiers...');
 cleanDirectory(reposDir);
 cleanDirectory(logsDir);
 cleanDirectory(exportsDir);
 cleanDirectory(tempDir);
 
-console.log('🔄 Cleaning database...');
+console.log('🔄 Nettoyage de la base de données...');
 cleanDatabase();
 
-console.log('✅ Purge complete! The application has been reset while preserving API keys and settings.');
-console.log('🚀 You can restart the server to apply the changes.'); 
+console.log('✅ Purge terminée! L\'application a été réinitialisée tout en préservant les clés API et paramètres.');
+console.log('🚀 Vous pouvez redémarrer le serveur pour appliquer les changements.'); 

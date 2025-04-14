@@ -197,57 +197,82 @@ class RenderService {
   }
 
   /**
-   * Process a render job
-   * @param {Object} project - Project to render
-   * @param {Object} render - Render entry
-   * @param {Object} options - Options
-   * @returns {Promise<Object>} - Render entry
+   * Traite un rendu
+   * @param {Object} project - Le projet associé au rendu
+   * @param {Object} render - L'objet de rendu à traiter
+   * @param {Object} options - Options supplémentaires pour le rendu
+   * @returns {Object} - L'objet de rendu mis à jour
    */
   async processRender(project, render, options = {}) {
+    console.log(`Début du traitement du rendu ${render.id}`);
+    
+    // Mettre à jour le statut du rendu
+    render.status = 'processing';
+    await this.updateRenderStatus(render.id, 'processing', 'Traitement du rendu en cours...', 0);
+    
     try {
-      // Check if the project has assigned repositories
-      if (!project.repositories || project.repositories.length === 0) {
-        throw new Error('No repositories assigned to project');
+      // Vérifier si le projet a des dépôts assignés
+      if (!project.repositoryDetails || project.repositoryDetails.length === 0) {
+        throw new Error('Aucun dépôt assigné au projet');
       }
-
-      // Get repositories for the project
-      const repositories = project.repositories.map(repoId => {
-        const repo = this.getDatabase().get('repositories').find({ id: repoId }).value();
-        return repo;
-      }).filter(Boolean);
-
-      console.log(`Generating combined logs for render ${render.id}`);
-      await this.updateRenderStatus(render.id, 'generating_logs', 'Generating Gource logs...', 10);
-
-      // Generate combined logs
-      const logFilePath = await this.generateCombinedLogs(repositories);
-
-      // Update status
-      await this.updateRenderStatus(render.id, 'generating_logs', 'Gource logs generated', 20);
-
-      // Prepare render
-      const outputDir = path.join(this.exportsDir, render.id);
-      await this.updateRenderStatus(render.id, 'rendering', 'Video generation in progress...', 30);
-
-      // Start the render process
-      await this.startGourceRender(render, logFilePath, outputDir);
-
-      // Update status when complete
-      await this.updateRenderStatus(
-        render.id, 
-        'completed', 
-        `Render completed: ${render.fileName}`, 
-        100, 
-        { filePath: render.filePath }
-      );
-
+      
+      // Créer les répertoires de sortie pour le rendu et les logs
+      const outputDir = path.join(this.exportsDir, render.id.toString());
+      const logsDir = path.join(this.logsDir, render.id.toString());
+      
+      if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+      }
+      
+      if (!fs.existsSync(logsDir)) {
+        fs.mkdirSync(logsDir, { recursive: true });
+      }
+      
+      console.log(`Génération des logs combinés pour le rendu ${render.id}`);
+      await this.updateRenderStatus(render.id, 'generating_logs', 'Génération des logs Gource...', 10);
+      
+      // Générer les logs combinés
+      const logOptions = {
+        startDate: render.startDate,
+        endDate: render.endDate,
+        ...options
+      };
+      
+      const combinedLogPath = await this.generateCombinedLogs(project.repositoryDetails, logOptions);
+      render.logPath = combinedLogPath;
+      await this.updateRenderStatus(render.id, 'generating_logs', 'Logs Gource générés', 20);
+      
+      // Exécuter le rendu Gource
+      console.log(`Exécution du rendu Gource pour ${render.id}`);
+      await this.updateRenderStatus(render.id, 'rendering', 'Génération de la vidéo en cours...', 30);
+      
+      const outputPath = path.join(outputDir, 'output.mp4');
+      
+      // Obtenir le profil de rendu associé au projet
+      const db = this.getDatabase();
+      const renderProfileId = project.renderProfileId;
+      const renderProfile = renderProfileId 
+        ? db.get('renderProfiles').find({ id: renderProfileId }).value() 
+        : null;
+      
+      // Utiliser les paramètres du profil de rendu ou des paramètres par défaut
+      const renderSettings = renderProfile?.settings || {};
+      
+      await this.executeGourceRender(combinedLogPath, render, outputPath, renderSettings);
+      
+      // Mettre à jour le rendu avec le chemin de sortie
+      render.outputPath = outputPath;
+      render.status = 'completed';
+      render.completedAt = new Date();
+      await this.updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
+      
+      console.log(`Rendu ${render.id} terminé avec succès`);
       return render;
     } catch (error) {
-      console.error(`Error during render ${render.id}:`, error);
-      
-      // Update status when failed
-      await this.updateRenderStatus(render.id, 'failed', `Render failed: ${error.message}`, 0);
-      
+      console.error(`Erreur lors du rendu ${render.id}:`, error);
+      render.status = 'failed';
+      render.error = error.message;
+      await this.updateRenderStatus(render.id, 'failed', error.message, 0);
       throw error;
     }
   }
@@ -495,6 +520,74 @@ class RenderService {
   }
 
   /**
+   * Update relative dates in profile settings based on the profile ID
+   * @param {Object} settings - Settings object to update
+   * @param {string} profileId - ID of the render profile to check
+   * @param {Object} profile - The complete profile object
+   * @returns {Object} Updated settings with current relative dates if needed
+   */
+  updateRelativeDatesInSettings(settings, profileId, profile) {
+    if (!settings || !profileId) return settings;
+    
+    // Create a new settings object to avoid modifying the original
+    const updatedSettings = { ...settings };
+    
+    // Vérifier si c'est un profil temporel (par l'indicateur explicite ou par l'ID)
+    const isTemporalProfile = 
+      (profile && profile.isTemporalProfile === true) ||
+      (profileId && (
+        profileId.includes('last_week') || 
+        profileId.includes('last_month') || 
+        profileId.includes('last_year')
+      ));
+    
+    if (!isTemporalProfile) return settings;
+    
+    // Calculate relative dates based on profile type
+    const now = new Date(); // Date actuelle réelle
+    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    
+    // Déterminer le nombre de jours à inclure
+    let daysToInclude = 0;
+    
+    if (profile && profile.daysToInclude) {
+      // Utiliser la valeur explicite du profil si disponible
+      daysToInclude = profile.daysToInclude;
+    } else if (updatedSettings['range-days'] && !isNaN(updatedSettings['range-days'])) {
+      // Sinon utiliser range-days s'il existe et est un nombre
+      daysToInclude = parseInt(updatedSettings['range-days'], 10);
+    } else if (profileId.includes('last_week')) {
+      daysToInclude = 7;
+    } else if (profileId.includes('last_month')) {
+      daysToInclude = 30;
+    } else if (profileId.includes('last_year')) {
+      daysToInclude = 365;
+    }
+    
+    // Calculer la date de début
+    if (daysToInclude > 0) {
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - daysToInclude);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      
+      // Mettre à jour les paramètres
+      updatedSettings['start-date'] = startDateStr;
+      updatedSettings['stop-date'] = today;
+      
+      // Log the updated dates for debugging
+      console.log(`Updated relative dates for profile ${profileId}: ${startDateStr} to ${today} (${daysToInclude} days)`);
+      
+      // Ensure we explicitly set these parameters as we want Gource to use them
+      if (updatedSettings['range-days']) {
+        delete updatedSettings['range-days']; // Remove range-days to avoid conflicts
+        console.log(`Removed range-days parameter to use start-date and stop-date instead`);
+      }
+    }
+    
+    return updatedSettings;
+  }
+
+  /**
    * Execute Gource render to video file
    * Optimized exclusively for Windows 11 Pro
    * @param {string} logFilePath - Path to log file
@@ -530,24 +623,37 @@ class RenderService {
         ? db.get('renderProfiles').find({ id: renderProfileId }).value() 
         : null;
       
-      if (renderProfile && renderProfile.dynamicTimeCalculation === true) {
-        // Dynamically calculate seconds per day
-        const calculatedSecondsPerDay = this.calculateSecondsPerDay(logFilePath);
+      if (renderProfile) {
+        // Update relative dates if this is a temporal profile
+        settings = this.updateRelativeDatesInSettings(settings, renderProfile.id, renderProfile);
         
-        // Update parameter in settings
-        settings['seconds-per-day'] = calculatedSecondsPerDay;
-        
-        // Update status to indicate calculation
-        this.updateRenderStatus(
-          render.id, 
-          'rendering', 
-          `Calculating time: ${calculatedSecondsPerDay.toFixed(3)} seconds per day for a one-minute render`, 
-          36
-        );
-      } else if (settings['seconds-per-day'] === 'auto') {
-        // If seconds-per-day is set to 'auto', do dynamic calculation
+        // Dynamic time calculation if specified
+        if (renderProfile.dynamicTimeCalculation === true) {
+          // Dynamically calculate seconds per day
+          const calculatedSecondsPerDay = this.calculateSecondsPerDay(logFilePath);
+          
+          // Update parameter in settings
+          settings['seconds-per-day'] = calculatedSecondsPerDay;
+          
+          // Update status to indicate calculation
+          this.updateRenderStatus(
+            render.id, 
+            'rendering', 
+            `Calculating time: ${calculatedSecondsPerDay.toFixed(3)} seconds per day for a one-minute render`, 
+            36
+          );
+        }
+      }
+      
+      // If seconds-per-day is set to 'auto', do dynamic calculation regardless of profile setting
+      if (settings['seconds-per-day'] === 'auto') {
         const calculatedSecondsPerDay = this.calculateSecondsPerDay(logFilePath);
         settings['seconds-per-day'] = calculatedSecondsPerDay;
+      }
+      
+      // Débogage: afficher les paramètres de date finaux
+      if (settings['start-date'] || settings['stop-date']) {
+        console.log(`Dates finales pour le rendu: du ${settings['start-date'] || 'début'} au ${settings['stop-date'] || 'fin'}`);
       }
       
       // Create temporary Gource config file
@@ -573,17 +679,17 @@ class RenderService {
         }
       }
       
-      // Generating PowerShell script for video rendering
+      // Génération du script PowerShell pour le rendu vidéo
       const powerShellScriptPath = path.join(this.tempDir, `render_script_${render.id}.ps1`);
       
-      // Prepare paths with double backslashes for PowerShell
+      // Préparer les chemins avec double backslashes pour PowerShell
       const psLogFilePath = logFilePath.replace(/\\/g, '\\\\');
       const psOutputFilePath = outputFilePath.replace(/\\/g, '\\\\');
       const psTempPPM = path.join(this.tempDir, `temp_${render.id}.ppm`).replace(/\\/g, '\\\\');
       
-      // Generate script content line by line
+      // Générer le contenu du script ligne par ligne
       const scriptLines = [
-        '# Simplified Gource rendering script',
+        '# Script simplifié de rendu Gource',
         '$ErrorActionPreference = "Stop"',
         '',
         '# File paths',
@@ -618,30 +724,30 @@ class RenderService {
         'exit 0'
       ];
       
-      // Join lines with line breaks
+      // Joindre les lignes avec des sauts de ligne
       const scriptContent = scriptLines.join('\r\n');
       
-      // Write PowerShell script
+      // Écrire le script PowerShell
       fs.writeFileSync(powerShellScriptPath, scriptContent, 'utf8');
       
-      // Update status
-      this.updateRenderStatus(render.id, 'rendering', 'Running render process...', 40);
+      // Mettre à jour le statut
+      this.updateRenderStatus(render.id, 'rendering', 'Exécution du processus de rendu...', 40);
       
-      // Create logging stream
+      // Créer un flux de journalisation
       const renderLogPath = path.join(this.logsDir, `render_${render.id}.log`);
       const logOutputStream = fs.createWriteStream(renderLogPath);
       
-      // Launch PowerShell with script
+      // Lancer PowerShell avec le script
       const powershellPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
       const psProcess = spawn(powershellPath, ['-ExecutionPolicy', 'Bypass', '-File', powerShellScriptPath], {
         stdio: 'pipe'
       });
       
-      // Redirect output streams
+      // Rediriger les flux de sortie
       psProcess.stdout.pipe(logOutputStream);
       psProcess.stderr.pipe(logOutputStream);
       
-      // Log output for debugging
+      // Journaliser la sortie pour le débogage
       psProcess.stdout.on('data', (data) => {
         console.log(`[Gource] ${data.toString().trim()}`);
       });
@@ -650,47 +756,47 @@ class RenderService {
         console.error(`[Gource Error] ${data.toString().trim()}`);
       });
 
-      // Periodically update render status
+      // Mettre à jour périodiquement le statut du rendu
       const statusUpdater = setInterval(() => {
         if (fs.existsSync(outputFilePath)) {
           try {
             const stats = fs.statSync(outputFilePath);
             if (stats.size > 0) {
-              // Calculate progress based on elapsed time (estimate)
+              // Calculer la progression en fonction du temps écoulé (estimation)
               const currentTime = new Date();
               const startTime = new Date(render.startTime || render.dateCreated);
               const elapsedSeconds = (currentTime - startTime) / 1000;
               
-              // Estimate progress (maximum 95% until rendering is complete)
+              // Estimer la progression (maximum 95% jusqu'à ce que le rendu soit terminé)
               const estimatedProgress = Math.min(40 + (elapsedSeconds / 3), 95);
               
-              this.updateRenderStatus(render.id, 'rendering', 'Rendering in progress...', estimatedProgress);
+              this.updateRenderStatus(render.id, 'rendering', 'Rendu en cours...', estimatedProgress);
             }
           } catch (error) {
-            console.error('Error checking output file:', error);
+            console.error('Erreur lors de la vérification du fichier de sortie:', error);
           }
         }
-      }, 5000); // Update every 5 seconds
+      }, 5000); // Mise à jour toutes les 5 secondes
       
-      // Wait for process to finish
+      // Attendre la fin du processus
       return new Promise((resolve, reject) => {
         psProcess.on('exit', (code) => {
           clearInterval(statusUpdater);
           
           if (code === 0) {
-            // Render successful
-            this.updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
-            console.log(`Render ${render.id} completed successfully, file: ${outputFilePath}`);
+            // Rendu réussi
+            this.updateRenderStatus(render.id, 'completed', 'Rendu terminé avec succès', 100);
+            console.log(`Rendu ${render.id} terminé avec succès, fichier: ${outputFilePath}`);
             resolve();
           } else {
-            // Render error
-            const errorMsg = `Render error (code ${code})`;
+            // Erreur de rendu
+            const errorMsg = `Erreur de rendu (code ${code})`;
             this.updateRenderStatus(render.id, 'failed', errorMsg, 0);
-            console.error(`Error during render ${render.id}, code: ${code}`);
+            console.error(`Erreur lors du rendu ${render.id}, code: ${code}`);
             reject(new Error(errorMsg));
           }
           
-          // Clean up temporary files
+          // Nettoyer les fichiers temporaires
           try {
             if (fs.existsSync(powerShellScriptPath)) {
               fs.unlinkSync(powerShellScriptPath);
@@ -699,15 +805,15 @@ class RenderService {
               fs.unlinkSync(tempConfigPath);
             }
           } catch (error) {
-            console.error('Error cleaning up temporary files:', error);
+            console.error('Erreur lors du nettoyage des fichiers temporaires:', error);
           }
         });
         
         psProcess.on('error', (error) => {
           clearInterval(statusUpdater);
-          const errorMsg = `Error starting process: ${error.message}`;
+          const errorMsg = `Erreur lors du démarrage du processus: ${error.message}`;
           this.updateRenderStatus(render.id, 'failed', errorMsg, 0);
-          console.error(`Error starting process for render ${render.id}:`, error);
+          console.error(`Erreur lors du démarrage du processus pour le rendu ${render.id}:`, error);
           reject(error);
         });
       });
