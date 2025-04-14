@@ -38,7 +38,8 @@ import {
   FormControl,
   FormControlLabel,
   RadioGroup,
-  Radio
+  Radio,
+  Checkbox
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -98,6 +99,8 @@ const RepositoriesPage = () => {
   // Project creation options
   const [projectCreationMode, setProjectCreationMode] = useState('none');
   const [projectNameTemplate, setProjectNameTemplate] = useState('{owner}');
+  // Option to create a project when adding a single repository
+  const [createProjectWithRepo, setCreateProjectWithRepo] = useState(false);
   
   // Ajouter un état pour vérifier si un token GitHub est configuré
   const [hasGithubToken, setHasGithubToken] = useState(false);
@@ -228,17 +231,17 @@ const RepositoriesPage = () => {
   useEffect(() => {
     let interval;
     if (bulkImportId && isBulkImporting) {
-      console.log('Démarrage du polling pour le statut d\'importation:', bulkImportId);
+      console.log('Starting bulk import polling for:', bulkImportId);
       
-      // Attendre un peu avant de commencer le polling pour donner
-      // au serveur le temps de démarrer le traitement
+      // Wait a bit before starting polling to give
+      // the server time to start processing
       setTimeout(() => {
         interval = setInterval(async () => {
           try {
-            console.log('Envoi d\'une requête de statut pour:', bulkImportId);
+            console.log('Sending status request for:', bulkImportId);
             const response = await repositoriesApi.getBulkImportStatus(bulkImportId);
             setBulkImportStatus(response.data);
-            console.log('Statut reçu:', response.data.status, 'Progress:', response.data.progress);
+            console.log('Status received:', response.data.status, 'Progress:', response.data.progress);
             
             // If bulk import is complete, stop polling
             if (response.data.status === 'completed' || response.data.status === 'failed') {
@@ -277,7 +280,7 @@ const RepositoriesPage = () => {
             clearInterval(interval);
           }
         }, 3000); // Poll every 3 seconds instead of 2
-      }, 2000); // Attendre 2 secondes avant de commencer le polling
+      }, 2000); // Wait 2 seconds before starting polling
     }
     
     return () => {
@@ -307,7 +310,8 @@ const RepositoriesPage = () => {
       setCloneSteps(initialSteps);
       
       const response = await repositoriesApi.create({
-        url: newRepoUrl
+        url: newRepoUrl,
+        createProject: createProjectWithRepo
       });
       
       // If API returns a clone ID, start tracking status
@@ -322,11 +326,31 @@ const RepositoriesPage = () => {
       }
     } catch (err) {
       console.error('Error adding repository:', err);
-      const errorMessage = err.response?.data?.error 
-        ? `${err.response.data.error}: ${err.response.data.details || ''}`
-        : 'Failed to add repository';
-      toast.error(errorMessage);
-      setAddingRepo(false);
+      
+      // Check if the server is suggesting to use bulk import (username detected)
+      if (err.response?.status === 422 && err.response.data?.suggestBulkImport) {
+        // Stop the single repo import process
+        setAddingRepo(false);
+        
+        // Switch to bulk import mode
+        setDialogMode('bulk');
+        
+        // Set the github URL from the response
+        setBulkImportUrl(err.response.data.githubUrl || `https://github.com/${err.response.data.username}`);
+        
+        // Set the default project creation mode to 'per_owner'
+        setProjectCreationMode('per_owner');
+        
+        // Show a toast to inform the user
+        toast.info('Switching to bulk import mode for GitHub username');
+      } else {
+        // Handle normal errors
+        const errorMessage = err.response?.data?.error 
+          ? `${err.response.data.error}: ${err.response.data.details || ''}`
+          : 'Failed to add repository';
+        toast.error(errorMessage);
+        setAddingRepo(false);
+      }
     }
   };
   
@@ -337,7 +361,7 @@ const RepositoriesPage = () => {
     }
     
     try {
-      console.log('Démarrage de l\'importation en masse pour:', bulkImportUrl);
+      console.log('Starting bulk import for:', bulkImportUrl);
       
       setIsBulkImporting(true);
       setBulkImportStatus({
@@ -346,15 +370,15 @@ const RepositoriesPage = () => {
         message: 'Starting bulk import...'
       });
       
-      // Préparer le template de nom pour les projets combinés
+      // Prepare name template for combined projects
       let finalTemplate = projectNameTemplate;
       
-      // Pour les projets combinés, utiliser 'owner1 - owner2' si le mode est 'single'
+      // For combined projects, use 'owner1 - owner2' if mode is 'single'
       if (projectCreationMode === 'single') {
         finalTemplate = 'owner1 - owner2';
       }
       
-      console.log('Envoi de la requête d\'importation avec skipConfirmation:', true);
+      console.log('Sending import request with skipConfirmation:', true);
       
       const response = await repositoriesApi.bulkImport({
         githubUrl: bulkImportUrl,
@@ -365,18 +389,18 @@ const RepositoriesPage = () => {
       });
       
       if (response.data && response.data.bulkImportId) {
-        console.log('Importation démarrée avec ID:', response.data.bulkImportId);
+        console.log('Import started with ID:', response.data.bulkImportId);
         setBulkImportId(response.data.bulkImportId);
         toast.info(`Bulk import started for ${bulkImportUrl}`);
         
-        // Mettre à jour immédiatement l'état pour refléter le démarrage
+        // Immediately update status to reflect the start
         setBulkImportStatus({
           progress: 5,
           status: 'processing',
-          message: 'Importation en cours...'
+          message: 'Import in progress...'
         });
       } else {
-        console.error('Réponse d\'importation sans ID:', response.data);
+        console.error('Import response without ID:', response.data);
         toast.error('Failed to start bulk import: No import ID received');
         setIsBulkImporting(false);
       }
@@ -454,16 +478,18 @@ const RepositoriesPage = () => {
     
     try {
       setDeletingRepo(true);
-      await repositoriesApi.delete(repoToDelete.id);
+      const response = await repositoriesApi.delete(repoToDelete.id);
       
       // Refresh the entire list to ensure everything is up to date
       await fetchRepositories();
       
-      toast.success('Repository deleted successfully');
+      toast.success(response.data.message || 'Repository deleted successfully');
       handleCloseDeleteDialog();
     } catch (err) {
       console.error('Error deleting repository:', err);
-      toast.error('Failed to delete repository');
+      // Display a more precise error message if available
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to delete repository';
+      toast.error(errorMessage);
     } finally {
       setDeletingRepo(false);
     }
@@ -476,8 +502,10 @@ const RepositoriesPage = () => {
     setBulkImportUrl('');
     setBulkImportId(null);
     setBulkImportStatus(null);
-    setProjectCreationMode('none');
+    // Set default mode for projects
+    setProjectCreationMode(mode === 'bulk' ? 'per_owner' : 'none');
     setProjectNameTemplate('{owner}');
+    setCreateProjectWithRepo(false);
     setOpenAddDialog(true);
   };
 
@@ -534,7 +562,7 @@ const RepositoriesPage = () => {
     return acc;
   }, {});
 
-  // Nouvelle fonction pour supprimer tous les dépôts d'un utilisateur
+  // Function to delete all repositories from a user
   const handleDeleteUserRepositories = async () => {
     if (!userToDelete) return;
     
@@ -542,46 +570,48 @@ const RepositoriesPage = () => {
       setDeletingUserRepos(true);
       let successCount = 0;
       let errorCount = 0;
+      let errorMessages = [];
       
-      // Liste des IDs qui ont déjà échoué pour éviter une boucle infinie
-      const failedIds = new Set();
-      
-      // Récupérer la liste initiale des dépôts
+      // Get the initial list of repositories once at the beginning
       await fetchRepositories();
-      let currentUserRepos = groupedRepositories[userToDelete] || [];
+      const reposToDelete = [...(groupedRepositories[userToDelete] || [])];
       
-      // Continuer tant qu'il reste des dépôts pour cet utilisateur
-      // et que nous n'avons pas déjà essayé tous les dépôts sans succès
-      while (currentUserRepos.length > 0 && failedIds.size < currentUserRepos.length) {
-        // Trouver le premier dépôt qui n'a pas encore échoué
-        const repoToDelete = currentUserRepos.find(repo => !failedIds.has(repo.id));
-        
-        // Si tous les dépôts ont échoué, sortir de la boucle
-        if (!repoToDelete) break;
-        
+      // Process all repositories to delete at once without refreshing the list between each
+      for (const repo of reposToDelete) {
         try {
-          await repositoriesApi.delete(repoToDelete.id);
+          await repositoriesApi.delete(repo.id);
           successCount++;
-          // Récupérer la liste mise à jour après suppression réussie
-          await fetchRepositories();
-          currentUserRepos = groupedRepositories[userToDelete] || [];
         } catch (err) {
-          console.error(`Error deleting repository ${repoToDelete.name}:`, err);
+          console.error(`Error deleting repository ${repo.name}:`, err);
           errorCount++;
-          // Marquer cet ID comme ayant échoué
-          failedIds.add(repoToDelete.id);
+          
+          // Don't consider "repository not found" as an error to display
+          if (err.response?.status !== 404) {
+            const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || `Failed to delete repository ${repo.name}`;
+            errorMessages.push(`${repo.name}: ${errorMessage}`);
+          }
         }
       }
       
-      // Mise à jour finale de la liste
+      // Refresh the list once at the end
       await fetchRepositories();
       
+      // Display a toast for the results
       const message = `${successCount} repositories deleted${errorCount > 0 ? `, ${errorCount} failures` : ''}`;
       toast.success(message);
+      
+      // Display a toast for each important error (limited to 3)
+      if (errorMessages.length > 0) {
+        errorMessages.slice(0, 3).forEach(msg => toast.error(msg));
+        if (errorMessages.length > 3) {
+          toast.error(`And ${errorMessages.length - 3} more errors`);
+        }
+      }
+      
       handleCloseDeleteUserDialog();
     } catch (err) {
       console.error('Error deleting user repositories:', err);
-      toast.error('Failed to delete repositories');
+      toast.error(err.message || 'Failed to delete repositories');
     } finally {
       setDeletingUserRepos(false);
     }
@@ -812,6 +842,12 @@ const RepositoriesPage = () => {
                 variant="outlined"
                 value={newRepoUrl}
                 onChange={(e) => setNewRepoUrl(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !addingRepo) {
+                    e.preventDefault();
+                    handleAddRepository();
+                  }
+                }}
                 placeholder="https://github.com/username/repository.git"
                 required
                 sx={{ mb: 2 }}
@@ -823,6 +859,17 @@ const RepositoriesPage = () => {
                   ),
                 }}
               />
+              <Box sx={{ mt: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox 
+                      checked={createProjectWithRepo} 
+                      onChange={(e) => setCreateProjectWithRepo(e.target.checked)}
+                    />
+                  }
+                  label="Create a project with this repository"
+                />
+              </Box>
             </>
           )}
           
@@ -843,6 +890,12 @@ const RepositoriesPage = () => {
                 variant="outlined"
                 value={bulkImportUrl}
                 onChange={(e) => setBulkImportUrl(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !isBulkImporting) {
+                    e.preventDefault();
+                    handleBulkImport();
+                  }
+                }}
                 placeholder="https://github.com/organization/"
                 required
                 sx={{ mb: 2 }}
