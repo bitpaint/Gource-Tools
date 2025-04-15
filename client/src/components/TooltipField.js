@@ -19,26 +19,76 @@ const TooltipField = ({
   rows = 1,
   InputProps = {},
   inputProps = {},
-  disabled = false
+  disabled = false,
+  InputLabelProps = {}
 }) => {
   
+  // Universal handler that works with all components
   const handleChange = (e) => {
-    onChange(e.target.value);
+    // Get the new value from the event
+    const newValue = e.target.value;
+    
+    // Special handling for date-text type
+    if (type === 'date-text') {
+      // Only allow digits and hyphens
+      let formattedValue = newValue.replace(/[^\d-]/g, '');
+      
+      // Auto-format as YYYY-MM-DD
+      if (formattedValue.length > 0) {
+        const digits = formattedValue.replace(/-/g, '');
+        if (digits.length <= 4) {
+          // Just the year part
+          formattedValue = digits;
+        } else if (digits.length <= 6) {
+          // Year and month
+          formattedValue = `${digits.substring(0, 4)}-${digits.substring(4)}`;
+        } else {
+          // Full date
+          formattedValue = `${digits.substring(0, 4)}-${digits.substring(4, 6)}-${digits.substring(6, 8)}`;
+        }
+      }
+      
+      // Always use synthetic event object to maintain compatibility
+      const syntheticEvent = {
+        target: {
+          value: formattedValue
+        }
+      };
+      
+      onChange(syntheticEvent);
+    } else {
+      // For all other fields, just pass the original event
+      onChange(e);
+    }
   };
+
+  // Determine the actual input type
+  // For our custom date implementation, use text input
+  const actualType = type === 'date-text' ? 'text' : type;
+  
+  // Set appropriate placeholder for date fields
+  const actualPlaceholder = type === 'date-text' ? 'YYYY-MM-DD' : placeholder;
 
   return (
     <Box sx={{ width: '100%' }}>
       <TextField
         fullWidth
         label={label}
-        value={value || ''}
+        value={value !== undefined ? value : ''}
         onChange={handleChange}
-        type={type}
-        placeholder={placeholder}
+        type={actualType}
+        placeholder={actualPlaceholder}
         multiline={multiline}
         rows={rows}
         disabled={disabled}
-        inputProps={inputProps}
+        InputLabelProps={{
+          shrink: type === 'date-text' ? true : undefined,
+          ...InputLabelProps
+        }}
+        inputProps={{
+          ...inputProps,
+          maxLength: type === 'date-text' ? 10 : undefined
+        }}
         InputProps={{
           ...InputProps,
           endAdornment: (

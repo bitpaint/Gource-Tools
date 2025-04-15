@@ -1,8 +1,7 @@
 import React from 'react';
 import {
   Grid,
-  Typography,
-  InputAdornment // Added for potential future use
+  Typography
 } from '@mui/material';
 
 // Import custom components
@@ -206,8 +205,8 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
            <TooltipField
              label="Directory Name Depth"
              type="number"
-             value={settings.dirNameDepth || 0}
-             onChange={(value) => onSettingsChange('dirNameDepth', parseInt(value) || 0)}
+             value={settings.dirNameDepth || ''}
+             onChange={(value) => onSettingsChange('dirNameDepth', value === '' ? '' : parseInt(value) || 0)}
              tooltip={settingsDescriptions.dirNameDepth || 'Draw dir names down to this depth (0=default).'}
              inputProps={{ min: 0 }}
            />

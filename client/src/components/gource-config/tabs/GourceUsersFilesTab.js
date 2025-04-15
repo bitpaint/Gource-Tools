@@ -100,8 +100,8 @@ const GourceUsersFilesTab = ({ settings, onSettingsChange, settingsDescriptions 
           <TooltipField
             label="Max User Count"
             type="number"
-            value={settings.maxUserCount || 0}
-            onChange={(value) => onSettingsChange('maxUserCount', parseInt(value) || 0)}
+            value={settings.maxUserCount || ''}
+            onChange={(value) => onSettingsChange('maxUserCount', value === '' ? '' : parseInt(value) || 0)}
             tooltip={settingsDescriptions.maxUserCount || 'Limit the number of users shown (0 = no limit).'}
             inputProps={{ min: 0 }}
             helperText="0 for unlimited"
@@ -167,8 +167,8 @@ const GourceUsersFilesTab = ({ settings, onSettingsChange, settingsDescriptions 
           <TooltipField
             label="Max File Lag (Seconds)"
             type="number"
-            value={settings.maxFilelag || 0.5} // Gource often uses max-file-lag
-            onChange={(value) => onSettingsChange('maxFilelag', parseFloat(value) || 0.5)}
+            value={settings.maxFilelag || ''}
+            onChange={(value) => onSettingsChange('maxFilelag', value === '' ? '' : parseFloat(value) || 0.5)}
             tooltip={settingsDescriptions.maxFilelag || 'Max delay before files appear after commit.'}
             inputProps={{ min: 0, step: 0.1 }}
           />
@@ -177,8 +177,8 @@ const GourceUsersFilesTab = ({ settings, onSettingsChange, settingsDescriptions 
           <TooltipField
             label="Max Files"
             type="number"
-            value={settings.maxFiles || 0}
-            onChange={(value) => onSettingsChange('maxFiles', parseInt(value) || 0)}
+            value={settings.maxFiles || ''}
+            onChange={(value) => onSettingsChange('maxFiles', value === '' ? '' : parseInt(value) || 0)}
             tooltip={settingsDescriptions.maxFiles || 'Max number of files displayed (0 = unlimited).'}
             inputProps={{ min: 0 }}
             helperText="0 for unlimited"
@@ -188,8 +188,8 @@ const GourceUsersFilesTab = ({ settings, onSettingsChange, settingsDescriptions 
           <TooltipField
             label="File Idle Time (Seconds)"
             type="number"
-            value={settings.fileIdleTime || 0}
-            onChange={(value) => onSettingsChange('fileIdleTime', parseInt(value) || 0)}
+            value={settings.fileIdleTime || ''}
+            onChange={(value) => onSettingsChange('fileIdleTime', value === '' ? '' : parseInt(value) || 0)}
             tooltip={settingsDescriptions.fileIdleTime || 'Time files stay after inactivity (0 = remove immediately).'}
             inputProps={{ min: 0 }}
           />
@@ -198,8 +198,8 @@ const GourceUsersFilesTab = ({ settings, onSettingsChange, settingsDescriptions 
           <TooltipField
             label="File Idle Time At End (Seconds)"
             type="number"
-            value={settings.fileIdleTimeAtEnd || 0}
-            onChange={(value) => onSettingsChange('fileIdleTimeAtEnd', parseInt(value) || 0)}
+            value={settings.fileIdleTimeAtEnd || ''}
+            onChange={(value) => onSettingsChange('fileIdleTimeAtEnd', value === '' ? '' : parseInt(value) || 0)}
             tooltip={settingsDescriptions.fileIdleTimeAtEnd || 'Time files stay at the very end (0 = remove immediately).'}
             inputProps={{ min: 0 }}
           />

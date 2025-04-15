@@ -7,8 +7,7 @@ import {
   Checkbox,
   FormControl,
   InputLabel,
-  Select,
-  Box
+  Select
 } from '@mui/material';
 
 // Import custom components
@@ -129,19 +128,20 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
                     </Select>
                   </FormControl>
                 </Grid>
-                <Grid item xs={0} sm={4} />
+                <Grid item xs={0} sm={4}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                    from today
+                  </Typography>
+                </Grid>
               </>
             ) : (
               <Grid item xs={12} sm={8}>
                 <TooltipField
                   label="Fixed Start Date"
-                  type="date"
+                  type="date-text"
                   value={safeSettings.startDateFixed || ''}
                   onChange={handleFixedStartDateChange}
                   tooltip={settingsDescriptions.startDate || 'Set a fixed start date (YYYY-MM-DD).'}
-                  InputLabelProps={{ shrink: true }}
-                  InputProps={{ sx: { '::-webkit-calendar-picker-indicator': { filter: 'invert(0.8)', cursor: 'pointer' }, color: 'text.primary' } }}
-                  fullWidth
                   variant="outlined"
                 />
               </Grid>
@@ -152,13 +152,10 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
         <Grid item xs={12} md={9} sx={{ ml: { md: '25%' } }}>
           <TooltipField
             label="Stop Date (Optional)"
-            type="date"
+            type="date-text"
             value={safeSettings.stopDate || ''}
-            onChange={(value) => onSettingsChange('stopDate', value)}
+            onChange={(event) => onSettingsChange('stopDate', event.target.value)}
             tooltip={settingsDescriptions.stopDate || 'Set a fixed stop date (YYYY-MM-DD). Leave empty to render until the end.'}
-            InputLabelProps={{ shrink: true }}
-            InputProps={{ sx: { '::-webkit-calendar-picker-indicator': { filter: 'invert(0.8)', cursor: 'pointer' }, color: 'text.primary' } }}
-            fullWidth
             variant="outlined"
           />
         </Grid>
@@ -170,8 +167,8 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Seconds Per Day"
             type="number"
-            value={safeSettings.secondsPerDay || 1}
-            onChange={(value) => onSettingsChange('secondsPerDay', parseFloat(value) || 1)}
+            value={safeSettings.secondsPerDay || ''}
+            onChange={(event) => onSettingsChange('secondsPerDay', event.target.value === '' ? '' : parseFloat(event.target.value) || 0.1)}
             tooltip={settingsDescriptions.secondsPerDay || 'Number of seconds each day lasts.'}
             inputProps={{ min: 0.1, step: 0.1 }}
             variant="outlined"
@@ -181,8 +178,8 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Auto Skip Seconds"
             type="number"
-            value={safeSettings.autoSkipSeconds || 0.1}
-            onChange={(value) => onSettingsChange('autoSkipSeconds', parseFloat(value) || 0.1)}
+            value={safeSettings.autoSkipSeconds || ''}
+            onChange={(event) => onSettingsChange('autoSkipSeconds', event.target.value === '' ? '' : parseFloat(event.target.value) || 0.1)}
             tooltip={settingsDescriptions.autoSkipSeconds || 'Skip inactivity longer than this (seconds).'}
             inputProps={{ min: 0, step: 0.1 }}
             disabled={safeSettings.disableAutoSkip}
@@ -233,7 +230,7 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Start Position"
             value={safeSettings.startPosition || ''}
-            onChange={(value) => onSettingsChange('startPosition', value)}
+            onChange={(event) => onSettingsChange('startPosition', event.target.value)}
             tooltip={settingsDescriptions.startPosition || "Start at a specific position (0.0-1.0 or 'random')."}
             placeholder="e.g., 0.0, 0.5, random"
             variant="outlined"
@@ -243,7 +240,7 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Stop Position"
             value={safeSettings.stopPosition || ''}
-            onChange={(value) => onSettingsChange('stopPosition', value)}
+            onChange={(event) => onSettingsChange('stopPosition', event.target.value)}
             tooltip={settingsDescriptions.stopPosition || 'Stop at a specific position (0.0-1.0).'}
             placeholder="e.g., 0.8, 1.0"
             variant="outlined"
@@ -253,8 +250,8 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Stop After Time (Seconds)"
             type="number"
-            value={safeSettings.stopAtTime || 0}
-            onChange={(value) => onSettingsChange('stopAtTime', parseInt(value) || 0)}
+            value={safeSettings.stopAtTime || ''}
+            onChange={(event) => onSettingsChange('stopAtTime', event.target.value === '' ? '' : parseInt(event.target.value) || 0)}
             tooltip={settingsDescriptions.stopAtTime || 'Stop simulation after X seconds.'}
             helperText="0 to disable"
             inputProps={{ min: 0 }}
@@ -273,8 +270,8 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Loop Delay (Seconds)"
             type="number"
-            value={safeSettings.loopDelaySeconds || 3}
-            onChange={(value) => onSettingsChange('loopDelaySeconds', parseInt(value) || 3)}
+            value={safeSettings.loopDelaySeconds || ''}
+            onChange={(event) => onSettingsChange('loopDelaySeconds', event.target.value === '' ? '' : parseInt(event.target.value) || 0)}
             tooltip={settingsDescriptions.loopDelaySeconds || 'Pause duration before looping.'}
             inputProps={{ min: 0 }}
             disabled={!safeSettings.loop}
