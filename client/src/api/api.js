@@ -144,7 +144,9 @@ export const rendersApi = {
 // Settings API
 export const settingsApi = {
   get: () => api.get('/settings'),
-  update: (data) => api.post('/settings', data),
+  update: (data) => api.put('/settings', data),
+  getDefaultProfileId: () => api.get('/settings/default-profile'),
+  setDefaultProfileId: (profileId) => api.put('/settings/default-profile', { profileId }),
 };
 
 // Create an object for default export

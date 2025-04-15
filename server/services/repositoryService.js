@@ -353,35 +353,6 @@ const generateGitLog = async (repository, outputPath, options = {}) => {
     // Clean up temporary file
     fs.unlinkSync(tempLogPath);
 
-    // --- Date Filtering (Applied after processing) ---
-    if (options.startDate || options.endDate || options.stopDate) {
-        logger.info(`Filtering log by date range for ${repository.name}`);
-        const startTimestamp = options.startDate ? new Date(options.startDate).getTime() / 1000 : 0;
-        const endTimestamp = (options.endDate || options.stopDate) ? 
-            new Date(options.endDate || options.stopDate).getTime() / 1000 : Number.MAX_SAFE_INTEGER;
-
-        let currentContent = fs.readFileSync(outputPath, 'utf8');
-        let filteredLines = currentContent.split('\n').filter(line => {
-            if (line.trim() === '') return false;
-            const parts = line.split('|');
-            // Timestamp is now at index 0 again
-            if (parts.length > 0) { 
-                const timestamp = parseInt(parts[0], 10);
-                return !isNaN(timestamp) && timestamp >= startTimestamp && timestamp <= endTimestamp;
-            }
-            return false; // Ignore lines without enough parts
-        });
-
-        if (filteredLines.length === 0) {
-            logger.warn(`No entries found within the specified date range for ${repository.name}. Log file might be empty.`);
-            // Write empty content if no lines match the filter
-            fs.writeFileSync(outputPath, '', 'utf8'); 
-        } else {
-            fs.writeFileSync(outputPath, filteredLines.join('\n'), 'utf8');
-            logger.info(`Log filtered by date. ${filteredLines.length} entries remaining.`);
-        }
-    }
-    
     // --- Final Analysis --- 
     const finalStats = fs.statSync(outputPath);
     const finalContentAfterFilter = fs.readFileSync(outputPath, 'utf8');

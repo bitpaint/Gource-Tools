@@ -3,7 +3,7 @@
  * Handles HTTP requests related to application settings
  */
 
-const SettingsService = require('../services/settingsService');
+const SettingsService = require('../services/SettingsService');
 const ErrorHandler = require('../utils/ErrorHandler');
 const Logger = require('../utils/Logger');
 
@@ -67,8 +67,42 @@ const validateGithubToken = async (req, res) => {
   }
 };
 
+/**
+ * Get the default project render profile ID
+ */
+const getDefaultProfile = (req, res) => {
+  try {
+    const profileId = SettingsService.getDefaultProjectProfileId();
+    res.json({ defaultProjectProfileId: profileId });
+  } catch (error) {
+    logger.error('Error fetching default profile ID', error);
+    ErrorHandler.handleError(error, res);
+  }
+};
+
+/**
+ * Set the default project render profile ID
+ */
+const setDefaultProfile = async (req, res) => {
+  try {
+    const { profileId } = req.body;
+    // Basic validation: profileId should be a string or null
+    if (typeof profileId !== 'string' && profileId !== null) {
+       return res.status(400).json({ error: 'Invalid profileId provided. Must be a string or null.' });
+    }
+
+    const result = await SettingsService.setDefaultProjectProfileId(profileId);
+    res.json(result);
+  } catch (error) {
+    logger.error('Error setting default profile ID', error);
+    ErrorHandler.handleError(error, res);
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
-  validateGithubToken
+  validateGithubToken,
+  getDefaultProfile,
+  setDefaultProfile
 }; 

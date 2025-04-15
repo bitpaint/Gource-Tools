@@ -8,7 +8,7 @@ const fs = require('fs');
 // Remove direct lowdb dependencies
 // const low = require('lowdb');
 // const FileSync = require('lowdb/adapters/FileSync');
-const { customRenderProfiles } = require('./customRenderProfiles');
+const customRenderProfiles = require('./customRenderProfiles'); // Import the array directly
 const Database = require('../utils/Database'); // Import the shared DB instance
 const Logger = require('../utils/Logger');
 

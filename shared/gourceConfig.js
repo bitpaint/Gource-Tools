@@ -269,263 +269,170 @@ function convertToGourceArgs(settings) {
 
   let args = '';
   
-  // Mappage direct des paramètres aux options Gource v0.53
-  const paramMapping = {
+  // Explicit mapping for clarity and control
+  const mapping = {
     resolution: '--viewport',
-    framerate: '--output-framerate',
-    secondsPerDay: '--seconds-per-day',
-    autoSkipSeconds: '--auto-skip-seconds',
-    elasticity: '--elasticity',
-    background: '--background-colour',
-    fontScale: '--font-scale',
-    cameraMode: '--camera-mode',
-    userScale: '--user-scale',
-    timeScale: '--time-scale',
-    // highlightUsers: handled by simpleBooleans
-    hideUsers: '--user-filter', // Corrected from --hide-users
-    hideFilesRegex: '--file-filter',
-    // hideRoot: handled by simpleBooleans
-    // maxUserCount: '--max-users', // Removed - Option does not exist in Gource v0.53
-    // titleText: handled specifically below
+    fullscreen: '-f',
+    screenNum: '--screen',
+    multiSampling: '--multi-sampling',
+    noVsync: '--no-vsync',
     startDate: '--start-date',
     stopDate: '--stop-date',
-    maxFilelag: '--max-file-lag',
-    bloomIntensity: '--bloom-intensity',
+    startPosition: '-p',
+    stopPosition: '--stop-position',
+    stopAtTime: '-t',
+    stopAtEnd: '--stop-at-end',
+    dontStop: '--dont-stop',
+    loop: '--loop',
+    autoSkipSeconds: '-a',
+    disableAutoSkip: '--disable-auto-skip',
+    secondsPerDay: '-s',
+    realtime: '--realtime',
+    noTimeTravel: '--no-time-travel',
+    timeScale: '-c',
+    elasticity: '-e',
+    key: '--key',
+    userImageDir: '--user-image-dir',
+    defaultUserImage: '--default-user-image',
+    fixedUserSize: '--fixed-user-size',
+    colourImages: '--colour-images',
+    fileIdleTime: '-i',
+    fileIdleTimeAtEnd: '--file-idle-time-at-end',
+    maxFiles: '--max-files',
+    maxFileLag: '--max-file-lag',
+    windowPosition: '--window-position',
+    frameless: '--frameless',
+    outputCustomLog: '--output-custom-log',
+    background: '-b',
+    backgroundImage: '--background-image',
     bloomMultiplier: '--bloom-multiplier',
-    // Added font sizes
+    bloomIntensity: '--bloom-intensity',
+    cameraMode: '--camera-mode',
+    cropAxis: '--crop',
+    padding: '--padding',
+    disableAutoRotate: '--disable-auto-rotate',
+    disableInput: '--disable-input',
+    dateFormat: '--date-format',
+    fontFile: '--font-file',
+    fontScale: '--font-scale',
     fontSize: '--font-size',
     filenameFontSize: '--file-font-size',
     dirnameFontSize: '--dir-font-size',
     userFontSize: '--user-font-size',
-    // Added colors
     fontColor: '--font-colour',
-    dirColor: '--dir-colour',
+    fileExtensions: '--file-extensions',
+    fileExtensionFallback: '--file-extension-fallback',
+    gitBranch: '--git-branch',
+    hide: '--hide', // Special handling for array value needed
+    logo: '--logo',
+    logoOffset: '--logo-offset',
+    loopDelaySeconds: '--loop-delay-seconds',
+    title: '--title', // Special handling for boolean/string value needed
+    transparent: '--transparent',
+    userFilter: '--user-filter',
+    userShowFilter: '--user-show-filter',
+    fileFilter: '--file-filter',
+    fileShowFilter: '--file-show-filter',
+    userFriction: '--user-friction',
+    userScale: '--user-scale',
+    maxUserSpeed: '--max-user-speed',
+    followUser: '--follow-user',
+    highlightDirs: '--highlight-dirs',
+    highlightUser: '--highlight-user',
+    highlightUsers: '--highlight-users',
     highlightColor: '--highlight-colour',
     selectionColor: '--selection-colour',
-    // Added Time/Position options
-    startPosition: '-p', // or --start-position
-    stopPosition: '--stop-position',
-    stopAtTime: '-t', // or --stop-at-time
-    loopDelaySeconds: '--loop-delay-seconds',
-    // Added Appearance Extras
     filenameColor: '--filename-colour',
+    dirColor: '--dir-colour',
     dirNameDepth: '--dir-name-depth',
     dirNamePosition: '--dir-name-position',
     filenameTime: '--filename-time',
-    // Added File options
-    maxFiles: '--max-files',
-    fileIdleTime: '-i', // or --file-idle-time
-    fileIdleTimeAtEnd: '--file-idle-time-at-end',
-    // titleColor is not a direct Gource option, fontColor affects title
-    // Added User / Avatar options
-    defaultUserImage: '--default-user-image',
-    userFriction: '--user-friction',
-    maxUserSpeed: '--max-user-speed',
-    // Added Background / Logo
-    backgroundImage: '--background-image',
-    logo: '--logo',
-    logoOffset: '--logo-offset',
-    // Added Group 1 Mappings
-    screenNum: '--screen',
-    windowPosition: '--window-position',
-    cropAxis: '--crop',
-    padding: '--padding',
-    hashSeed: '--hash-seed',
-    // Added Group 2 Mappings
-    userShowFilter: '--user-show-filter',
-    fileShowFilter: '--file-show-filter',
-    highlightUser: '--highlight-user',
     captionFile: '--caption-file',
     captionSize: '--caption-size',
     captionColour: '--caption-colour',
     captionDuration: '--caption-duration',
     captionOffset: '--caption-offset',
-    // Added Last Group Mappings
-    fontFile: '--font-file',
-    followUser: '--follow-user',
-    outputCustomLog: '--output-custom-log',
-    gitBranch: '--git-branch'
+    hashSeed: '--hash-seed',
+    framerate: '--output-framerate' // Note: This is technically an output option
   };
 
-  // Paramètres booléens qui sont inversés (présence = désactivation)
-  // Gource v0.53 uses --hide <element>
-  const hideElements = [];
-  if (settings.title === false) hideElements.push('title');
-  if (settings.key === false) hideElements.push('key');
-  if (settings.showDates === false) hideElements.push('date');
-  if (settings.showLines === false) hideElements.push('files');
-  // Add other hideable elements if needed: bloom, dirnames, filenames, mouse, progress, root, tree, users, usernames
+  // Map camelCase keys in settings to kebab-case arguments
+  const settingKeys = Object.keys(settings);
 
-  // Paramètres booléens simples (flags qui existent dans Gource v0.53)
-  const simpleBooleans = {
-    multiSampling: '--multi-sampling',
-    disableProgress: '--disable-progress', // Will be converted to --hide progress
-    disableAutoRotate: '--disable-auto-rotate',
-    // followUsers: removed, requires specific user in Gource v0.53
-    highlightUsers: '--highlight-users',
-    hideRoot: '--hide-root', // Will be converted to --hide root
-    loop: '--loop', // Added loop flag
-    transparent: '--transparent', // Added transparent flag
-    // Added File options
-    fileExtensions: '--file-extensions',
-    fileExtensionFallback: '--file-extension-fallback',
-    // Added User / Avatar flags
-    fixedUserSize: '--fixed-user-size',
-    colourImages: '--colour-images',
-    // Added Group 1 Flags
-    fullscreen: '-f', // or --fullscreen
-    noVsync: '--no-vsync',
-    frameless: '--frameless',
-    stopAtEnd: '--stop-at-end',
-    dontStop: '--dont-stop',
-    disableAutoSkip: '--disable-auto-skip',
-    realtime: '--realtime',
-    noTimeTravel: '--no-time-travel',
-    highlightDirs: '--highlight-dirs',
-    disableInput: '--disable-input'
-  };
+  for (const key of settingKeys) {
+    const value = settings[key];
 
-  // Paramètres qui nécessitent un traitement spécial pour les couleurs (# removal)
-  const colorParams = [
-      'background', 
-      'fontColor', 
-      'dirColor', 
-      'highlightColor', 
-      'selectionColor',
-      'filenameColor',
-      'captionColour' // Added caption color
-  ];
+    // Skip if value is null, undefined, or empty string (unless it's a boolean flag where presence matters)
+    if (value === null || value === undefined || value === '') continue;
 
-  // Traitement des paramètres
-  for (const [key, value] of Object.entries(settings)) {
-    // Skip the boolean controlling the avatar dir itself
-    if (key === 'useUserImageDir') {
-        continue;
-    }
-    
-    // Ignore les valeurs vides/null/undefined/default pour certains cas
-    if (value === '' || value === null || value === undefined) {
-      continue;
-    }
-    
-    // Skip bloom boolean itself, handle intensity/multiplier below
-    if (key === 'bloom') {
-        continue;
-    }
-
-    // Traitement spécifique pour extraArgs
-    if (key === 'extraArgs' && value) {
-      args += ` ${value}`;
+    const gourceArg = mapping[key];
+    if (!gourceArg) {
+      // console.warn(`No Gource argument mapping found for setting key: ${key}`);
       continue;
     }
 
-    // Traitement des booléens simples (flags qui existent)
-    if (key in simpleBooleans && value === true) {
-       // Special handling for fileExtensionFallback which depends on fileExtensions
-       if (key === 'fileExtensionFallback' && !settings.fileExtensions) {
-           console.warn('--file-extension-fallback requires --file-extensions to be enabled. Skipping.');
-           continue;
-       }
-       // Convert flags that map to --hide
-       if (key === 'hideRoot') {
-           if (!hideElements.includes('root')) hideElements.push('root');
-       } else if (key === 'disableProgress') {
-            if (!hideElements.includes('progress')) hideElements.push('progress');
-       } 
-       // Add actual boolean flags
-       else {
-           args += ` ${simpleBooleans[key]}`;
-       }
+    // Handle boolean flags (arguments without values)
+    if (typeof value === 'boolean') {
+      if (value) {
+        args += ` ${gourceArg}`;
+      }
+      continue; // Move to next setting
+    }
+
+    // Handle the 'hide' argument which can be an array
+    if (key === 'hide' && Array.isArray(value)) {
+      if (value.length > 0) {
+        args += ` ${gourceArg} ${value.join(',')}`;
+      }
       continue;
     }
-    
-    // Paramètres normaux via mapping
-    if (paramMapping[key]) {
-      // Skip bloom parameters if bloom is explicitly false
-      if ((key === 'bloomIntensity' || key === 'bloomMultiplier') && settings.bloom === false) {
-        continue;
+
+    // Handle the 'title' argument which can be boolean or string
+    if (key === 'title') {
+      if (typeof value === 'string' && value.trim() !== '') {
+        args += ` ${gourceArg} "${value.replace(/"/g, '\\"')}"`; // Add quotes for title text
+      } else if (value === true) {
+        args += ` ${gourceArg}`; // Add flag if just true
       }
-      
-      // Skip time/position values if 0 or empty string (unless it's startPosition which can be 0.0)
-      if ((key === 'stopPosition' || key === 'stopAtTime' || key === 'loopDelaySeconds') && 
-          (value === 0 || value === '0' || value === '')) {
-          continue;
-      }
-      if (key === 'startPosition' && value === '') {
-           continue;
-      }
-      
-      // Skip default values for some appearance extras
-      if (key === 'dirNameDepth' && (value === 0 || value === '0')) {
-          continue;
-      }
-      if (key === 'dirNamePosition' && (value === 0.5 || value === '0.5')) {
-          continue;
-      }
-      if (key === 'filenameTime' && (value === 4.0 || value === '4.0' || value === 4)) {
-          continue;
-      }
-      
-      // Skip file limits/times if 0 (default)
-      if ((key === 'maxFiles' || key === 'fileIdleTime' || key === 'fileIdleTimeAtEnd') && 
-          (value === 0 || value === '0')) {
-          continue;
-      }
-      
-      // Skip default/empty values for Group 1
-      if (key === 'screenNum' && (value === 0 || value === '0')) continue;
-      if (key === 'windowPosition' && value === '') continue;
-      if (key === 'cropAxis' && value === '') continue;
-      if (key === 'padding' && (value === 1.1 || value === '1.1')) continue;
-      if (key === 'hashSeed' && value === '') continue;
-      
-      // Skip empty values for Group 2
-      if ((key === 'userShowFilter' || key === 'fileShowFilter' || key === 'highlightUser' || key === 'captionFile') && value === '') {
-          continue;
-      }
-      // Skip default caption values?
-      if (key === 'captionSize' && (value === 12 || value === '12')) continue;
-      if (key === 'captionColour' && (value === '#FFFFFF' || value === 'FFFFFF')) continue;
-      if (key === 'captionDuration' && (value === 10.0 || value === '10.0' || value === 10)) continue;
-      if (key === 'captionOffset' && (value === 0 || value === '0')) continue;
-      
-      // Skip empty values for Last Group
-      if ((key === 'fontFile' || key === 'followUser' || key === 'outputCustomLog' || key === 'gitBranch') && value === '') {
-          continue;
-      }
-      
-      // Traitement spécial pour les dates (format requis par Gource: "YYYY-MM-DD hh:mm:ss +tz")
-      if (key === 'startDate' || key === 'stopDate') {
-        if (typeof value === 'string' && value.trim() !== '') {
-          // Assume YYYY-MM-DD format, ajouter l'heure et fuseau horaire
-          const formattedDate = `"${value} 00:00:00 +0000"`;
-          args += ` ${paramMapping[key]} ${formattedDate}`;
+      continue;
+    }
+
+    // Special handling for colors (remove # if present)
+    if (['background', 'fontColor', 'dirColor', 'highlightColor', 'selectionColor', 'filenameColor', 'captionColour'].includes(key)) {
+      const colorValue = typeof value === 'string' ? value.replace('#', '') : value;
+      args += ` ${gourceArg} ${colorValue}`;
+      continue;
+    }
+
+    // Special handling for viewport/resolution
+    if (key === 'resolution') {
+      args += ` ${gourceArg} ${value}`; // --viewport WIDTHxHEIGHT
+      continue;
+    }
+
+    // Handle dates (ensure correct format string)
+    if (key === 'startDate' || key === 'stopDate') {
+      if (typeof value === 'string' && value) {
+        // Ensure value is just "YYYY-MM-DD HH:MM:SS" before adding quotes
+        const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+        if (dateMatch && dateMatch[1]) {
+          args += ` ${gourceArg} "${dateMatch[1]}"`; 
+        } else {
+          console.warn(`Invalid date format for ${key}: ${value}. Skipping.`);
         }
-      } 
-      // Traitement spécial pour les booléens mappés qui ne sont pas des flags
-      // (Example: highlightUsers was here but is a flag)
-      // Traitement spécial pour les couleurs (enlever le #)
-      else if (colorParams.includes(key) && typeof value === 'string') {
-        const colorValue = value.replace(/^#/, '');
-        args += ` ${paramMapping[key]} ${colorValue}`;
-      } 
-      // Handle titleText which maps to --title
-      else if (key === 'titleText') {
-        args += ` --title "${value}"`;
       }
-      // Arguments normaux
-      else {
-        // Ensure value is quoted if it contains spaces and is not a number/position
-        const needsQuotes = typeof value === 'string' && value.includes(' ') && !['startPosition', 'stopPosition'].includes(key);
-        const argValue = needsQuotes ? `"${value}"` : value;
-        args += ` ${paramMapping[key]} ${argValue}`;
-      }
+      continue;
     }
+
+    // For all other arguments, add them with their values
+    args += ` ${gourceArg} ${value}`;
   }
 
+  // Note: extraArgs is not explicitly mapped, needs separate handling if required.
+
   // Add combined --hide arguments if any
-  if (hideElements.length > 0) {
-      args += ` --hide ${hideElements.join(',')}`;
+  if (settings.hide && settings.hide.length > 0) {
+    args += ` --hide ${settings.hide.join(',')}`;
   }
   
   // Ensure framerate is present for output
@@ -535,7 +442,7 @@ function convertToGourceArgs(settings) {
 
   // Add --user-image-dir if enabled
   if (settings.useUserImageDir === true) {
-      args += ` --user-image-dir "${AVATAR_DIR_PATH}"`;
+    args += ` --user-image-dir "${AVATAR_DIR_PATH}"`;
   }
 
   // Remove leading/trailing spaces

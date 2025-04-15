@@ -31,10 +31,162 @@ const logsDir = path.join(__dirname, '../../logs');
 let pid = null;
 
 // Import ProjectService module
-const ProjectService = require('./projectService');
+const ProjectService = require('./ProjectService');
 
 // Import RepositoryService after this service's declaration to avoid circular dependency
 let RepositoryService = null;
+
+// Helper function to parse date strings (YYYY-MM-DD or relative)
+function calculateStartDate(startDateSetting) {
+  if (typeof startDateSetting === 'string' && startDateSetting.startsWith('relative-')) {
+    const match = startDateSetting.match(/^relative-(\d+)([dwmy])$/);
+    if (match) {
+      const value = parseInt(match[1], 10);
+      const unit = match[2];
+      const now = new Date();
+      switch (unit) {
+        case 'd':
+          now.setDate(now.getDate() - value);
+          break;
+        case 'w':
+          now.setDate(now.getDate() - value * 7);
+          break;
+        case 'm':
+          now.setMonth(now.getMonth() - value);
+          break;
+        case 'y':
+          now.setFullYear(now.getFullYear() - value);
+          break;
+        default:
+          logger.warn(`Invalid relative date unit: ${unit}`);
+          return null; // Invalid unit
+      }
+      // Format as YYYY-MM-DD HH:MM:SS for Gource
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 00:00:00`;
+    } else {
+      logger.warn(`Invalid relative date format: ${startDateSetting}`);
+      return null; // Invalid format
+    }
+  } else if (typeof startDateSetting === 'string' && /\d{4}-\d{2}-\d{2}/.test(startDateSetting)) {
+    // Assume YYYY-MM-DD if provided, add time for Gource compatibility
+    return `${startDateSetting} 00:00:00`;
+  }
+  return startDateSetting; // Return original if not relative or valid date string
+}
+
+// Function to read log file and calculate dynamic parameters
+const calculateDynamicParams = async (logFilePath, settings, render) => {
+  logger.info(`Calculating dynamic parameters for log: ${logFilePath}`);
+  const processedSettings = { ...settings };
+
+  if (!fs.existsSync(logFilePath)) {
+    logger.error(`Log file not found for dynamic calculation: ${logFilePath}`);
+    throw new Error(`Log file not found: ${logFilePath}`);
+  }
+
+  // Calculate effective start and end timestamps from the full log
+  let firstTimestamp = null;
+  let lastTimestamp = null;
+
+  try {
+    // Read the first and last lines efficiently to get the full log range
+    const fileContent = fs.readFileSync(logFilePath, 'utf8');
+    const lines = fileContent.trim().split('\n');
+    if (lines.length > 0) {
+      firstTimestamp = parseInt(lines[0].split('|')[0], 10);
+      lastTimestamp = parseInt(lines[lines.length - 1].split('|')[0], 10);
+    }
+  } catch (error) {
+    logger.error(`Error reading log file ${logFilePath}: ${error.message}`);
+    throw new Error(`Failed to read log file for dynamic calculations: ${error.message}`);
+  }
+
+  if (firstTimestamp === null || lastTimestamp === null || isNaN(firstTimestamp) || isNaN(lastTimestamp)) {
+    logger.warn(`Could not parse timestamps from log file: ${logFilePath}. Skipping dynamic calculations.`);
+    return processedSettings; // Return original settings if timestamps invalid
+  }
+
+  const logStartDate = new Date(firstTimestamp * 1000);
+  const logEndDate = new Date(lastTimestamp * 1000); // End date is always the last commit in the log
+  let effectiveStartDate = logStartDate; // Default effective start is the log's start
+  const effectiveEndDate = logEndDate;   // Effective end is always the log's end
+
+  // Process relative startDate marker
+  if (typeof settings.startDate === 'string' && settings.startDate.startsWith('relative-')) {
+    const calculatedStartDateStr = calculateStartDate(settings.startDate); // Use helper to get YYYY-MM-DD HH:MM:SS
+    if (calculatedStartDateStr) {
+      const calculatedStartDate = new Date(calculatedStartDateStr.split(' ')[0]); // Parse YYYY-MM-DD part for comparison
+      // Use the later of the calculated start date or the log's actual start date
+      effectiveStartDate = calculatedStartDate > logStartDate ? calculatedStartDate : logStartDate;
+      // Update the setting passed to Gource with the calculated, formatted date string
+      processedSettings.startDate = calculatedStartDateStr; 
+      logger.info(`Calculated relative start date for Gource: ${processedSettings.startDate}`);
+    } else {
+      logger.warn(`Could not calculate relative start date for ${settings.startDate}, using log start date.`);
+      processedSettings.startDate = null; // Remove invalid marker
+    }
+  } else if (settings.startDate) {
+      // If a fixed start date is provided, use the later of it or the log start
+      const providedStartDate = new Date(settings.startDate.split(' ')[0]);
+      effectiveStartDate = providedStartDate > logStartDate ? providedStartDate : logStartDate;
+      // Ensure fixed date has correct format for Gource if needed
+      if (!/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(processedSettings.startDate)) {
+           processedSettings.startDate = `${settings.startDate.split(' ')[0]} 00:00:00`;
+      }
+      logger.info(`Using fixed start date for Gource: ${processedSettings.startDate}`);
+  } else {
+       // No start date specified, Gource will use the beginning of the log
+       processedSettings.startDate = null; // Ensure it's explicitly null if not set
+       logger.info('No start date specified, using log start date.');
+  }
+
+  // Stop date is generally not needed if we want to visualize up to the last commit
+  // If a stopDate was provided (fixed or relative), it should be handled similarly,
+  // but for now, we assume visualization runs until the end of the log (effectiveEndDate).
+  processedSettings.stopDate = null; // Explicitly nullify stop date unless specifically needed
+
+  // Calculate effective duration based on the determined start/end points for SPD calculation
+  const effectiveDurationSeconds = (effectiveEndDate.getTime() - effectiveStartDate.getTime()) / 1000;
+  // Ensure duration is at least 1 second to avoid division by zero or nonsensical SPD
+  const effectiveDurationDays = Math.max(1 / 86400, effectiveDurationSeconds / 86400); 
+
+  logger.info(`Effective visualization start: ${effectiveStartDate.toISOString()}, end: ${effectiveEndDate.toISOString()}`);
+  logger.info(`Effective duration for SPD calc: ${effectiveDurationDays.toFixed(4)} days (${effectiveDurationSeconds.toFixed(0)} seconds)`);
+
+  // Process auto secondsPerDay marker
+  if (typeof settings.secondsPerDay === 'string' && settings.secondsPerDay.startsWith('auto-')) {
+    const match = settings.secondsPerDay.match(/^auto-(\d+)s$/);
+    if (match) {
+      const targetVideoSeconds = parseInt(match[1], 10);
+      if (effectiveDurationDays > 0 && targetVideoSeconds > 0) {
+        // Formula: SPD = TargetVideoSeconds / EffectiveDays
+        processedSettings.secondsPerDay = (targetVideoSeconds / effectiveDurationDays).toFixed(4);
+        logger.info(`Calculated secondsPerDay for ${targetVideoSeconds}s video: ${processedSettings.secondsPerDay}`);
+      } else {
+        logger.warn(`Cannot calculate auto secondsPerDay: duration ${effectiveDurationDays.toFixed(4)} days, target ${targetVideoSeconds}s. Using default 1.`);
+        processedSettings.secondsPerDay = '1'; // Default to 1 second per day
+      }
+    } else {
+      logger.warn(`Invalid auto secondsPerDay format: ${settings.secondsPerDay}. Using default 1.`);
+      processedSettings.secondsPerDay = '1';
+    }
+  }
+  
+  // Process dynamic title placeholders
+  if (typeof processedSettings.title === 'string') {
+     // Use the calculated SPD for duration estimate
+     const spd = parseFloat(processedSettings.secondsPerDay || 1);
+     const totalVideoSecondsApprox = effectiveDurationDays * spd;
+     const durationMinutes = (totalVideoSecondsApprox / 60).toFixed(1);
+     // Ensure render object exists for projectName, provide fallback
+     const projectName = render ? render.projectName : 'Project'; 
+     processedSettings.title = processedSettings.title.replace('{projectName}', projectName)
+                                                     .replace('{duration}', durationMinutes);
+     logger.info(`Processed title: ${processedSettings.title}`);
+  }
+
+  return processedSettings;
+};
 
 /**
  * Initialize the database
@@ -258,14 +410,8 @@ const processRender = async (project, render, options = {}) => {
     logger.render(`Generating combined logs for render ${render.id}`);
     await updateRenderStatus(render.id, 'generating_logs', 'Generating Gource logs...', 10);
     
-    // Generate combined logs - Use dates stored in the render object
-    const logOptions = {
-      startDate: render.startDate,
-      endDate: render.stopDate,
-      ...options // Keep other options if needed
-    };
-    
-    const combinedLogPath = await generateCombinedLogs(project.repositoryDetails, logOptions);
+    // Generate combined logs (always full history)
+    const combinedLogPath = await generateCombinedLogs(project.repositoryDetails);
     render.logPath = combinedLogPath;
     await updateRenderStatus(render.id, 'generating_logs', 'Gource logs generated', 20);
     
@@ -319,32 +465,40 @@ const processRender = async (project, render, options = {}) => {
     // --- End Corrected Logic ---
 
     // Use the selected render profile's settings
-    const renderSettings = { ...(renderProfile.settings || {}) };
+    let initialSettings = { ...(renderProfile.settings || {}) };
     
-    // Apply date filters from profile if they exist and weren't overridden by specific render options
-    if (!logOptions.startDate && renderSettings.startDate) {
-      logOptions.startDate = renderSettings.startDate;
-      logger.config(`Applying start date from profile: ${logOptions.startDate}`);
-    }
-    if (!logOptions.stopDate && renderSettings.stopDate) {
-      logOptions.stopDate = renderSettings.stopDate;
-      logger.config(`Applying stop date from profile: ${logOptions.stopDate}`);
-    }
-    // Re-generate logs if date filters from the profile were added
-    if ((renderSettings.startDate && !render.startDate) || (renderSettings.stopDate && !render.stopDate)) {
-      logger.info("Re-generating logs with date filters from selected profile.");
-      await updateRenderStatus(render.id, 'generating_logs', 'Re-generating Gource logs with profile dates...', 15);
-      const updatedLogPath = await generateCombinedLogs(project.repositoryDetails, logOptions);
-      render.logPath = updatedLogPath; // Update the log path
-      await updateRenderStatus(render.id, 'generating_logs', 'Gource logs re-generated', 25);
+    // Merge render-specific dates (if any) into the initial settings *before* dynamic calculation
+    if (render.startDate) initialSettings.startDate = render.startDate;
+    if (render.stopDate) initialSettings.stopDate = render.stopDate;
+
+    // Calculate dynamic parameters ONCE using the combined settings
+    let processedSettings = {};
+    try {
+        processedSettings = await calculateDynamicParams(render.logPath, initialSettings, render);
+        logger.info('Successfully calculated dynamic parameters for Gource execution.');
+    } catch (error) {
+        logger.error(`Error calculating dynamic parameters: ${error.message}. Render might use incorrect dates/speed.`);
+        // Fallback to initial settings if calculation fails
+        processedSettings = { ...initialSettings }; 
+        // Remove markers if calculation failed
+        if (typeof processedSettings.startDate === 'string' && processedSettings.startDate.startsWith('relative-')) {
+             processedSettings.startDate = null; 
+        }
+        if (typeof processedSettings.secondsPerDay === 'string' && processedSettings.secondsPerDay.startsWith('auto-')) {
+             processedSettings.secondsPerDay = '1'; // Default SPD
+        }
     }
 
-
+    // Ensure title is set if dynamic processing failed to set it
+    if (!processedSettings.title && render.projectName) {
+        processedSettings.title = render.projectName;
+    }
+    
     // Use the render's definitive file path
     const finalOutputFilePath = render.filePath;
     logger.config(`Final output path: ${finalOutputFilePath}`);
     
-    await executeGourceRender(render.logPath, render, finalOutputFilePath, renderSettings);
+    await executeGourceRender(render.logPath, render, finalOutputFilePath, processedSettings);
     
     // Update render status to completed
     render.status = 'completed';
@@ -411,8 +565,31 @@ const startGourceRender = async (render, logFilePath, outputDir) => {
     // Use the profile settings for rendering - passed directly to executeGourceRender from processRender now
     const settings = { ...(finalProfile.settings || {}) }; 
     
+    // Calculate dynamic parameters (startDate, secondsPerDay, title)
+    let processedSettings = {};
+    try {
+        processedSettings = await calculateDynamicParams(logFilePath, settings, render);
+        logger.info('Successfully calculated dynamic parameters.');
+    } catch (error) {
+        logger.error(`Error calculating dynamic parameters: ${error.message}. Continuing with base settings.`);
+        // Use base settings if dynamic calculation fails
+        processedSettings = { ...settings }; 
+        // Ensure potential relative/auto markers are removed or defaulted if calculation failed
+        if (typeof processedSettings.startDate === 'string' && processedSettings.startDate.startsWith('relative-')) {
+             processedSettings.startDate = null; // Remove invalid relative start
+        }
+        if (typeof processedSettings.secondsPerDay === 'string' && processedSettings.secondsPerDay.startsWith('auto-')) {
+             processedSettings.secondsPerDay = '1'; // Default SPD
+        }
+    }
+
+    // Ensure title is set if dynamic processing failed to set it
+    if (!processedSettings.title && render.projectName) {
+        processedSettings.title = render.projectName;
+    }
+    
     // Execute Gource render using the definitive path from the render object
-    await executeGourceRender(logFilePath, render, render.filePath, settings);
+    await executeGourceRender(logFilePath, render, render.filePath, processedSettings);
     
     return true;
   } catch (error) {
@@ -424,11 +601,10 @@ const startGourceRender = async (render, logFilePath, outputDir) => {
 /**
  * Generates a combined log file from multiple repositories
  * @param {Array} repositories - List of repositories
- * @param {Object} options - Options for log generation
  * @returns {string} - Path to the combined log file
  */
-const generateCombinedLogs = async (repositories, options = {}) => {
-  logger.render(`Generating combined logs for ${repositories.length} repositories`);
+const generateCombinedLogs = async (repositories) => {
+  logger.info(`Generating combined logs for repositories: ${repositories.map(r => r.name).join(', ')}`);
   
   if (!repositories || repositories.length === 0) {
     logger.error('No repositories provided for log generation');
@@ -469,7 +645,7 @@ const generateCombinedLogs = async (repositories, options = {}) => {
       }
       
       // Use generateGitLog from RepositoryService directly with repo object
-      const result = await RepositoryService.generateGitLog(repo, logFilePath, options);
+      const result = await RepositoryService.generateGitLog(repo, logFilePath, {});
       
       if (result && !result.isEmpty) {
         logFiles.push(result);

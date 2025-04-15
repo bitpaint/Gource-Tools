@@ -8,6 +8,7 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 const { Octokit } = require('@octokit/rest');
 const Logger = require('../utils/Logger');
+const Database = require('../utils/Database'); // Import Database utility
 
 // Create a component logger
 const logger = Logger.createComponentLogger('SettingsService');
@@ -15,11 +16,43 @@ const logger = Logger.createComponentLogger('SettingsService');
 class SettingsService {
   constructor() {
     this.envPath = path.resolve(__dirname, '../../.env');
+    this._initializeDbSettings(); // Ensure DB settings are initialized
   }
 
   /**
-   * Load settings from .env file
-   * @returns {Object} Settings
+   * Ensure the settings collection exists in the database and has defaults.
+   */
+  _initializeDbSettings() {
+    try {
+      const db = Database.getDatabase();
+      if (!db.has('settings').value()) {
+        logger.info('Initializing settings collection in database...');
+        // Find the profile marked as default in customRenderProfiles
+        const customProfiles = require('../config/customRenderProfiles');
+        const defaultProfile = customProfiles.find(p => p.isDefault === true);
+        const defaultId = defaultProfile ? defaultProfile.id : null;
+        if (!defaultId) {
+            logger.warn('No profile marked as isDefault=true found in customRenderProfiles.js. Default Project Profile ID will be null.');
+        }
+        db.defaults({ settings: { defaultProjectProfileId: defaultId } }).write();
+        logger.info(`Initialized settings with defaultProjectProfileId: ${defaultId}`);
+      } else {
+         // Ensure the defaultProjectProfileId key exists even if settings collection was already there
+         const currentSettings = db.get('settings').value();
+         if (typeof currentSettings.defaultProjectProfileId === 'undefined') {
+             logger.warn('defaultProjectProfileId missing in existing settings collection. Initializing to null.');
+             db.get('settings').assign({ defaultProjectProfileId: null }).write();
+         }
+      }
+    } catch (error) {
+      logger.error('Error initializing database settings:', error);
+      // Handle error appropriately, maybe throw or log significantly
+    }
+  }
+
+  /**
+   * Load settings from .env file AND database
+   * @returns {Object} Settings (merged)
    */
   getSettings() {
     try {
@@ -46,9 +79,14 @@ class SettingsService {
         tokenStatus = 'present';
       }
       
+      // Get settings from Database
+      const db = Database.getDatabase();
+      const dbSettings = db.get('settings').value() || { defaultProjectProfileId: null };
+      
       return {
         githubToken: token,
-        tokenStatus
+        tokenStatus,
+        defaultProjectProfileId: dbSettings.defaultProjectProfileId
       };
     } catch (error) {
       logger.error('Error loading settings', error);
@@ -158,6 +196,47 @@ class SettingsService {
         message: `Token validation failed: ${error.message}` 
       };
     }
+  }
+
+  /**
+   * Get the ID of the default render profile for new projects.
+   * @returns {string | null} The ID of the default profile or null.
+   */
+  getDefaultProjectProfileId() {
+      try {
+          const db = Database.getDatabase();
+          const settings = db.get('settings').value();
+          return settings ? settings.defaultProjectProfileId : null;
+      } catch (error) {
+          logger.error('Error getting default project profile ID:', error);
+          return null; // Return null on error
+      }
+  }
+
+  /**
+   * Set the ID of the default render profile for new projects.
+   * @param {string | null} profileId - The ID of the profile to set as default.
+   * @returns {Promise<Object>} Result
+   */
+  async setDefaultProjectProfileId(profileId) {
+      try {
+          // Optional: Validate if the profileId actually exists in renderProfiles?
+          const db = Database.getDatabase();
+          const profileExists = db.get('renderProfiles').find({ id: profileId }).value();
+          if (!profileId) { // Allowing setting back to null/none
+             logger.info('Setting default project profile ID to null.');
+          } else if (!profileExists) {
+              logger.warn(`Attempted to set non-existent profile ID (${profileId}) as default. Setting to null instead.`);
+              profileId = null; // Or throw an error?
+          }
+
+          db.get('settings').assign({ defaultProjectProfileId: profileId }).write();
+          logger.success(`Default project profile ID set to: ${profileId}`);
+          return { success: true, defaultProjectProfileId: profileId };
+      } catch (error) {
+          logger.error('Error setting default project profile ID:', error);
+          throw new Error('Failed to set default project profile ID');
+      }
   }
 }
 

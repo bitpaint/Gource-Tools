@@ -33,147 +33,68 @@ function getStartOfYear() {
 
 // -- Custom Render Profiles --
 const customRenderProfiles = [
-  // -- Temporal Profiles --
-  {
-    id: 'last_24h',
-    name: 'Last 24 Hours',
-    description: 'Visualize activity from the last 24 hours',
-    settings: { 
-      secondsPerDay: 1, 
-      timeScale: 1.5, 
-      autoSkipSeconds: 0.1 
-    },
-    dynamicTimeCalculation: true, // Indicates this profile needs date calculation
-    daysToInclude: 1,
-    isTemporalProfile: true
-  },
-  {
-    id: 'last_7d',
-    name: 'Last 7 Days',
-    description: 'Visualize activity from the last 7 days',
-    settings: { 
-      secondsPerDay: 10, 
-      timeScale: 1.0, 
-      autoSkipSeconds: 0.5 
-    },
-    dynamicTimeCalculation: true,
-    daysToInclude: 7,
-    isTemporalProfile: true
-  },
-  {
-    id: 'last_30d',
-    name: 'Last 30 Days',
-    description: 'Visualize activity from the last 30 days',
-    settings: { 
-      secondsPerDay: 60, 
-      timeScale: 1.0, 
-      autoSkipSeconds: 1 
-    },
-    dynamicTimeCalculation: true,
-    daysToInclude: 30,
-    isTemporalProfile: true
-  },
-  {
-    id: 'last_90d',
-    name: 'Last 90 Days',
-    description: 'Visualize activity from the last 90 days',
-    settings: { 
-      secondsPerDay: 180, 
-      timeScale: 1.0, 
-      autoSkipSeconds: 1 
-    },
-    dynamicTimeCalculation: true,
-    daysToInclude: 90,
-    isTemporalProfile: true
-  },
-  {
-    id: 'last_365d',
-    name: 'Last 365 Days',
-    description: 'Visualize activity from the last 365 days',
-    settings: { 
-      secondsPerDay: 300, 
-      timeScale: 0.8, 
-      autoSkipSeconds: 1 
-    },
-    dynamicTimeCalculation: true,
-    daysToInclude: 365,
-    isTemporalProfile: true
-  },
-  {
-    id: 'this_week',
-    name: 'This Week (Since Sunday)',
-    description: 'Visualize activity since the start of the current week (Sunday)',
-    settings: { 
-      secondsPerDay: 10, 
-      timeScale: 1.0, 
-      autoSkipSeconds: 0.5 
-    },
-    dynamicTimeCalculation: true,
-    getStartDate: getStartOfWeek,
-    isTemporalProfile: true
-  },
-  {
-    id: 'this_month',
-    name: 'This Month',
-    description: 'Visualize activity since the start of the current month',
-    settings: { 
-      secondsPerDay: 60, 
-      timeScale: 1.0, 
-      autoSkipSeconds: 1 
-    },
-    dynamicTimeCalculation: true,
-    getStartDate: getStartOfMonth,
-    isTemporalProfile: true
-  },
-  {
-    id: 'this_year',
-    name: 'This Year',
-    description: 'Visualize activity since the start of the current year',
-    settings: { 
-      secondsPerDay: 300, 
-      timeScale: 0.8, 
-      autoSkipSeconds: 1 
-    },
-    dynamicTimeCalculation: true,
-    getStartDate: getStartOfYear,
-    isTemporalProfile: true
-  },
-  
-  // -- Thematic/Duration Profiles --
-  {
-    id: 'quick_overview_30s',
-    name: 'Quick Overview (30s)',
-    description: 'Fast-paced overview of the project activity, compressed into 30 seconds',
-    settings: {
-      secondsPerDay: -1, // Placeholder, will be calculated based on project duration
-      outputFramerate: 30,
-      timeScale: 2.0,
-      autoSkipSeconds: 0.01, // Very fast skipping
-      hide: ['filenames'],
-      bloomMultiplier: 1.5,
-      titleText: '{projectName} - Quick Overview',
-      stopPosition: '1.0' // Ensure it plays till the end
-    },
-    targetDurationSeconds: 30,
-    isTemporalProfile: false // This profile adjusts based on project duration, not a fixed past period
-  },
   {
     id: 'everything_1m',
-    name: 'Everything in 1min',
-    description: 'Profile to visualize the entire project in 1 minute',
+    name: 'Everything in 1 min',
+    description: 'Visualize the entire project history compressed into approximately 1 minute.',
+    isDefault: true, // Mark this as the default profile
+    isSystemProfile: true, // Cannot be edited or deleted by user
     settings: {
-      secondsPerDay: -1, // Placeholder, calculated based on project duration
+      // Key setting: Dynamic calculation based on project duration
+      secondsPerDay: 'auto-60s', 
+      // Sensible defaults for a quick overview
       outputFramerate: 30,
-      timeScale: 1.5,
       autoSkipSeconds: 0.1,
-      hide: ['date'],
+      hide: ['date'], // Hide date for faster pace
       bloomMultiplier: 1.2,
-      titleText: '{projectName} - Full History (1 min)',
-      stopPosition: '1.0'
-    },
-    targetDurationSeconds: 60,
-    isTemporalProfile: false // Based on the total duration of the project (first commit to last commit)
+      title: '{projectName} - Full History ({duration} min)',
+      stopPosition: '1.0' // Ensure it plays till the end
+    }
   },
+  {
+    id: 'last_week_1m',
+    name: 'Last Week in 1 min',
+    description: 'Visualize the last 7 days of activity compressed into approximately 1 minute.',
+    isSystemProfile: true,
+    settings: {
+      // Key settings: Relative start date and dynamic speed
+      startDate: 'relative-7d',
+      secondsPerDay: 'auto-60s',
+      // Other settings
+      outputFramerate: 30,
+      autoSkipSeconds: 0.1,
+      title: '{projectName} - Last 7 Days ({duration} min)',
+      stopPosition: '1.0'
+    }
+  },
+  {
+    id: 'last_month_1m',
+    name: 'Last Month in 1 min',
+    description: 'Visualize the last 30 days of activity compressed into approximately 1 minute.',
+    isSystemProfile: true,
+    settings: {
+      startDate: 'relative-30d',
+      secondsPerDay: 'auto-60s',
+      outputFramerate: 30,
+      autoSkipSeconds: 0.1,
+      title: '{projectName} - Last 30 Days ({duration} min)',
+      stopPosition: '1.0'
+    }
+  },
+  {
+    id: 'last_year_1m',
+    name: 'Last Year in 1 min',
+    description: 'Visualize the last 365 days of activity compressed into approximately 1 minute.',
+    isSystemProfile: true,
+    settings: {
+      startDate: 'relative-365d',
+      secondsPerDay: 'auto-60s',
+      outputFramerate: 30,
+      autoSkipSeconds: 0.1,
+      title: '{projectName} - Last 365 Days ({duration} min)',
+      stopPosition: '1.0'
+    }
+  }
 ];
 
 module.exports = customRenderProfiles; 

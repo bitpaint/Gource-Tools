@@ -7,6 +7,7 @@ const path = require('path');
 const fs = require('fs');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const SettingsService = require('./SettingsService'); // Import SettingsService
 const Database = require('../utils/Database'); // Import Database
 
 class ProjectService {
@@ -128,13 +129,17 @@ class ProjectService {
     // Generate unique ID
     const id = Date.now().toString();
     
+    // Get the current default render profile ID from settings
+    const defaultProfileId = SettingsService.getDefaultProjectProfileId();
+
     // Create the project
     const newProject = {
       id,
       name: projectData.name,
       description: projectData.description || '',
       repositories: projectData.repositories || [],
-      renderProfileId: projectData.renderProfileId || null,
+      // Use provided ID, otherwise use the default from settings
+      renderProfileId: projectData.renderProfileId !== undefined ? projectData.renderProfileId : defaultProfileId, 
       dateCreated: new Date().toISOString(),
       lastModified: new Date().toISOString()
     };
