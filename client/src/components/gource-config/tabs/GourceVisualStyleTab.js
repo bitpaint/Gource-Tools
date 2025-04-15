@@ -14,6 +14,27 @@ import TooltipCheckbox from '../../TooltipCheckbox';
  * Visual Style settings tab for Gource configuration
  */
 const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions }) => {
+  // Helper function for handling numeric inputs
+  const handleNumericChange = (field, value, defaultValue, isFloat = false) => {
+    // Get value from event if needed
+    if (value && value.target) {
+      value = value.target.value;
+    }
+
+    // If value is empty and empty is allowed, use empty string
+    if (value === '') {
+      onSettingsChange(field, '');
+      return;
+    }
+    
+    // Parse the value as number (int or float)
+    const parsedValue = isFloat ? parseFloat(value) : parseInt(value, 10);
+    
+    // Use defaultValue if parsing fails
+    const finalValue = isNaN(parsedValue) ? defaultValue : parsedValue;
+    onSettingsChange(field, finalValue);
+  };
+
   return (
     <>
       <Typography variant="body2" color="text.secondary" paragraph>
@@ -27,7 +48,7 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
           <TooltipField
             label="Font File Path (.ttf, .otf)"
             value={settings.fontFile || ''}
-            onChange={(value) => onSettingsChange('fontFile', value)}
+            onChange={(e) => onSettingsChange('fontFile', e.target.value)}
             tooltip={settingsDescriptions.fontFile || 'Path to a .ttf or .otf font file.'}
             placeholder="Leave empty for default font"
           />
@@ -44,16 +65,16 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
             max={2.5}
           />
         </Grid>
-         <Grid item xs={12} sm={6} md={4}>
-           <TooltipField
-             label="Filename Time (Seconds)"
-             type="number"
-             value={settings.filenameTime || 4.0}
-             onChange={(value) => onSettingsChange('filenameTime', parseFloat(value) || 4.0)}
-             tooltip={settingsDescriptions.filenameTime || 'Duration filenames stay on screen.'}
-             inputProps={{ min: 0, step: 0.1 }}
-           />
-         </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <TooltipField
+            label="Filename Time (Seconds)"
+            type="number"
+            value={settings.filenameTime !== undefined ? settings.filenameTime : 4.0}
+            onChange={(e) => handleNumericChange('filenameTime', e, 4.0, true)}
+            tooltip={settingsDescriptions.filenameTime || 'Duration filenames stay on screen.'}
+            inputProps={{ min: 0, step: 0.1 }}
+          />
+        </Grid>
         {/* Individual Font Sizes (Can be added if needed, Gource might use fontScale more) */}
         {/* 
         <Grid item xs={12} sm={6} md={3}>
@@ -98,7 +119,7 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
             tooltip={settingsDescriptions.filenameColor || 'Color for filenames.'}
           />
         </Grid>
-         <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4}>
           <ColorPickerField
             label="Highlight Color"
             value={settings.highlightColor || '#FF0000'}
@@ -106,7 +127,7 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
             tooltip={settingsDescriptions.highlightColor || 'Color for highlighted users/dirs.'}
           />
         </Grid>
-         <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4}>
           <ColorPickerField
             label="Selection Color"
             value={settings.selectionColor || '#FFFF00'}
@@ -143,23 +164,23 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
             tooltip={settingsDescriptions.showDates || 'Display the current date.'}
           />
         </Grid>
-         <Grid item xs={12} sm={4} md={3}>
+        <Grid item xs={12} sm={4} md={3}>
           <TooltipCheckbox
             label="Swap Title & Date Position"
-            checked={Boolean(settings.swapTitleDate)} // Assuming this exists
+            checked={Boolean(settings.swapTitleDate)}
             onChange={(checked) => onSettingsChange('swapTitleDate', checked)}
             tooltip={settingsDescriptions.swapTitleDate || 'Swap the position of the title and date.'}
           />
         </Grid>
         <Grid item xs={12} sm={4} md={3}>
-           <TooltipCheckbox
-             label="Multi-Sampling (AA)"
-             checked={Boolean(settings.multiSampling)}
-             onChange={(checked) => onSettingsChange('multiSampling', checked)}
-             tooltip={settingsDescriptions.multiSampling || 'Enable anti-aliasing for smoother edges.'}
-           />
-         </Grid>
-         <Grid item xs={12} sm={4} md={3}>
+          <TooltipCheckbox
+            label="Multi-Sampling (AA)"
+            checked={Boolean(settings.multiSampling)}
+            onChange={(checked) => onSettingsChange('multiSampling', checked)}
+            tooltip={settingsDescriptions.multiSampling || 'Enable anti-aliasing for smoother edges.'}
+          />
+        </Grid>
+        <Grid item xs={12} sm={4} md={3}>
           <TooltipCheckbox
             label="Enable Bloom Effect"
             checked={Boolean(settings.bloom)}
@@ -189,50 +210,50 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
             step={0.1}
             marks
             min={0.1}
-            max={1.5} // Adjust max as needed
+            max={1.5}
             disabled={!settings.bloom}
           />
         </Grid>
-         <Grid item xs={12} sm={6} md={4}> 
-           <TooltipCheckbox
-             label="Transparent Background"
-             checked={Boolean(settings.transparent)}
-             onChange={(checked) => onSettingsChange('transparent', checked)}
-             tooltip={settingsDescriptions.transparent || 'Make the background transparent (for overlays).'}
-           />
-         </Grid>
-         <Grid item xs={12} sm={6} md={4}>
-           <TooltipField
-             label="Directory Name Depth"
-             type="number"
-             value={settings.dirNameDepth || ''}
-             onChange={(value) => onSettingsChange('dirNameDepth', value === '' ? '' : parseInt(value) || 0)}
-             tooltip={settingsDescriptions.dirNameDepth || 'Draw dir names down to this depth (0=default).'}
-             inputProps={{ min: 0 }}
-           />
-         </Grid>
-         <Grid item xs={12} sm={6} md={4}>
-           <TooltipSlider
-             label="Directory Name Position"
-             value={settings.dirNamePosition || 0.5}
-             onChange={(value) => onSettingsChange('dirNamePosition', value)}
-             tooltip={settingsDescriptions.dirNamePosition || 'Position of dir names along edge (0.0-1.0).'}
-             step={0.1}
-             marks
-             min={0.0}
-             max={1.0}
-           />
-         </Grid>
+        <Grid item xs={12} sm={6} md={4}> 
+          <TooltipCheckbox
+            label="Transparent Background"
+            checked={Boolean(settings.transparent)}
+            onChange={(checked) => onSettingsChange('transparent', checked)}
+            tooltip={settingsDescriptions.transparent || 'Make the background transparent (for overlays).'}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <TooltipField
+            label="Directory Name Depth"
+            type="number"
+            value={settings.dirNameDepth !== undefined ? settings.dirNameDepth : ''}
+            onChange={(e) => handleNumericChange('dirNameDepth', e, 0)}
+            tooltip={settingsDescriptions.dirNameDepth || 'Draw dir names down to this depth (0=default).'}
+            inputProps={{ min: 0 }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <TooltipSlider
+            label="Directory Name Position"
+            value={settings.dirNamePosition || 0.5}
+            onChange={(value) => onSettingsChange('dirNamePosition', value)}
+            tooltip={settingsDescriptions.dirNamePosition || 'Position of dir names along edge (0.0-1.0).'}
+            step={0.1}
+            marks
+            min={0.0}
+            max={1.0}
+          />
+        </Grid>
       </Grid>
 
-       {/* Background & Logo Section */}
+      {/* Background & Logo Section */}
       <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>Background & Logo</Typography>
       <Grid container spacing={3}>
         <Grid item xs={12} sm={6}>
           <TooltipField
             label="Background Image Path"
             value={settings.backgroundImage || ''}
-            onChange={(value) => onSettingsChange('backgroundImage', value)}
+            onChange={(e) => onSettingsChange('backgroundImage', e.target.value)}
             tooltip={settingsDescriptions.backgroundImage || 'Path to an image file for the background.'}
             placeholder="e.g., ./images/background.png"
           />
@@ -241,23 +262,12 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
           <TooltipField
             label="Logo Image Path"
             value={settings.logo || ''}
-            onChange={(value) => onSettingsChange('logo', value)}
+            onChange={(e) => onSettingsChange('logo', e.target.value)}
             tooltip={settingsDescriptions.logo || 'Path to an image file for the logo overlay.'}
             placeholder="e.g., ./images/logo.png"
           />
         </Grid>
-        <Grid item xs={12} sm={6}>
-          <TooltipField
-            label="Logo Offset (XxY)"
-            value={settings.logoOffset || ''}
-            onChange={(value) => onSettingsChange('logoOffset', value)}
-            tooltip={settingsDescriptions.logoOffset || 'Logo position offset (e.g., 10x10, -20x50).'}
-            placeholder="e.g., 10x10"
-            disabled={!settings.logo}
-          />
-        </Grid>
       </Grid>
-
     </>
   );
 };

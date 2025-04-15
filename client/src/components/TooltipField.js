@@ -20,7 +20,8 @@ const TooltipField = ({
   InputProps = {},
   inputProps = {},
   disabled = false,
-  InputLabelProps = {}
+  InputLabelProps = {},
+  helperText = ''
 }) => {
   
   // Universal handler that works with all components
@@ -48,15 +49,20 @@ const TooltipField = ({
         }
       }
       
-      // Always use synthetic event object to maintain compatibility
-      const syntheticEvent = {
+      // Return the processed value
+      onChange({
         target: {
           value: formattedValue
         }
-      };
-      
-      onChange(syntheticEvent);
-    } else {
+      });
+    } 
+    // Special handling for number type - parse the value correctly
+    else if (type === 'number') {
+      // Simply pass the event - parent components should handle parsing themselves
+      // This ensures all numeric fields work consistently across all tabs
+      onChange(e);
+    }
+    else {
       // For all other fields, just pass the original event
       onChange(e);
     }
@@ -81,6 +87,7 @@ const TooltipField = ({
         multiline={multiline}
         rows={rows}
         disabled={disabled}
+        helperText={helperText}
         InputLabelProps={{
           shrink: type === 'date-text' ? true : undefined,
           ...InputLabelProps

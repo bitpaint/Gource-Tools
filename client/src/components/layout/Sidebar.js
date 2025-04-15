@@ -21,9 +21,11 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import MovieIcon from '@mui/icons-material/Movie';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import TuneIcon from '@mui/icons-material/Tune';
+import VideoSettingsIcon from '@mui/icons-material/VideoSettings';
 
 const drawerWidth = 240;
 
+// Main menu items excluding Settings
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Repos', icon: <GitHubIcon />, path: '/repositories' },
@@ -31,8 +33,11 @@ const menuItems = [
   { text: 'Projects', icon: <FolderSpecialIcon />, path: '/projects' },
   { text: 'Render', icon: <MovieIcon />, path: '/render' },
   { text: 'Exports', icon: <VideoLibraryIcon />, path: '/exports' },
-  { text: 'Settings', icon: <TuneIcon />, path: '/settings' },
+  { text: 'FFmpeg Editor', icon: <VideoSettingsIcon />, path: '/ffmpeg-editor' },
 ];
+
+// Settings as a separate item
+const settingsItem = { text: 'Settings', icon: <TuneIcon />, path: '/settings' };
 
 const Sidebar = ({ drawerOpen, handleDrawerToggle }) => {
   const theme = useTheme();
@@ -41,7 +46,7 @@ const Sidebar = ({ drawerOpen, handleDrawerToggle }) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const drawer = (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Toolbar sx={{ display: 'flex', justifyContent: 'center', padding: 2 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <img 
@@ -61,125 +66,171 @@ const Sidebar = ({ drawerOpen, handleDrawerToggle }) => {
         </Box>
       </Toolbar>
       <Divider />
-      <List>
-        {menuItems.slice(0, 1).map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton 
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  handleDrawerToggle();
-                }
-              }}
-            >
-              <ListItemIcon sx={{ 
-                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-      <Divider />
-      <List>
-        {menuItems.slice(1, 4).map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton 
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  handleDrawerToggle();
-                }
-              }}
-            >
-              <ListItemIcon sx={{ 
-                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-      <Divider />
-      <List>
-        {menuItems.slice(4, 5).map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton 
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  handleDrawerToggle();
-                }
-              }}
-            >
-              <ListItemIcon sx={{ 
-                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-      <Divider />
-      <List>
-        {menuItems.slice(5, 6).map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton 
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  handleDrawerToggle();
-                }
-              }}
-            >
-              <ListItemIcon sx={{ 
-                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-      <Divider />
+      
+      {/* Main menu sections */}
+      <Box sx={{ overflow: 'auto' }}>
+        <List>
+          {menuItems.slice(0, 1).map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton 
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) {
+                    handleDrawerToggle();
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+        <Divider />
+        <List>
+          {menuItems.slice(1, 4).map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton 
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) {
+                    handleDrawerToggle();
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+        <Divider />
+        <List>
+          {menuItems.slice(4, 5).map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton 
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) {
+                    handleDrawerToggle();
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+        <Divider />
+        <List>
+          {menuItems.slice(5, 6).map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton 
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) {
+                    handleDrawerToggle();
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+        <Divider />
+        <List>
+          {menuItems.slice(6, 7).map((item) => (
+            <ListItem key={item.text} disablePadding>
+              <ListItemButton 
+                selected={location.pathname === item.path}
+                onClick={() => {
+                  navigate(item.path);
+                  if (isMobile) {
+                    handleDrawerToggle();
+                  }
+                }}
+              >
+                <ListItemIcon sx={{ 
+                  color: location.pathname === item.path ? 'primary.main' : 'text.primary'
+                }}>
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText primary={item.text} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+      
+      {/* Spacer to push settings and footer to bottom */}
       <Box sx={{ flexGrow: 1 }} />
+      
+      {/* Settings at bottom */}
+      <Divider />
       <List>
-        {menuItems.slice(6).map((item) => (
-          <ListItem key={item.text} disablePadding>
-            <ListItemButton 
-              selected={location.pathname === item.path}
-              onClick={() => {
-                navigate(item.path);
-                if (isMobile) {
-                  handleDrawerToggle();
-                }
-              }}
-            >
-              <ListItemIcon sx={{ 
-                color: location.pathname === item.path ? 'primary.main' : 'text.primary'
-              }}>
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText primary={item.text} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+        <ListItem disablePadding>
+          <ListItemButton 
+            selected={location.pathname === settingsItem.path}
+            onClick={() => {
+              navigate(settingsItem.path);
+              if (isMobile) {
+                handleDrawerToggle();
+              }
+            }}
+          >
+            <ListItemIcon sx={{ 
+              color: location.pathname === settingsItem.path ? 'primary.main' : 'text.primary'
+            }}>
+              {settingsItem.icon}
+            </ListItemIcon>
+            <ListItemText primary={settingsItem.text} />
+          </ListItemButton>
+        </ListItem>
       </List>
-      <Divider sx={{ mt: 'auto' }} />
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography variant="caption" color="text.secondary">
-          Gource Tools is made by bitpaint and liscenced is under MIT
+      
+      {/* Footer attribution */}
+      <Divider />
+      <Box sx={{ p: 2, textAlign: 'center', mt: 'auto' }}>
+        <Typography 
+          variant="caption" 
+          color="text.secondary" 
+          component="a" 
+          href="https://x.com/BITPAINTCLUB" 
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{ 
+            textDecoration: 'none', 
+            color: 'text.secondary',
+            '&:hover': {
+              color: 'primary.main',
+              textDecoration: 'underline'
+            }
+          }}
+        >
+          GourceTools by Bitpaint ₿
         </Typography>
       </Box>
     </div>

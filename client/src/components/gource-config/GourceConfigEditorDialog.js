@@ -3,23 +3,19 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
-  TextField,
   Button,
-  Box,
   Typography,
-  Divider,
   Tabs,
   Tab,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem
+  Grid,
+  Paper,
+  IconButton,
 } from '@mui/material';
+import { Close as CloseIcon } from '@mui/icons-material';
 
-// Import NEW tab components (will be created)
+// Import tab components
 import GourceGeneralVideoTab from './tabs/GourceGeneralVideoTab';
 import GourceTimelineSpeedTab from './tabs/GourceTimelineSpeedTab';
 import GourceVisualStyleTab from './tabs/GourceVisualStyleTab';
@@ -28,13 +24,13 @@ import GourceUsersFilesTab from './tabs/GourceUsersFilesTab';
 import GourceCaptionsOverlaysTab from './tabs/GourceCaptionsOverlaysTab';
 import GourceAdvancedOutputTab from './tabs/GourceAdvancedOutputTab';
 import GourceTabPanel from './GourceTabPanel';
-import { defaultSettings } from '../../shared/gourceConfig'; // NEW PATH within src/
+import { defaultSettings } from '../../shared/gourceConfig';
 
 // Define Presets
 const presets = {
   default: {
     name: 'Default Settings',
-    settings: { ...defaultSettings } // Start with default Gource settings
+    settings: { ...defaultSettings }
   },
   quick_overview: {
     name: 'Quick Overview (Fast)',
@@ -43,7 +39,7 @@ const presets = {
       autoSkipSeconds: 0.05,
       timeScale: 1.5,
       framerate: 30,
-      hide: ['date'], // Example, adjust as needed
+      hide: ['date'],
       bloomMultiplier: 1.1
     }
   },
@@ -73,12 +69,32 @@ const presets = {
   }
 };
 
-// Helper function to reconstruct relative date string (ensure consistency)
+// Helper function to reconstruct relative date string
 const buildRelativeString = (number, unit) => {
   const num = number || 1;
   const u = unit || 'day';
-  return `relative-${num}-${u}${num > 1 ? 's' : ''}`; // Basic pluralization, adjust if needed
+  return `relative-${num}-${u}${num > 1 ? 's' : ''}`;
 };
+
+// Styled components (using a simple styling approach)
+const StyledDialogTitle = ({ children, onClose, ...other }) => (
+  <DialogTitle 
+    sx={{ 
+      display: 'flex', 
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: (theme) => theme.spacing(1, 2)
+    }} 
+    {...other}
+  >
+    <Typography variant="h6">{children}</Typography>
+    {onClose && (
+      <IconButton onClick={onClose} size="small">
+        <CloseIcon />
+      </IconButton>
+    )}
+  </DialogTitle>
+);
 
 /**
  * Dialog component for creating and editing Gource configuration files
@@ -95,8 +111,10 @@ const GourceConfigEditorDialog = ({
 }) => {
   // Track the active tab
   const [tabValue, setTabValue] = useState(0);
-  const [selectedPreset, setSelectedPreset] = useState(''); // State for preset selector
-
+  const [selectedPreset, setSelectedPreset] = useState('');
+  const [attemptedSave, setAttemptedSave] = useState(false);
+  const [titleValidationFailed, setTitleValidationFailed] = useState(false);
+  
   // Handle tab change
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
@@ -118,10 +136,41 @@ const GourceConfigEditorDialog = ({
         ...preset.settings
       }
     }));
-    // Optionally, show a toast notification
   };
 
-  // Renamed internal settings change handler
+  // Handle profile name and description changes
+  const handleProfileInfoChange = (type, value) => {
+    setCurrentProfile(prev => ({
+      ...prev,
+      [type]: value
+    }));
+  };
+
+  // Handle save with validation
+  const handleSave = () => {
+    setAttemptedSave(true);
+    
+    // Check if name is provided
+    const isNameValid = Boolean(currentProfile.name);
+    
+    // Check if title is enabled but text is empty
+    const isTitleValid = !(
+      currentProfile.settings.title && 
+      (!currentProfile.settings.titleText || currentProfile.settings.titleText.trim() === '')
+    );
+    
+    setTitleValidationFailed(!isTitleValid);
+    
+    // If validation passes, save the profile
+    if (isNameValid && isTitleValid) {
+      onSave();
+    } else if (!isTitleValid) {
+      // If title validation fails, switch to the General & Video tab
+      setTabValue(0);
+    }
+  };
+
+  // Internal settings change handler
   const handleInternalSettingsChange = (key, value) => {
     if (!currentProfile) return;
 
@@ -136,45 +185,39 @@ const GourceConfigEditorDialog = ({
     // Store the directly changed value first
     settingsToUpdate[key] = processedValue;
 
-    // --- Centralized Date Logic --- 
+    // Clear title validation error when title is disabled or titleText is provided
+    if (key === 'title' && processedValue === false) {
+      setTitleValidationFailed(false);
+    } else if (key === 'titleText' && processedValue && processedValue.trim() !== '') {
+      setTitleValidationFailed(false);
+    }
 
+    // --- Centralized Date Logic --- 
     if (key === 'useRelativeStartDate') {
-      const isChecked = processedValue; // The new state of the checkbox
+      const isChecked = processedValue;
       if (isChecked) {
-        // Switching TO relative: reconstruct start date from relative parts
         const num = settingsToUpdate.relativeStartDateNumber || 1;
         const unit = settingsToUpdate.relativeStartDateUnit || 'day';
         settingsToUpdate.startDate = buildRelativeString(num, unit);
       } else {
-        // Switching FROM relative: use the fixed date value
         settingsToUpdate.startDate = settingsToUpdate.startDateFixed || '';
       }
     } else if (key === 'relativeStartDateNumber' || key === 'relativeStartDateUnit') {
-      // If relative number or unit changes, reconstruct the main startDate IF relative mode is active
       if (settingsToUpdate.useRelativeStartDate) {
         const num = key === 'relativeStartDateNumber' ? processedValue : (settingsToUpdate.relativeStartDateNumber || 1);
         const unit = key === 'relativeStartDateUnit' ? processedValue : (settingsToUpdate.relativeStartDateUnit || 'day');
         settingsToUpdate.startDate = buildRelativeString(num, unit);
       }
     } else if (key === 'startDateFixed') {
-      // If the fixed date input is changed, ensure we are NOT in relative mode
-      settingsToUpdate.startDate = processedValue; // Update main start date
-      settingsToUpdate.useRelativeStartDate = false; // Uncheck the box
-      // Optional: Reset relative values for cleanliness
-      // settingsToUpdate.relativeStartDateNumber = 1;
-      // settingsToUpdate.relativeStartDateUnit = 'day';
+      settingsToUpdate.startDate = processedValue;
+      settingsToUpdate.useRelativeStartDate = false;
     } else if (key === 'startDate') {
-       // If startDate is somehow changed directly (e.g., loading a profile),
-       // try to sync the individual fields IF it's a relative date
        const { isRelative, number, unit } = parseRelativeDate(processedValue); 
        if (isRelative) {
            settingsToUpdate.useRelativeStartDate = true;
            settingsToUpdate.relativeStartDateNumber = number;
            settingsToUpdate.relativeStartDateUnit = unit;
-           // Ensure fixed date isn't out of sync (though it's hidden)
-           // settingsToUpdate.startDateFixed = ''; // Or keep last known value? Decide based on UX.
        } else {
-           // If it's a fixed date string being set
            settingsToUpdate.useRelativeStartDate = false;
            settingsToUpdate.startDateFixed = processedValue; 
        }
@@ -187,188 +230,154 @@ const GourceConfigEditorDialog = ({
     });
   };
 
-  // Make sure parseRelativeDate is available here if not imported globally
-  // Add this inside the component or import it:
+  // Parse relative date string
   const parseRelativeDate = (relativeDateString) => {
     if (typeof relativeDateString !== 'string' || !relativeDateString.startsWith('relative-')) {
       return { isRelative: false, number: 1, unit: 'day' };
     }
     const parts = relativeDateString.match(/^relative-(\d+)-([a-zA-Z]+)s?$/);
     if (!parts || parts.length < 3) {
-      return { isRelative: false, number: 1, unit: 'day' }; // Invalid format
+      return { isRelative: false, number: 1, unit: 'day' };
     }
     const number = parseInt(parts[1], 10);
     let unit = parts[2].toLowerCase();
-    // Normalize unit (remove trailing 's') - check if valid
     const validUnits = ['day', 'week', 'month', 'year'];
     if (unit.endsWith('s')) { 
         unit = unit.slice(0, -1);
     }
     if (!validUnits.includes(unit)) {
-       unit = 'day'; // Default to day if unit is invalid
+       unit = 'day';
     }
     
     return { isRelative: true, number: isNaN(number) ? 1 : number, unit };
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
-      maxWidth="lg"
       fullWidth
+      maxWidth="xl"
+      PaperProps={{ sx: { height: '90vh' } }}
     >
-      <DialogTitle>{isEditing ? 'Edit Gource Config File' : 'Create Gource Config File'}</DialogTitle>
-      {currentProfile.isSystemProfile && (
-        <DialogContentText sx={{ px: 3, color: 'warning.main' }}>
-          Note: System profiles cannot be fully edited or deleted. Changes might be limited.
-        </DialogContentText>
-      )}
-      <DialogContent>
-        <Box sx={{ mb: 2 }}>
-          <TextField
-            autoFocus
-            margin="dense"
-            id="name"
-            label="Config Name"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={currentProfile.name || ''}
-            onChange={(e) => setCurrentProfile({...currentProfile, name: e.target.value})}
-            required
-            disabled={currentProfile.isSystemProfile} // Disable editing name for system profiles
-            sx={{ mb: 2, mt: 1 }}
-          />
+      <StyledDialogTitle onClose={onClose}>
+        {isEditing ? 'Edit' : 'Create'} Gource Configuration
+      </StyledDialogTitle>
+      <DialogContent sx={{ p: 2 }}>
+        <Grid container spacing={2}>
+          {/* Left sidebar for tabs */}
+          <Grid item xs={12} sm={3} md={2.5}>
+            <Paper elevation={1} sx={{ height: '100%' }}>
+              <Tabs 
+                value={tabValue} 
+                onChange={handleTabChange} 
+                aria-label="gource config settings tabs"
+                orientation="vertical"
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{ 
+                  borderRight: 1, 
+                  borderColor: 'divider',
+                  height: '100%',
+                  '& .MuiTab-root': {
+                    alignItems: 'flex-start',
+                    textAlign: 'left',
+                    py: 1.5
+                  }
+                }}
+              >
+                <Tab label="GENERAL & VIDEO" />
+                <Tab label="TIMELINE & SPEED" />
+                <Tab label="VISUAL STYLE" />
+                <Tab label="CAMERA & NAVIGATION" />
+                <Tab label="USERS & FILES" />
+                <Tab label="CAPTIONS & OVERLAYS" />
+                <Tab label="ADVANCED & OUTPUT" />
+              </Tabs>
+            </Paper>
+          </Grid>
           
-          <TextField
-            margin="dense"
-            id="description"
-            label="Description (optional)"
-            type="text"
-            fullWidth
-            variant="outlined"
-            value={currentProfile.description || ''}
-            onChange={(e) => setCurrentProfile({...currentProfile, description: e.target.value})}
-            disabled={currentProfile.isSystemProfile} // Disable editing description for system profiles
-            multiline
-            rows={2}
-          />
-        </Box>
-        
-        <Divider sx={{ my: 2 }} />
-        
-        {/* Preset Selector */}
-        {!currentProfile.isSystemProfile && ( // Don't show presets for system profiles
-          <Box sx={{ mb: 3 }}>
-             <FormControl fullWidth variant="outlined">
-               <InputLabel id="preset-select-label">Apply Preset (Optional)</InputLabel>
-               <Select
-                 labelId="preset-select-label"
-                 id="preset-select"
-                 value={selectedPreset}
-                 onChange={(e) => handleApplyPreset(e.target.value)}
-                 label="Apply Preset (Optional)"
-               >
-                 <MenuItem value="">
-                   <em>None - Custom Settings</em>
-                 </MenuItem>
-                 {Object.entries(presets).map(([key, preset]) => (
-                   <MenuItem key={key} value={key}>
-                     {preset.name}
-                   </MenuItem>
-                 ))}
-               </Select>
-             </FormControl>
-           </Box>
-        )}
-        
-        <Typography variant="h6" gutterBottom>Config Settings</Typography>
-        
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs 
-            value={tabValue} 
-            onChange={handleTabChange} 
-            aria-label="gource config settings tabs" 
-            variant="scrollable" 
-            scrollButtons="auto"
-          >
-            <Tab label="General & Video" />
-            <Tab label="Timeline & Speed" />
-            <Tab label="Visual Style" />
-            <Tab label="Camera & Navigation" />
-            <Tab label="Users & Files" />
-            <Tab label="Captions & Overlays" />
-            <Tab label="Advanced & Output" />
-          </Tabs>
-        </Box>
-        
-        {/* Tab Panels - Pass the renamed handler */} 
-        <GourceTabPanel value={tabValue} index={0}>
-          <GourceGeneralVideoTab 
-            settings={currentProfile.settings || {}} 
-            onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-            settingsDescriptions={settingsDescriptions}
-          />
-        </GourceTabPanel>
-        
-        <GourceTabPanel value={tabValue} index={1}>
-          <GourceTimelineSpeedTab 
-             settings={currentProfile.settings || {}} 
-             onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-             settingsDescriptions={settingsDescriptions}
-          />
-        </GourceTabPanel>
-        
-        <GourceTabPanel value={tabValue} index={2}>
-          <GourceVisualStyleTab 
-             settings={currentProfile.settings || {}} 
-             onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-             settingsDescriptions={settingsDescriptions}
-           />
-        </GourceTabPanel>
-        
-        <GourceTabPanel value={tabValue} index={3}>
-          <GourceCameraNavTab 
-             settings={currentProfile.settings || {}} 
-             onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-             settingsDescriptions={settingsDescriptions}
-           />
-        </GourceTabPanel>
+          {/* Right content area for tab panels */}
+          <Grid item xs={12} sm={9} md={9.5}>
+            {/* Tab Panels - Pass the renamed handler */} 
+            <GourceTabPanel value={tabValue} index={0}>
+              {/* Pass profile info and preset to the General tab */}
+              <GourceGeneralVideoTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+                profileName={currentProfile?.name || ''}
+                profileDescription={currentProfile?.description || ''}
+                onProfileInfoChange={handleProfileInfoChange}
+                isSystemProfile={currentProfile?.isSystemProfile}
+                selectedPreset={selectedPreset}
+                onPresetChange={handleApplyPreset}
+                presets={presets}
+                showNameError={attemptedSave && !currentProfile?.name}
+                showTitleError={titleValidationFailed}
+                isEditing={isEditing}
+              />
+            </GourceTabPanel>
+            
+            <GourceTabPanel value={tabValue} index={1}>
+              <GourceTimelineSpeedTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+              />
+            </GourceTabPanel>
+            
+            <GourceTabPanel value={tabValue} index={2}>
+              <GourceVisualStyleTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+              />
+            </GourceTabPanel>
+            
+            <GourceTabPanel value={tabValue} index={3}>
+              <GourceCameraNavTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+              />
+            </GourceTabPanel>
 
-        <GourceTabPanel value={tabValue} index={4}>
-           <GourceUsersFilesTab 
-             settings={currentProfile.settings || {}} 
-             onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-             settingsDescriptions={settingsDescriptions}
-           />
-        </GourceTabPanel>
+            <GourceTabPanel value={tabValue} index={4}>
+              <GourceUsersFilesTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+              />
+            </GourceTabPanel>
 
-        <GourceTabPanel value={tabValue} index={5}>
-           <GourceCaptionsOverlaysTab 
-             settings={currentProfile.settings || {}} 
-             onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-             settingsDescriptions={settingsDescriptions}
-           />
-        </GourceTabPanel>
+            <GourceTabPanel value={tabValue} index={5}>
+              <GourceCaptionsOverlaysTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+              />
+            </GourceTabPanel>
 
-        <GourceTabPanel value={tabValue} index={6}>
-          <GourceAdvancedOutputTab 
-             settings={currentProfile.settings || {}} 
-             onSettingsChange={handleInternalSettingsChange} // Use renamed handler
-             settingsDescriptions={settingsDescriptions}
-           />
-        </GourceTabPanel>
+            <GourceTabPanel value={tabValue} index={6}>
+              <GourceAdvancedOutputTab 
+                settings={currentProfile.settings || {}} 
+                onSettingsChange={handleInternalSettingsChange}
+                settingsDescriptions={settingsDescriptions}
+              />
+            </GourceTabPanel>
+          </Grid>
+        </Grid>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={savingProfile}>Cancel</Button>
         <Button 
-          onClick={onSave} 
+          onClick={handleSave} 
           variant="contained" 
-          disabled={!currentProfile.name || savingProfile || currentProfile.isSystemProfile} // Disable save for system profiles directly
+          disabled={savingProfile || currentProfile?.isSystemProfile}
           startIcon={savingProfile ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {savingProfile ? 'Saving...' : (currentProfile.isSystemProfile ? 'Cannot Save System Profile' : 'Save')}
+          {savingProfile ? 'Saving...' : (currentProfile?.isSystemProfile ? 'Cannot Save System Profile' : 'Save')}
         </Button>
       </DialogActions>
     </Dialog>

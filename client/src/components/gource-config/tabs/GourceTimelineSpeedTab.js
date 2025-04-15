@@ -53,6 +53,22 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
     safeSettings.useRelativeStartDate ? safeSettings.startDate : ''
   );
 
+  // Helper function for handling numeric inputs
+  const handleNumericChange = (field, value, defaultValue, isFloat = false) => {
+    // If value is empty string and empty is allowed, use empty string
+    if (value === '') {
+      onSettingsChange(field, '');
+      return;
+    }
+    
+    // Parse the value as number (int or float)
+    const parsedValue = isFloat ? parseFloat(value) : parseInt(value, 10);
+    
+    // Use defaultValue if parsing fails
+    const finalValue = isNaN(parsedValue) ? defaultValue : parsedValue;
+    onSettingsChange(field, finalValue);
+  };
+
   // Simplified handlers - Just call onSettingsChange
   const handleFixedStartDateChange = (event) => {
     // Pass the key 'startDateFixed' so the parent handler knows it's the fixed input
@@ -154,7 +170,7 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
             label="Stop Date (Optional)"
             type="date-text"
             value={safeSettings.stopDate || ''}
-            onChange={(event) => onSettingsChange('stopDate', event.target.value)}
+            onChange={(e) => onSettingsChange('stopDate', e.target.value)}
             tooltip={settingsDescriptions.stopDate || 'Set a fixed stop date (YYYY-MM-DD). Leave empty to render until the end.'}
             variant="outlined"
           />
@@ -167,8 +183,8 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Seconds Per Day"
             type="number"
-            value={safeSettings.secondsPerDay || ''}
-            onChange={(event) => onSettingsChange('secondsPerDay', event.target.value === '' ? '' : parseFloat(event.target.value) || 0.1)}
+            value={safeSettings.secondsPerDay !== undefined ? safeSettings.secondsPerDay : ''}
+            onChange={(e) => handleNumericChange('secondsPerDay', e.target.value, 0.1, true)}
             tooltip={settingsDescriptions.secondsPerDay || 'Number of seconds each day lasts.'}
             inputProps={{ min: 0.1, step: 0.1 }}
             variant="outlined"
@@ -178,8 +194,8 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Auto Skip Seconds"
             type="number"
-            value={safeSettings.autoSkipSeconds || ''}
-            onChange={(event) => onSettingsChange('autoSkipSeconds', event.target.value === '' ? '' : parseFloat(event.target.value) || 0.1)}
+            value={safeSettings.autoSkipSeconds !== undefined ? safeSettings.autoSkipSeconds : ''}
+            onChange={(e) => handleNumericChange('autoSkipSeconds', e.target.value, 0.1, true)}
             tooltip={settingsDescriptions.autoSkipSeconds || 'Skip inactivity longer than this (seconds).'}
             inputProps={{ min: 0, step: 0.1 }}
             disabled={safeSettings.disableAutoSkip}
@@ -230,7 +246,7 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Start Position"
             value={safeSettings.startPosition || ''}
-            onChange={(event) => onSettingsChange('startPosition', event.target.value)}
+            onChange={(e) => onSettingsChange('startPosition', e.target.value)}
             tooltip={settingsDescriptions.startPosition || "Start at a specific position (0.0-1.0 or 'random')."}
             placeholder="e.g., 0.0, 0.5, random"
             variant="outlined"
@@ -240,7 +256,7 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
           <TooltipField
             label="Stop Position"
             value={safeSettings.stopPosition || ''}
-            onChange={(event) => onSettingsChange('stopPosition', event.target.value)}
+            onChange={(e) => onSettingsChange('stopPosition', e.target.value)}
             tooltip={settingsDescriptions.stopPosition || 'Stop at a specific position (0.0-1.0).'}
             placeholder="e.g., 0.8, 1.0"
             variant="outlined"
@@ -248,50 +264,13 @@ const GourceTimelineSpeedTab = ({ settings, onSettingsChange, settingsDescriptio
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <TooltipField
-            label="Stop After Time (Seconds)"
-            type="number"
-            value={safeSettings.stopAtTime || ''}
-            onChange={(event) => onSettingsChange('stopAtTime', event.target.value === '' ? '' : parseInt(event.target.value) || 0)}
-            tooltip={settingsDescriptions.stopAtTime || 'Stop simulation after X seconds.'}
-            helperText="0 to disable"
-            inputProps={{ min: 0 }}
-            variant="outlined"
-          />
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <TooltipCheckbox
-            label="Loop Visualization"
-            checked={Boolean(safeSettings.loop)}
-            onChange={(checked) => onSettingsChange('loop', checked)}
-            tooltip={settingsDescriptions.loop || 'Loop the visualization when it ends.'}
-          />
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <TooltipField
             label="Loop Delay (Seconds)"
             type="number"
-            value={safeSettings.loopDelaySeconds || ''}
-            onChange={(event) => onSettingsChange('loopDelaySeconds', event.target.value === '' ? '' : parseInt(event.target.value) || 0)}
-            tooltip={settingsDescriptions.loopDelaySeconds || 'Pause duration before looping.'}
-            inputProps={{ min: 0 }}
-            disabled={!safeSettings.loop}
+            value={safeSettings.loopDelay !== undefined ? safeSettings.loopDelay : ''}
+            onChange={(e) => handleNumericChange('loopDelay', e.target.value, 0, true)}
+            tooltip={settingsDescriptions.loopDelay || 'Delay between loops (seconds).'}
+            inputProps={{ min: 0, step: 0.1 }}
             variant="outlined"
-          />
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <TooltipCheckbox
-            label="Stop At End"
-            checked={Boolean(safeSettings.stopAtEnd)}
-            onChange={(checked) => onSettingsChange('stopAtEnd', checked)}
-            tooltip={settingsDescriptions.stopAtEnd || 'Stop simulation exactly at the end of the log.'}
-          />
-        </Grid>
-        <Grid item xs={12} sm={4} md={3}>
-          <TooltipCheckbox
-            label="Don't Stop (Keep Rotating)"
-            checked={Boolean(safeSettings.dontStop)}
-            onChange={(checked) => onSettingsChange('dontStop', checked)}
-            tooltip={settingsDescriptions.dontStop || 'Keep camera rotating after the log ends.'}
           />
         </Grid>
       </Grid>

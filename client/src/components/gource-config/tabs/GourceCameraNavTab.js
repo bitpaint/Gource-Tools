@@ -83,15 +83,15 @@ const GourceCameraNavTab = ({ settings, onSettingsChange, settingsDescriptions }
           />
         </Grid>
 
-         {/* Follow Specific User Field */}
+        {/* Follow Specific User Field */}
         <Grid item xs={12} sm={6} md={4}>
           <TooltipField
             label="Follow Specific User"
             value={settings.followUser || ''}
-            onChange={(value) => onSettingsChange('followUser', value)}
+            onChange={(e) => onSettingsChange('followUser', e.target.value)}
             tooltip={settingsDescriptions.followUser || 'Make the camera follow this specific username.'}
             placeholder="Enter username"
-            disabled={settings.cameraMode !== 'follow' && !settings.followUsers } // Only relevant if cameraMode is 'follow' or followUsers is true?
+            disabled={settings.cameraMode !== 'follow' && !settings.followUsers}
           />
         </Grid>
 
@@ -99,10 +99,9 @@ const GourceCameraNavTab = ({ settings, onSettingsChange, settingsDescriptions }
         <Grid item xs={12} sm={6} md={4}>
           <TooltipCheckbox
             label="Follow Active Users"
-            checked={Boolean(settings.followUsers)} // Gource uses --follow-user flag without value usually
+            checked={Boolean(settings.followUsers)}
             onChange={(checked) => onSettingsChange('followUsers', checked)}
             tooltip={settingsDescriptions.followUsers || 'Camera automatically follows active users.'}
-            // Consider disabling if a specific user is entered in followUser?
           />
         </Grid>
 
@@ -116,21 +115,19 @@ const GourceCameraNavTab = ({ settings, onSettingsChange, settingsDescriptions }
           />
         </Grid>
 
-         {/* Elasticity Slider (Moved from Visualization for now) */}
-         {/* Consider if this fits better here or under a potential 'Physics' tab */}
-         <Grid item xs={12} sm={6} md={4}>
-           <TooltipSlider
-             label="Elasticity"
-             value={settings.elasticity || 0.3}
-             onChange={(value) => onSettingsChange('elasticity', value)}
-             tooltip={settingsDescriptions.elasticity || 'Elasticity of connections (0.0 to 1.0).'}
-             step={0.05}
-             marks
-             min={0.0}
-             max={1.0}
-           />
-         </Grid>
-
+        {/* Elasticity Slider (Moved from Visualization for now) */}
+        <Grid item xs={12} sm={6} md={4}>
+          <TooltipSlider
+            label="Elasticity"
+            value={settings.elasticity || 0.3}
+            onChange={(value) => onSettingsChange('elasticity', value)}
+            tooltip={settingsDescriptions.elasticity || 'Elasticity of connections (0.0 to 1.0).'}
+            step={0.05}
+            marks
+            min={0.0}
+            max={1.0}
+          />
+        </Grid>
       </Grid>
     </>
   );

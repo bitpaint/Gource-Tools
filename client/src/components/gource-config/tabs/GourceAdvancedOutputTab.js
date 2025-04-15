@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Grid,
   Typography,
-  TextField // Added for text area
+  TextField
 } from '@mui/material';
 
 // Import custom components
@@ -13,6 +13,27 @@ import TooltipCheckbox from '../../TooltipCheckbox';
  * Advanced & Output settings tab for Gource configuration
  */
 const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescriptions }) => {
+  // Helper function for handling numeric inputs
+  const handleNumericChange = (field, value, defaultValue, isFloat = false) => {
+    // Get value from event if needed
+    if (value && value.target) {
+      value = value.target.value;
+    }
+
+    // If value is empty and empty is allowed, use empty string
+    if (value === '') {
+      onSettingsChange(field, '');
+      return;
+    }
+    
+    // Parse the value as number (int or float)
+    const parsedValue = isFloat ? parseFloat(value) : parseInt(value, 10);
+    
+    // Use defaultValue if parsing fails
+    const finalValue = isNaN(parsedValue) ? defaultValue : parsedValue;
+    onSettingsChange(field, finalValue);
+  };
+
   return (
     <>
       <Typography variant="body2" color="text.secondary" paragraph>
@@ -34,8 +55,8 @@ const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescripti
           <TooltipField
             label="Screen Number (for Fullscreen)"
             type="number"
-            value={settings.screenNum || 0}
-            onChange={(value) => onSettingsChange('screenNum', parseInt(value) || 0)}
+            value={settings.screenNum !== undefined ? settings.screenNum : 0}
+            onChange={(e) => handleNumericChange('screenNum', e, 0)}
             tooltip={settingsDescriptions.screenNum || 'Screen number to use for fullscreen.'}
             inputProps={{ min: 0 }}
             disabled={!settings.fullscreen}
@@ -49,23 +70,23 @@ const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescripti
             tooltip={settingsDescriptions.noVsync || 'Disable vertical sync (may cause tearing).'}
           />
         </Grid>
-         <Grid item xs={12} sm={6} md={3}>
-           <TooltipCheckbox
-             label="Frameless Window"
-             checked={Boolean(settings.frameless)}
-             onChange={(checked) => onSettingsChange('frameless', checked)}
-             tooltip={settingsDescriptions.frameless || 'Run in a borderless window.'}
-           />
-         </Grid>
-         <Grid item xs={12} sm={6} md={4}> 
-           <TooltipField
-             label="Window Position (XxY)"
-             value={settings.windowPosition || ''}
-             onChange={(value) => onSettingsChange('windowPosition', value)}
-             tooltip={settingsDescriptions.windowPosition || 'Initial window position (e.g., 100x50).'}
-             placeholder="e.g., 100x50"
-           />
-         </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <TooltipCheckbox
+            label="Frameless Window"
+            checked={Boolean(settings.frameless)}
+            onChange={(checked) => onSettingsChange('frameless', checked)}
+            tooltip={settingsDescriptions.frameless || 'Run in a borderless window.'}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}> 
+          <TooltipField
+            label="Window Position (XxY)"
+            value={settings.windowPosition || ''}
+            onChange={(e) => onSettingsChange('windowPosition', e.target.value)}
+            tooltip={settingsDescriptions.windowPosition || 'Initial window position (e.g., 100x50).'}
+            placeholder="e.g., 100x50"
+          />
+        </Grid>
       </Grid>
 
       {/* Output & Debug Section */}
@@ -83,7 +104,7 @@ const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescripti
           <TooltipField
             label="Output Custom Log File Path"
             value={settings.outputCustomLog || ''}
-            onChange={(value) => onSettingsChange('outputCustomLog', value)}
+            onChange={(e) => onSettingsChange('outputCustomLog', e.target.value)}
             tooltip={settingsDescriptions.outputCustomLog || 'Output a Gource custom log during processing.'}
             placeholder="e.g., ./temp/gource_debug.log"
           />
@@ -97,7 +118,7 @@ const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescripti
           <TooltipField
             label="Hash Seed"
             value={settings.hashSeed || ''}
-            onChange={(value) => onSettingsChange('hashSeed', value)}
+            onChange={(e) => onSettingsChange('hashSeed', e.target.value)}
             tooltip={settingsDescriptions.hashSeed || 'Seed for the layout hash function (string or number).'}
             placeholder="Leave empty for default"
           />
@@ -106,7 +127,7 @@ const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescripti
           <TooltipField
             label="Git Branch (Internal Gource Log)"
             value={settings.gitBranch || ''}
-            onChange={(value) => onSettingsChange('gitBranch', value)}
+            onChange={(e) => onSettingsChange('gitBranch', e.target.value)}
             tooltip={settingsDescriptions.gitBranch || 'Specify branch if Gource generates its own log (limited use here).'}
             placeholder="e.g., main"
           />
@@ -117,7 +138,7 @@ const GourceAdvancedOutputTab = ({ settings, onSettingsChange, settingsDescripti
             multiline
             rows={3}
             value={settings.extraArgs || ''}
-            onChange={(value) => onSettingsChange('extraArgs', value)}
+            onChange={(e) => onSettingsChange('extraArgs', e.target.value)}
             tooltip={settingsDescriptions.extraArgs || 'Pass additional raw arguments directly to Gource.'}
             placeholder="--some-flag --another-option value"
             fullWidth

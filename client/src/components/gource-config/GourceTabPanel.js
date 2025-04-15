@@ -15,7 +15,12 @@ const GourceTabPanel = ({ children, value, index, ...other }) => {
       {...other}
     >
       {value === index && (
-        <Box sx={{ pt: 3 }}>
+        <Box sx={{ 
+          pt: 1,
+          px: { xs: 1, sm: 2 },
+          height: '100%',
+          overflowY: 'auto'
+        }}>
           {children}
         </Box>
       )}

@@ -15,6 +15,27 @@ import TooltipField from '../../TooltipField';
 const GourceCaptionsOverlaysTab = ({ settings, onSettingsChange, settingsDescriptions }) => {
   const captionsEnabled = settings.captionFile && settings.captionFile.trim() !== '';
 
+  // Helper function for handling numeric inputs
+  const handleNumericChange = (field, value, defaultValue, isFloat = false) => {
+    // Get value from event if needed
+    if (value && value.target) {
+      value = value.target.value;
+    }
+
+    // If value is empty and empty is allowed, use empty string
+    if (value === '') {
+      onSettingsChange(field, '');
+      return;
+    }
+    
+    // Parse the value as number (int or float)
+    const parsedValue = isFloat ? parseFloat(value) : parseInt(value, 10);
+    
+    // Use defaultValue if parsing fails
+    const finalValue = isNaN(parsedValue) ? defaultValue : parsedValue;
+    onSettingsChange(field, finalValue);
+  };
+
   return (
     <>
       <Typography variant="body2" color="text.secondary" paragraph>
@@ -28,7 +49,7 @@ const GourceCaptionsOverlaysTab = ({ settings, onSettingsChange, settingsDescrip
           <TooltipField
             label="Caption File Path"
             value={settings.captionFile || ''}
-            onChange={(value) => onSettingsChange('captionFile', value)}
+            onChange={(e) => onSettingsChange('captionFile', e.target.value)}
             tooltip={settingsDescriptions.captionFile || 'Path to the caption file (.srt or Gource format).'}
             placeholder="e.g., ./data/captions.txt"
           />
@@ -39,8 +60,8 @@ const GourceCaptionsOverlaysTab = ({ settings, onSettingsChange, settingsDescrip
           <TooltipField
             label="Caption Font Size"
             type="number"
-            value={settings.captionSize || 12}
-            onChange={(value) => onSettingsChange('captionSize', parseInt(value) || 12)}
+            value={settings.captionSize !== undefined ? settings.captionSize : 12}
+            onChange={(e) => handleNumericChange('captionSize', e, 12)}
             tooltip={settingsDescriptions.captionSize || 'Font size for captions.'}
             inputProps={{ min: 6 }}
             disabled={!captionsEnabled}
@@ -63,8 +84,8 @@ const GourceCaptionsOverlaysTab = ({ settings, onSettingsChange, settingsDescrip
           <TooltipField
             label="Caption Duration (Seconds)"
             type="number"
-            value={settings.captionDuration || 10.0}
-            onChange={(value) => onSettingsChange('captionDuration', parseFloat(value) || 10.0)}
+            value={settings.captionDuration !== undefined ? settings.captionDuration : 10.0}
+            onChange={(e) => handleNumericChange('captionDuration', e, 10.0, true)}
             tooltip={settingsDescriptions.captionDuration || 'Default time captions stay on screen.'}
             inputProps={{ min: 0.1, step: 0.1 }}
             disabled={!captionsEnabled}
@@ -76,8 +97,8 @@ const GourceCaptionsOverlaysTab = ({ settings, onSettingsChange, settingsDescrip
           <TooltipField
             label="Caption Horizontal Offset"
             type="number"
-            value={settings.captionOffset || 0}
-            onChange={(value) => onSettingsChange('captionOffset', parseInt(value) || 0)}
+            value={settings.captionOffset !== undefined ? settings.captionOffset : 0}
+            onChange={(e) => handleNumericChange('captionOffset', e, 0)}
             tooltip={settingsDescriptions.captionOffset || 'Horizontal position offset for captions.'}
             disabled={!captionsEnabled}
           />

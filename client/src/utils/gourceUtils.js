@@ -154,8 +154,18 @@ export function convertToKebabCase(obj) {
 export const generateGourceCommand = (settings, logPath) => {
   if (!settings || !logPath) return '';
   
+  // Create a copy of settings to avoid modifying the original
+  const settingsCopy = { ...settings };
+  
+  // Fix the title issue - if title is enabled but no titleText is provided,
+  // use a default value to prevent Gource from showing other args as title
+  if (settingsCopy.title === true && (!settingsCopy.titleText || settingsCopy.titleText.trim() === '')) {
+    // If no titleText is provided but title is enabled, use a fallback
+    settingsCopy.titleText = settingsCopy.name || 'Git Repository';
+  }
+  
   // Convert to kebab-case for Gource
-  const kebabSettings = convertToKebabCase(settings);
+  const kebabSettings = convertToKebabCase(settingsCopy);
   
   let command = 'gource';
   
