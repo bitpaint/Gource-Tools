@@ -520,7 +520,21 @@ const ConfigFilesPage = () => {
                         {profile.settings.background || '#000000'}
                       </Box>
                     </TableCell>
-                    <TableCell>{getProfileSetting(profile, 'seconds-per-day') || '1'}</TableCell>
+                    <TableCell>
+                      {/* Display 'auto' if speed is dynamic */} 
+                      {(() => {
+                        const spdSetting = getProfileSetting(profile, 'seconds-per-day');
+                        const startDateSetting = profile.settings.startDate;
+                        
+                        // Check if SPD contains 'auto' or if start date is relative
+                        if ((typeof spdSetting === 'string' && spdSetting.includes('auto')) ||
+                            (typeof startDateSetting === 'string' && startDateSetting.startsWith('relative'))) {
+                          return 'auto';
+                        }
+                        // Otherwise, return the numeric value or default to 1
+                        return spdSetting || '1';
+                      })()}
+                    </TableCell>
                     <TableCell>{formatDate(profile.updatedAt)}</TableCell>
                     <TableCell>
                       {/* Edit Button */}

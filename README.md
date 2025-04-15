@@ -98,7 +98,8 @@ The visualization process follows these steps:
 -   Built-in profiles for specific time periods (week, month, year)
 -   **Dynamic System Profiles**: Includes pre-configured profiles like "Everything in 1 min", "Last Week/Month/Year in 1 min". These profiles automatically calculate the start date and visualization speed (`secondsPerDay`) to fit the desired timeframe and video duration. System profiles cannot be edited or deleted.
 -   **User Profiles**: Users can create, edit, and delete their own custom profiles.
--   **Default Profile Management**: Users can designate one of their custom profiles as the default profile for new projects via the "Config Files" page.
+-   **Default Profile Management**: Any profile (system or user) can be designated as the default for new projects via the "Config Files" page. The default profile is automatically selected when creating a new project.
+-   **Duplication**: Any profile can be duplicated to create a new customizable user profile.
 
 ### 4. Rendering and Visualization
 
@@ -137,7 +138,8 @@ Projects allow grouping repositories for a common visualization:
 
 1.  Selection of one or more repositories
 2.  Configuration of a default render profile (optional)
-3.  Customization of metadata (name, description)
+3.  Configuration of a render profile (the application's default profile is pre-selected).
+4.  Customization of metadata (name, description)
 
 ### 3. Gource Configuration
 
@@ -151,6 +153,7 @@ The application allows customizing all aspects of Gource visualizations:
 
 Configurations can be saved as reusable profiles.
 System profiles provide quick presets for common timeframes, while user profiles allow full customization.
+The configuration management page allows creating, duplicating, deleting (user profiles only), and setting any profile as the application default. The table view truncates long descriptions and shows dynamic speeds ('auto') correctly.
 
 ### 4. Rendering Process
 
@@ -165,6 +168,12 @@ The rendering of a visualization follows these steps:
 7.  **Finalization**: Saving metadata and the video file.
 
 For multi-repository projects, logs are merged with file path prefixing.
+
+Refactored rendering pipeline to generate full logs first and apply time filters via Gource arguments.
+Improved default profile management: any profile can be set as default, it's pre-selected on project creation, and initialized correctly on first launch.
+Added profile duplication functionality.
+Corrected UI inconsistencies (Edit/Delete buttons disabled for system profiles, dynamic SPD display).
+Ensured system profiles are updated correctly on server start to maintain consistency.
 
 ### 5. FFmpeg Post-processing
 
@@ -320,8 +329,10 @@ This section details the purpose and functionality of key files within the appli
 -   Implemented dynamic system profiles ("Everything in 1 min", "Last Week/Month/Year in 1 min") with automatic date and speed calculation.
 -   Fixed date formatting for Gource arguments.
 -   Refactored rendering pipeline to generate full logs first and apply time filters via Gource arguments.
--   Added functionality to set a custom user profile as the application default.
--   Enhanced cross-platform support
+-   Improved default profile management: any profile can be set as default, it's pre-selected on project creation, and initialized correctly on first launch.
+-   Added profile duplication functionality.
+-   Corrected UI inconsistencies (Edit/Delete buttons disabled for system profiles, dynamic SPD display).
+-   Ensured system profiles are updated correctly on server start to maintain consistency.
 
 ---
 

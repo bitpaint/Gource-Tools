@@ -21,32 +21,56 @@ function initCustomRenderProfiles() {
     
     // Check if the renderProfiles collection exists
     if (!db || !db.has('renderProfiles').value()) {
-      console.error('Render profiles collection not found. Cannot initialize custom profiles.');
+      logger.error('Render profiles collection not found. Cannot initialize system profiles.');
       return;
     }
     
-    // Initialize custom render profiles in the database
+    // Initialize/Update system render profiles in the database
     let addedCount = 0;
+    let updatedCount = 0;
     for (const profile of customRenderProfiles) {
-      const existingProfile = db.get('renderProfiles')
-        .find({ id: profile.id })
-        .value();
+      // Ensure the profile definition has an ID
+      if (!profile.id) {
+        logger.warn('Skipping a profile in customRenderProfiles.js because it lacks an ID.', profile);
+        continue;
+      }
       
-      // Only add if it doesn't exist by ID
+      const existingProfileChain = db.get('renderProfiles').find({ id: profile.id });
+      const existingProfile = existingProfileChain.value();
+      
       if (!existingProfile) {
+        // Add the new system profile
         db.get('renderProfiles').push(profile).write();
         addedCount++;
+        logger.info(`Added system profile: ${profile.name} (ID: ${profile.id})`);
+      } else {
+        // Update existing system profile to ensure consistency
+        // We only update system profiles defined in the config file
+        // Check if the definition marks it as a system profile
+        if (profile.isSystemProfile) {
+          // Use assign to update the found profile
+          existingProfileChain.assign(profile).write(); 
+          updatedCount++;
+          // logger.info(`Updated system profile: ${profile.name} (ID: ${profile.id})`); // Potentially too verbose
+        } else {
+          // If a profile with the same ID exists but is NOT marked as system in the definition,
+          // we don't touch it (it might be a user profile that happens to share an old ID)
+          logger.warn(`Profile with ID ${profile.id} exists but is not marked as system in definition. Skipping update.`);
+        }
       }
     }
     
     if (addedCount > 0) {
-      console.log(`Added ${addedCount} custom render profiles to the database.`);
+      logger.success(`Added ${addedCount} new system render profiles.`);
+    }
+    if (updatedCount > 0) {
+      logger.info(`Checked/Updated ${updatedCount} existing system render profiles for consistency.`);
     } else {
-      // console.log('All custom render profiles already exist in the database.');
+      // logger.info('All system render profiles already exist and are up-to-date.');
     }
     
   } catch (error) {
-    console.error('Error initializing custom render profiles:', error);
+    logger.error('Error initializing/updating system render profiles:', error);
   }
 }
 
