@@ -31,7 +31,7 @@ const logsDir = path.join(__dirname, '../../logs');
 let pid = null;
 
 // Import ProjectService module
-const ProjectService = require('./ProjectService');
+const ProjectService = require('./projectService');
 
 // Import RepositoryService after this service's declaration to avoid circular dependency
 let RepositoryService = null;
@@ -1001,17 +1001,34 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
     // Make sure required settings have defaults
     const framerate = settings.framerate || 60;
     
+    // Ensure resolution is explicitly set (fix for resolution not being passed)
+    if (!settings.resolution) {
+      settings.resolution = '1920x1080'; // Set default resolution if missing
+      logger.info(`Resolution not specified, defaulting to 1920x1080`);
+    }
+    
     // Convert parameters to command line arguments
     const gourceArgs = convertToGourceArgs(settings);
     
+    // Log the settings being used
+    logger.config(`Using Gource settings: resolution=${settings.resolution}, framerate=${framerate}`);
+    
+    // Check if viewport argument is missing and add it directly if needed
+    const hasViewport = gourceArgs.includes('--viewport');
+    let finalGourceArgs = gourceArgs;
+    if (!hasViewport && settings.resolution) {
+      finalGourceArgs = `--viewport ${settings.resolution} ${gourceArgs}`;
+      logger.info(`Added missing viewport argument: ${settings.resolution}`);
+    }
+    
     // Build the complete Gource command for direct execution (debugging only)
-    const directGourceCommand = `gource --log-format custom ${gourceArgs} --output-ppm-stream - "${logFilePath}" | ffmpeg -y -i - -r ${framerate} -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "${outputFilePath}"`;
+    const directGourceCommand = `gource --log-format custom ${finalGourceArgs} --output-ppm-stream - "${logFilePath}" | ffmpeg -y -i - -r ${framerate} -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "${outputFilePath}"`;
     
     // Afficher la commande complète pour le débogage
-    console.log(`=====================================================`);
-    console.log(`COMMANDE GOURCE DIRECTE (référence):`);
-    console.log(`${directGourceCommand}`);
-    console.log(`=====================================================`);
+    logger.render(`=====================================================`);
+    logger.render(`FULL GOURCE COMMAND (for debugging):`);
+    logger.render(`${directGourceCommand}`);
+    logger.render(`=====================================================`);
     
     // Create temporary file for batch script
     const tempDir = path.join(__dirname, '../../temp');
@@ -1033,7 +1050,7 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
       `echo Output file: "${outputFilePath}"`, 
       '',
       'REM Execute Gource and pipe to FFmpeg',
-      `gource --log-format custom ${gourceArgs} --output-ppm-stream - "${logFilePath}" | ffmpeg -y -i - -r ${framerate} -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "${outputFilePath}"`,
+      `gource --log-format custom ${finalGourceArgs} --output-ppm-stream - "${logFilePath}" | ffmpeg -y -i - -r ${framerate} -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "${outputFilePath}"`,
       '',
       'if %ERRORLEVEL% neq 0 (',
       '  echo Error: Gource or FFmpeg failed with error code %ERRORLEVEL%',

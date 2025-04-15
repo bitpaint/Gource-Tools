@@ -1445,6 +1445,78 @@ const deleteRepository = async (id) => {
   }
 };
 
+/**
+ * Pull latest changes for a repository
+ * @param {string} id - Repository ID
+ * @returns {Promise<Object>} Pull result
+ */
+const pullRepository = async (id) => {
+  logger.info(`Pulling latest changes for repository ID: ${id}`);
+  
+  // Get the repository from the database
+  const db = Database.getDatabase();
+  const repository = db.get('repositories')
+    .find({ id: id.toString() })
+    .value();
+  
+  if (!repository) {
+    logger.error(`Repository with ID ${id} not found`);
+    throw new Error('Repository not found');
+  }
+  
+  logger.info(`Found repository: ${repository.name} at path: ${repository.path}`);
+  
+  // Verify the repository path exists
+  if (!fs.existsSync(repository.path)) {
+    logger.error(`Repository path does not exist: ${repository.path}`);
+    throw new Error(`Repository path does not exist: ${repository.path}`);
+  }
+  
+  try {
+    // Initialize git on the repository
+    const git = simpleGit(repository.path);
+    
+    // Get initial commit count
+    const initialLogs = await git.log();
+    const initialCommitCount = initialLogs.total;
+    logger.info(`Initial commit count: ${initialCommitCount}`);
+    
+    // Perform git pull
+    logger.info(`Executing git pull for ${repository.name}`);
+    const pullResult = await git.pull();
+    logger.info(`Pull result: ${JSON.stringify(pullResult)}`);
+    
+    // Get updated commit count
+    const updatedLogs = await git.log();
+    const updatedCommitCount = updatedLogs.total;
+    logger.info(`Updated commit count: ${updatedCommitCount}`);
+    
+    // Calculate new commits
+    const newCommitsCount = updatedCommitCount - initialCommitCount;
+    
+    // Update the lastUpdated field in the database
+    db.get('repositories')
+      .find({ id: id.toString() })
+      .assign({
+        lastUpdated: new Date().toISOString(),
+        newCommitsCount: newCommitsCount > 0 ? newCommitsCount : 0
+      })
+      .write();
+    
+    logger.success(`Successfully pulled changes for ${repository.name}, ${newCommitsCount} new commits`);
+    
+    return {
+      success: true,
+      repository: repository.name,
+      newCommitsCount: newCommitsCount > 0 ? newCommitsCount : 0,
+      pullResult
+    };
+  } catch (error) {
+    logger.error(`Error pulling changes for ${repository.name}: ${error.message}`);
+    throw new Error(`Failed to pull changes: ${error.message}`);
+  }
+};
+
 module.exports = {
   getAllRepositories,
   getRepositoryById,
@@ -1454,4 +1526,5 @@ module.exports = {
   bulkImport,
   getDashboardStats,
   deleteRepository,
+  pullRepository
 };

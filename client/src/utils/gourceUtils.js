@@ -195,6 +195,12 @@ export const generateGourceCommand = (settings, logPath) => {
       return;
     }
     
+    // Special handling for date-format to ensure proper quoting
+    if (key === 'date-format') {
+      command += ` --${key} "${value}"`;
+      return;
+    }
+    
     // Handle booleans
     if (typeof value === 'boolean') {
       if (value === true) {

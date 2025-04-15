@@ -183,11 +183,11 @@ const RepositoriesPage = () => {
     fetchRepositories();
   }, [fetchRepositories]);  // Now we need to include fetchRepositories as a dependency
   
-  // Initialize all owners as expanded on load
+  // Initialize all owners as collapsed on load
   useEffect(() => {
     const initialExpandedState = {};
     Object.keys(groupedRepositories).forEach(owner => {
-      initialExpandedState[owner] = true;
+      initialExpandedState[owner] = false;
     });
     setExpandedOwners(initialExpandedState);
   }, [groupedRepositories]);
@@ -440,64 +440,61 @@ const RepositoriesPage = () => {
     }
   };
 
-  const handleUpdateRepository = async (id) => {
+  // Simplified repository update function using the correct endpoint
+  const handleUpdateRepo = async (repo) => {
     try {
-      const repoIndex = repositories.findIndex(repo => repo.id === id);
-      if (repoIndex === -1) {
-        toast.error(`Repository with ID ${id} not found in local state`);
-        await fetchRepositories();
-        return;
+      // Mark repo as updating
+      const updatedRepos = [...repositories];
+      const repoIndex = updatedRepos.findIndex(r => r.id === repo.id);
+      if (repoIndex !== -1) {
+        updatedRepos[repoIndex].updating = true;
+        setRepositories(updatedRepos);
       }
 
-      const repo = repositories[repoIndex];
-      repo.updating = true;
-      setRepositories([...repositories]);
-
-      try {
-        const response = await repositoriesApi.update(id);
-        
-        // Refresh the entire list to ensure everything is up to date
-        await fetchRepositories();
-        
-        // Check if there were warnings or errors in the log generation
-        if (response.data.logStatus === 'warning') {
-          toast.warning(`Repository updated but with warnings: ${response.data.logMessage}`);
-        } else if (response.data.logStatus === 'error') {
-          toast.warning(`Repository updated but log generation failed: ${response.data.logMessage}`);
-        } else {
-          const newCommitsMessage = response.data.newCommitsCount > 0 
-            ? ` (${response.data.newCommitsCount} new commits found)`
-            : '';
-          toast.success(`Repository updated successfully${newCommitsMessage}`);
-        }
-      } catch (err) {
-        console.error('Error updating repository:', err);
-        
-        // Si l'erreur est 404, on recharge la liste complète pour synchro
-        if (err.response?.status === 404) {
-          toast.error(`Repository with ID ${id} not found on server. Refreshing list...`);
-          await fetchRepositories();
-        } else {
-          // Display a more descriptive error message
-          const errorMessage = err.response?.data?.error 
-            ? `Failed to update repository: ${err.response.data.error}`
-            : 'Failed to update repository';
-          toast.error(errorMessage);
-          
-          // Update UI to show repo is no longer updating
-          const updatedRepos = [...repositories];
-          const repoIndex = updatedRepos.findIndex(repo => repo.id === id);
-          if (repoIndex !== -1) {
-            updatedRepos[repoIndex].updating = false;
-            setRepositories(updatedRepos);
-          }
-        }
-      }
+      console.log(`Updating repository: ${repo.name} (${repo.url}) with ID: ${repo.id}`);
+      
+      // Use the new gitPull endpoint
+      await repositoriesApi.gitPull(repo.id);
+      
+      // Refresh the repository list
+      await fetchRepositories();
+      
+      toast.success(`Repository ${repo.name} updated successfully`);
     } catch (err) {
-      console.error('Unexpected error in handleUpdateRepository:', err);
-      toast.error('An unexpected error occurred');
+      console.error('Error updating repository:', err);
+      toast.error('Failed to update repository');
+      
+      // Update UI to show repo is no longer updating
+      const updatedRepos = [...repositories];
+      const repoIndex = updatedRepos.findIndex(r => r.id === repo.id);
+      if (repoIndex !== -1) {
+        updatedRepos[repoIndex].updating = false;
+        setRepositories(updatedRepos);
+      }
     }
   };
+
+  // Table cell with the update button
+  const renderActionButtons = (repo) => (
+    <TableCell align="right">
+      <IconButton 
+        size="small" 
+        color="primary"
+        onClick={() => handleUpdateRepo(repo)}
+        disabled={repo.updating}
+        title="Update repository with latest changes"
+      >
+        {repo.updating ? <CircularProgress size={24} /> : <RefreshIcon />}
+      </IconButton>
+      <IconButton 
+        size="small" 
+        color="error"
+        onClick={() => handleOpenDeleteDialog(repo)}
+      >
+        <DeleteIcon />
+      </IconButton>
+    </TableCell>
+  );
 
   const handleDeleteRepository = async () => {
     if (!repoToDelete) return;
@@ -653,6 +650,84 @@ const RepositoriesPage = () => {
     setUserToDelete(null);
   };
 
+  // Function to update all repositories of a specific user
+  const handleUpdateAllUserRepos = async (owner) => {
+    try {
+      // Get all repositories for this owner
+      const ownerRepos = groupedRepositories[owner] || [];
+      if (ownerRepos.length === 0) {
+        toast.info(`No repositories found for ${owner}`);
+        return;
+      }
+
+      // Mark all repos as updating
+      const updatedRepos = [...repositories];
+      ownerRepos.forEach(repo => {
+        const repoIndex = updatedRepos.findIndex(r => r.id === repo.id);
+        if (repoIndex !== -1) {
+          updatedRepos[repoIndex].updating = true;
+        }
+      });
+      setRepositories(updatedRepos);
+      
+      toast.info(`Updating ${ownerRepos.length} repositories from ${owner}...`);
+      
+      // Update repositories sequentially to avoid overloading the server
+      for (const repo of ownerRepos) {
+        try {
+          await repositoriesApi.gitPull(repo.id);
+          console.log(`Updated repository ${repo.name}`);
+        } catch (err) {
+          console.error(`Error updating repository ${repo.name}:`, err);
+        }
+      }
+      
+      // Refresh the list once all updates are done
+      await fetchRepositories();
+      
+      toast.success(`Updated ${ownerRepos.length} repositories from ${owner}`);
+    } catch (err) {
+      console.error(`Error updating repositories for ${owner}:`, err);
+      toast.error(`Failed to update repositories for ${owner}`);
+      await fetchRepositories();
+    }
+  };
+  
+  // Function to update all repositories
+  const handleUpdateAllRepos = async () => {
+    try {
+      if (repositories.length === 0) {
+        toast.info('No repositories to update');
+        return;
+      }
+      
+      // Mark all repos as updating
+      const updatedRepos = repositories.map(repo => ({ ...repo, updating: true }));
+      setRepositories(updatedRepos);
+      
+      toast.info(`Updating all ${repositories.length} repositories...`);
+      
+      // Update repositories sequentially to avoid overloading the server
+      for (const repo of repositories) {
+        try {
+          await repositoriesApi.gitPull(repo.id);
+          console.log(`Updated repository ${repo.name}`);
+        } catch (err) {
+          console.error(`Error updating repository ${repo.name}:`, err);
+        }
+      }
+      
+      // Refresh the list once all updates are done
+      await fetchRepositories();
+      
+      toast.success(`Updated ${repositories.length} repositories`);
+    } catch (err) {
+      console.error('Error updating all repositories:', err);
+      toast.error('Failed to update all repositories');
+      await fetchRepositories();
+    }
+  };
+
   return (
     <Container maxWidth="xl">
       <Box sx={{ mb: 4 }}>
@@ -680,22 +755,32 @@ const RepositoriesPage = () => {
             ),
           }}
         />
-        <Box>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenAddDialog('single')}
-            sx={{ mr: 1 }}
-          >
-            Add Repository
-          </Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Button
             variant="outlined"
-            startIcon={<GitHubIcon />}
-            onClick={() => handleOpenAddDialog('bulk')}
+            startIcon={<RefreshIcon />}
+            onClick={handleUpdateAllRepos}
+            color="primary"
+            fullWidth
           >
-            Bulk Import
+            Update All Repos
           </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenAddDialog('single')}
+            >
+              Add Repository
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<GitHubIcon />}
+              onClick={() => handleOpenAddDialog('bulk')}
+            >
+              Bulk Import
+            </Button>
+          </Box>
         </Box>
       </Box>
 
@@ -751,14 +836,25 @@ const RepositoriesPage = () => {
                 </Typography>
               </Box>
               
-              <IconButton 
-                size="small" 
-                color="error"
-                onClick={() => handleOpenDeleteUserDialog(owner)}
-                title={`Delete all repositories from ${owner}`}
-              >
-                <DeleteForeverIcon />
-              </IconButton>
+              <Box>
+                <IconButton 
+                  size="small" 
+                  color="primary"
+                  onClick={() => handleUpdateAllUserRepos(owner)}
+                  title={`Update all repositories from ${owner}`}
+                  sx={{ mr: 1 }}
+                >
+                  <RefreshIcon />
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  color="error"
+                  onClick={() => handleOpenDeleteUserDialog(owner)}
+                  title={`Delete all repositories from ${owner}`}
+                >
+                  <DeleteForeverIcon />
+                </IconButton>
+              </Box>
             </Box>
             
             <Collapse in={expandedOwners[owner]} timeout="auto">
@@ -803,23 +899,7 @@ const RepositoriesPage = () => {
                               />
                             )}
                           </TableCell>
-                          <TableCell align="right">
-                            <IconButton 
-                              size="small" 
-                              color="primary"
-                              onClick={() => handleUpdateRepository(repo.id)}
-                              disabled={repo.updating}
-                            >
-                              {repo.updating ? <CircularProgress size={24} /> : <RefreshIcon />}
-                            </IconButton>
-                            <IconButton 
-                              size="small" 
-                              color="error"
-                              onClick={() => handleOpenDeleteDialog(repo)}
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </TableCell>
+                          {renderActionButtons(repo)}
                         </TableRow>
                       ))}
                     </TableBody>

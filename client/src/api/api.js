@@ -9,7 +9,7 @@ const api = axios.create({
   },
 });
 
-// Interceptor to hide API tokens in logs
+// Enhanced interceptor to log more details about requests
 api.interceptors.request.use(request => {
   // Create a copy for logs that masks tokens
   const sanitizedRequest = { ...request };
@@ -24,11 +24,31 @@ api.interceptors.request.use(request => {
     
     // Log the cleaned request instead of the original
     console.log('Making request to:', sanitizedRequest.url);
+    console.log('Request method:', request.method);
+    console.log('Request headers:', JSON.stringify(sanitizedRequest.headers));
+    
+    if (request.data) {
+      console.log('Request data:', typeof request.data === 'string' ? request.data : JSON.stringify(request.data));
+    }
   }
   
   // Note: return the original request, not the cleaned version
   return request;
 }, error => {
+  return Promise.reject(error);
+});
+
+// Add response interceptor
+api.interceptors.response.use(response => {
+  console.log('Response status:', response.status);
+  console.log('Response headers:', JSON.stringify(response.headers));
+  return response;
+}, error => {
+  console.error('API Error:', error.message);
+  if (error.response) {
+    console.error('Response status:', error.response.status);
+    console.error('Response data:', error.response.data);
+  }
   return Promise.reject(error);
 });
 
@@ -94,7 +114,8 @@ export const repositoriesApi = {
   getCloneStatus: (cloneId) => api.get(`/repositories/clone-status/${cloneId}`),
   bulkImport: (data) => api.post('/repositories/bulk-import', data),
   getBulkImportStatus: (bulkImportId) => api.get(`/repositories/bulk-import-status/${bulkImportId}`),
-  update: (id) => api.put(`/repositories/${id}/update`),
+  gitPull: (id) => api.post(`/repositories/${String(id)}/pull`),
+  update: (id) => api.post(`/repositories/update/${String(id)}`),
   delete: (id) => api.delete(`/repositories/${id}`),
   getStats: () => api.get('/repositories/stats'),
 };
@@ -158,4 +179,4 @@ const apiExports = {
   settings: settingsApi,
 };
 
-export default apiExports; 
+export default apiExports;

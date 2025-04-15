@@ -25,6 +25,7 @@ const defaultSettings = {
   maxUserCount: 0,
   titleText: '',
   showDates: true,
+  dateFormat: '%d %B %Y', // Added date format for "3 January 2009" style
   disableProgress: false,
   disableAutoRotate: false,
   showLines: true,
@@ -142,6 +143,7 @@ const settingsDescriptions = {
   maxUserCount: "Limits the maximum number of users displayed (0 = no limit)",
   titleText: "Custom title text (empty = use project name)",
   showDates: "Shows dates in the visualization",
+  dateFormat: "Format for displaying dates (e.g., '%d %B %Y' for '3 January 2009')",
   disableProgress: "Disables the progress bar",
   disableAutoRotate: "Disables automatic camera rotation",
   showLines: "Shows lines connecting files to users",
@@ -269,8 +271,9 @@ function convertToGourceArgs(settings) {
 
   let args = '';
   
-  // Explicit mapping for clarity and control
+  // Explicit mapping for clarity and control (fixed mapping with Gource command flags)
   const mapping = {
+    // Basic parameters
     resolution: '--viewport',
     fullscreen: '-f',
     screenNum: '--screen',
@@ -292,19 +295,45 @@ function convertToGourceArgs(settings) {
     timeScale: '-c',
     elasticity: '-e',
     key: '--key',
+    dateFormat: '--date-format',
+    
+    // User & avatar options
     userImageDir: '--user-image-dir',
     defaultUserImage: '--default-user-image',
     fixedUserSize: '--fixed-user-size',
     colourImages: '--colour-images',
+    userFriction: '--user-friction',
+    userScale: '--user-scale',
+    maxUserSpeed: '--max-user-speed',
+    followUser: '--follow-user',
+    highlightUser: '--highlight-user',
+    highlightUsers: '--highlight-users',
+    highlightDirs: '--highlight-dirs',
+    
+    // File options
     fileIdleTime: '-i',
     fileIdleTimeAtEnd: '--file-idle-time-at-end',
     maxFiles: '--max-files',
     maxFileLag: '--max-file-lag',
+    filenameTime: '--filename-time',
+    fileExtensions: '--file-extensions',
+    fileExtensionFallback: '--file-extension-fallback',
+    
+    // Filters & regex
+    userFilter: '--user-filter',
+    userShowFilter: '--user-show-filter',
+    fileFilter: '--file-filter',
+    fileShowFilter: '--file-show-filter',
+    
+    // Window & output options
     windowPosition: '--window-position',
     frameless: '--frameless',
     outputCustomLog: '--output-custom-log',
+    
+    // Appearance options
     background: '-b',
     backgroundImage: '--background-image',
+    transparent: '--transparent',
     bloomMultiplier: '--bloom-multiplier',
     bloomIntensity: '--bloom-intensity',
     cameraMode: '--camera-mode',
@@ -312,7 +341,8 @@ function convertToGourceArgs(settings) {
     padding: '--padding',
     disableAutoRotate: '--disable-auto-rotate',
     disableInput: '--disable-input',
-    dateFormat: '--date-format',
+    
+    // Font & text options
     fontFile: '--font-file',
     fontScale: '--font-scale',
     fontSize: '--font-size',
@@ -320,44 +350,54 @@ function convertToGourceArgs(settings) {
     dirnameFontSize: '--dir-font-size',
     userFontSize: '--user-font-size',
     fontColor: '--font-colour',
-    fileExtensions: '--file-extensions',
-    fileExtensionFallback: '--file-extension-fallback',
-    gitBranch: '--git-branch',
-    hide: '--hide', // Special handling for array value needed
-    logo: '--logo',
-    logoOffset: '--logo-offset',
-    loopDelaySeconds: '--loop-delay-seconds',
-    title: '--title', // Special handling for boolean/string value needed
-    transparent: '--transparent',
-    userFilter: '--user-filter',
-    userShowFilter: '--user-show-filter',
-    fileFilter: '--file-filter',
-    fileShowFilter: '--file-show-filter',
-    userFriction: '--user-friction',
-    userScale: '--user-scale',
-    maxUserSpeed: '--max-user-speed',
-    followUser: '--follow-user',
-    highlightDirs: '--highlight-dirs',
-    highlightUser: '--highlight-user',
-    highlightUsers: '--highlight-users',
+    dirColor: '--dir-colour',
     highlightColor: '--highlight-colour',
     selectionColor: '--selection-colour',
     filenameColor: '--filename-colour',
-    dirColor: '--dir-colour',
     dirNameDepth: '--dir-name-depth',
     dirNamePosition: '--dir-name-position',
-    filenameTime: '--filename-time',
+    
+    // Logo & caption options
+    logo: '--logo',
+    logoOffset: '--logo-offset',
+    loopDelaySeconds: '--loop-delay-seconds',
     captionFile: '--caption-file',
     captionSize: '--caption-size',
     captionColour: '--caption-colour',
     captionDuration: '--caption-duration',
     captionOffset: '--caption-offset',
+    
+    // Misc
+    gitBranch: '--git-branch',
     hashSeed: '--hash-seed',
-    framerate: '--output-framerate' // Note: This is technically an output option
+    title: '--title', // Special handling needed
+    framerate: '--output-framerate' // Output option
   };
 
-  // Map camelCase keys in settings to kebab-case arguments
-  const settingKeys = Object.keys(settings);
+  // "hide" elements mapping - from our UI settings to Gource command line parameters
+  // We need to convert these boolean flags into a comma-separated list for --hide
+  const hideElementsMapping = {
+    hideRoot: 'root',
+    hideUsers: 'users',
+    hideFiles: 'files',
+    hideFilenames: 'filenames',
+    hideDirnames: 'dirnames',
+    hideUsernames: 'usernames',
+    hideDate: 'date',
+    hideProgress: 'progress',
+    hideMouse: 'mouse',
+    hideTree: 'tree',
+    hideBloom: 'bloom'
+  };
+
+  // Process hide elements first to collect them
+  let hideElements = [];
+  for (const [settingKey, hideValue] of Object.entries(hideElementsMapping)) {
+    // If the setting exists and is true, add the element to hide
+    if (settings[settingKey] === true) {
+      hideElements.push(hideValue);
+    }
+  }
 
   // Process title and titleText first, to ensure they're handled properly
   if (settings.title !== undefined && settings.title !== null) {
@@ -377,34 +417,27 @@ function convertToGourceArgs(settings) {
     }
   }
 
-  // Now process other settings, but skip title and titleText since we handled them above
-  for (const key of settingKeys) {
-    // Skip title and titleText as we've already handled them
-    if (key === 'title' || key === 'titleText') continue;
+  // Now process other settings, skipping those we've already handled
+  for (const key of Object.keys(settings)) {
+    // Skip already processed settings
+    if (key === 'title' || key === 'titleText' || key in hideElementsMapping) continue;
     
     const value = settings[key];
 
-    // Skip if value is null, undefined, or empty string (unless it's a boolean flag where presence matters)
+    // Skip if value is null, undefined, or empty string
     if (value === null || value === undefined || value === '') continue;
 
     const gourceArg = mapping[key];
     if (!gourceArg) {
-      // console.warn(`No Gource argument mapping found for setting key: ${key}`);
+      // Not every UI setting maps to a Gource parameter, so we'll just skip unmapped ones
       continue;
     }
 
     // Handle boolean flags (arguments without values)
     if (typeof value === 'boolean') {
+      // For boolean flags, we only include the argument if true
       if (value) {
         args += ` ${gourceArg}`;
-      }
-      continue; // Move to next setting
-    }
-
-    // Handle the 'hide' argument which can be an array
-    if (key === 'hide' && Array.isArray(value)) {
-      if (value.length > 0) {
-        args += ` ${gourceArg} ${value.join(',')}`;
       }
       continue;
     }
@@ -422,13 +455,15 @@ function convertToGourceArgs(settings) {
       continue;
     }
 
-    // Handle dates (ensure correct format string)
+    // Handle dates (ensure correct format with quotes)
     if (key === 'startDate' || key === 'stopDate') {
       if (typeof value === 'string' && value) {
-        // Ensure value is just "YYYY-MM-DD HH:MM:SS" before adding quotes
-        const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+        // Ensure value is "YYYY-MM-DD HH:MM:SS" before adding quotes
+        const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?)/);
         if (dateMatch && dateMatch[1]) {
-          args += ` ${gourceArg} "${dateMatch[1]}"`; 
+          // If time component is missing, add it
+          const dateStr = dateMatch[1].includes(' ') ? dateMatch[1] : `${dateMatch[1]} 00:00:00`;
+          args += ` ${gourceArg} "${dateStr}"`; 
         } else {
           console.warn(`Invalid date format for ${key}: ${value}. Skipping.`);
         }
@@ -436,25 +471,34 @@ function convertToGourceArgs(settings) {
       continue;
     }
 
+    // Special handling for dateFormat to ensure proper quoting
+    if (key === 'dateFormat') {
+      args += ` ${gourceArg} "${value}"`; // Ensure dateFormat is quoted
+      continue;
+    }
+
     // For all other arguments, add them with their values
     args += ` ${gourceArg} ${value}`;
   }
 
-  // Note: extraArgs is not explicitly mapped, needs separate handling if required.
-
-  // Add combined --hide arguments if any
-  if (settings.hide && settings.hide.length > 0) {
-    args += ` --hide ${settings.hide.join(',')}`;
+  // Add collected hide elements if any
+  if (hideElements.length > 0) {
+    args += ` --hide ${hideElements.join(',')}`;
   }
   
   // Ensure framerate is present for output
   if (!args.includes('--output-framerate')) {
-    args += ` --output-framerate ${settings.framerate || 30}`;
+    args += ` --output-framerate ${settings.framerate || 60}`;
   }
 
   // Add --user-image-dir if enabled
   if (settings.useUserImageDir === true) {
     args += ` --user-image-dir "${AVATAR_DIR_PATH}"`;
+  }
+  
+  // Special handling for file-extensions flag
+  if (settings.fileExtensions === true && !args.includes('--file-extensions')) {
+    args += ` --file-extensions`;
   }
 
   // Remove leading/trailing spaces
