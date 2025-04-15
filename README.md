@@ -234,6 +234,78 @@ The application uses LowDB to store data in a JSON file (`/db/db.json`). Main co
 
 The implementation uses a singleton (`Database.js`) to ensure consistent access to the database.
 
+## Component Documentation
+
+This section details the purpose and functionality of key files within the application.
+
+### Server (`server/`)
+
+- **`index.js`**: Main entry point for the backend server. Initializes Express, middleware, database, routes, and starts the server.
+- **`purge.js`**: Standalone script to clean the database and remove temporary files/folders, preserving settings.
+
+#### Routes (`server/routes/`)
+
+- **`repositories.js`**: Handles API requests related to Git repositories (add, get, delete, bulk import, status checks).
+- **`projects.js`**: Handles API requests for managing projects (groups of repositories).
+- **`configFiles.js`**: Handles API requests for managing Gource render profiles (CRUD operations).
+- **`renders.js`**: Handles API requests for starting, monitoring, and managing Gource render processes.
+- **`settings.js`**: Handles API requests for managing application settings (e.g., GitHub token).
+
+#### Controllers (`server/controllers/`)
+
+- **`RepositoryController.js`**: Contains the logic for handling repository-related HTTP requests, interacting with `RepositoryService` and `Database`.
+- **`ProjectController.js`**: Logic for handling project-related HTTP requests, using `ProjectService`.
+- **`ConfigController.js`**: Logic for handling Gource configuration profile requests, using `GourceConfigService`.
+- **`RenderController.js`**: Logic for handling render requests (start, status), using `RenderService` and `FFmpegService`.
+- **`SettingsController.js`**: Logic for handling settings requests, using `SettingsService`.
+
+#### Services (`server/services/`)
+
+- **`repositoryService.js`**: Core logic for Git operations (cloning, validation, log generation) and repository data management.
+- **`projectService.js`**: Core logic for creating, updating, deleting, and retrieving project data.
+- **`renderService.js`**: Manages the entire Gource rendering pipeline, including log combination, Gource execution via `child_process`, status updates, and interaction with `FFmpegService`.
+- **`ffmpegService.js`**: Handles video post-processing using FFmpeg (adding audio, titles, effects, generating previews).
+- **`gourceConfigService.js`**: Manages the retrieval and creation of Gource render profiles stored in the database.
+- **`settingsService.js`**: Manages loading, saving, and validating application settings (currently focused on the GitHub token in `.env`).
+
+#### Utilities (`server/utils/`)
+
+- **`Database.js`**: Implements the Singleton pattern for accessing the LowDB database instance. Provides common DB operations.
+- **`Logger.js`**: Provides a structured logging utility with different levels (info, warn, error, success, etc.) and component-specific loggers.
+- **`ErrorHandler.js`**: (If present) Centralized utility for handling and formatting errors consistently for API responses.
+- **`processUtils.js`**: Contains utilities for managing external processes, specifically `killProcessTree` for forcefully terminating Gource/FFmpeg processes.
+
+#### Config (`server/config/`)
+
+- **`defaultGourceConfig.js`**: Defines the default Gource settings used when creating the initial database or default profile.
+- **`customRenderProfiles.js`**: Defines additional pre-configured render profiles (e.g., "Last Week", "Everything in 1min").
+- **`initRenderProfiles.js`**: Script run on server start to ensure default and custom profiles exist in the database.
+
+### Client (`client/`)
+
+#### API (`client/src/api/`)
+
+- **`api.js`**: Centralizes all communication with the backend API using Axios. Defines functions for each API endpoint.
+
+#### Pages (`client/src/pages/`)
+
+- **`DashboardPage.js`**: Main landing page, displays summary statistics and recent activity.
+- **`RepositoriesPage.js`**: UI for viewing, adding (single/bulk), and deleting Git repositories.
+- **`ProjectsPage.js`**: UI for creating, viewing, editing, and deleting projects (groups of repositories).
+- **`ConfigFilesPage.js`**: UI for managing Gource render profiles (viewing, creating, editing, deleting).
+- **`RenderPage.js`**: UI for selecting a project and render profile to start a new Gource render, and monitoring progress.
+- **`FFmpegEditorPage.js`**: UI for applying post-processing effects (titles, audio, fades) to completed renders using FFmpeg.
+- **`ExportsPage.js`**: UI for viewing and managing completed video exports.
+- **`SettingsPage.js`**: UI for managing application settings (e.g., GitHub token).
+
+#### Components (`client/src/components/`)
+
+- Contains reusable React components used across different pages (e.g., `GourcePreview.js`, form elements like `ColorPickerField.js`, `TooltipSlider.js`).
+
+### Shared (`shared/`)
+
+- **`gourceConfig.js`**: Contains shared logic and data structures related to Gource configuration, used by both frontend and backend (e.g., mapping Gource options, parameter descriptions, argument conversion).
+
 ## Recent Changes
 
 ### June 2023: Configuration Issues Fixed
