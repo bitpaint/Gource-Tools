@@ -3,8 +3,12 @@
  * Handles HTTP requests related to render profile configurations
  */
 
-const GourceConfigService = require('../services/GourceConfigService');
+const GourceConfigService = require('../services/gourceConfigService');
 const Validator = require('../validators/RequestValidator');
+const Logger = require('../utils/Logger');
+
+// Create component logger
+const logger = Logger.createComponentLogger('ConfigController');
 
 /**
  * Validate and fix numeric values in Gource config
@@ -141,10 +145,12 @@ function validateAndFixSettings(settings) {
  */
 const getAllRenderProfiles = (req, res) => {
   try {
+    logger.info('Retrieving all render profiles');
     const renderProfiles = GourceConfigService.getAllRenderProfiles();
+    logger.success(`Retrieved ${renderProfiles.length} render profiles`);
     res.json(renderProfiles);
   } catch (error) {
-    console.error('Error fetching render profiles:', error);
+    logger.error('Failed to fetch render profiles', error);
     res.status(500).json({ error: 'Failed to fetch render profiles' });
   }
 };
@@ -155,17 +161,23 @@ const getAllRenderProfiles = (req, res) => {
 const getRenderProfileById = (req, res) => {
   try {
     const validation = Validator.validateId(req.params.id);
-    if (!Validator.handleValidation(validation, res)) return;
+    if (!Validator.handleValidation(validation, res)) {
+      logger.warn(`Invalid profile ID: ${req.params.id}`);
+      return;
+    }
     
+    logger.info(`Retrieving render profile with ID: ${req.params.id}`);
     const renderProfile = GourceConfigService.getRenderProfileById(req.params.id);
     
     if (!renderProfile) {
+      logger.warn(`Render profile not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Render profile not found' });
     }
     
+    logger.success(`Retrieved render profile: ${renderProfile.name}`);
     res.json(renderProfile);
   } catch (error) {
-    console.error('Error fetching render profile by ID:', error);
+    logger.error('Failed to fetch render profile by ID', error);
     res.status(500).json({ error: 'Failed to fetch render profile' });
   }
 };
@@ -176,9 +188,13 @@ const getRenderProfileById = (req, res) => {
 const createRenderProfile = (req, res) => {
   try {
     const validation = Validator.validateRequired(req.body, ['name']);
-    if (!Validator.handleValidation(validation, res)) return;
+    if (!Validator.handleValidation(validation, res)) {
+      logger.warn('Invalid request: missing required fields');
+      return;
+    }
     
     const { name, description, settings } = req.body;
+    logger.config(`Creating new render profile: ${name}`);
     
     // Validate and fix settings
     const validatedSettings = validateAndFixSettings(settings);
@@ -192,17 +208,16 @@ const createRenderProfile = (req, res) => {
     
     try {
       const newProfile = GourceConfigService.createRenderProfile(profileData);
+      logger.success(`Created render profile: ${newProfile.name} (ID: ${newProfile.id})`);
       res.status(201).json(newProfile);
     } catch (serviceError) {
       // Handle service-specific errors
+      logger.error(`Render profile creation failed: ${serviceError.message}`);
       return res.status(400).json({ error: serviceError.message });
     }
   } catch (error) {
-    console.error('Error creating render profile:', error);
-    res.status(500).json({ 
-      error: 'Failed to create render profile', 
-      details: error.message 
-    });
+    logger.error('Failed to create render profile', error);
+    res.status(500).json({ error: 'Failed to create render profile' });
   }
 };
 
@@ -212,18 +227,24 @@ const createRenderProfile = (req, res) => {
 const updateRenderProfile = (req, res) => {
   try {
     const idValidation = Validator.validateId(req.params.id);
-    if (!Validator.handleValidation(idValidation, res)) return;
+    if (!Validator.handleValidation(idValidation, res)) {
+      logger.warn(`Invalid profile ID: ${req.params.id}`);
+      return;
+    }
     
     const { name, description, settings } = req.body;
+    logger.config(`Updating render profile with ID: ${req.params.id}`);
     
     // Check if render profile exists
     const renderProfile = GourceConfigService.getRenderProfileById(req.params.id);
     if (!renderProfile) {
+      logger.warn(`Render profile not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Render profile not found' });
     }
     
     // Protect default Gource config
     if (renderProfile.isDefault) {
+      logger.error(`Attempted to modify default render profile: ${req.params.id}`);
       return res.status(403).json({ error: 'The default Gource config file cannot be modified' });
     }
     
@@ -239,16 +260,17 @@ const updateRenderProfile = (req, res) => {
     
     try {
       const updatedProfile = GourceConfigService.updateRenderProfile(req.params.id, profileData);
+      logger.success(`Updated render profile: ${updatedProfile.name} (ID: ${updatedProfile.id})`);
       res.json(updatedProfile);
     } catch (serviceError) {
       // Handle service-specific errors
+      logger.error(`Render profile update failed: ${serviceError.message}`);
       return res.status(400).json({ error: serviceError.message });
     }
   } catch (error) {
-    console.error('Error updating render profile:', error);
+    logger.error('Failed to update render profile', error);
     res.status(500).json({ 
-      error: 'Failed to update render profile', 
-      details: error.message 
+      error: 'Failed to update render profile'
     });
   }
 };
@@ -259,16 +281,23 @@ const updateRenderProfile = (req, res) => {
 const deleteRenderProfile = (req, res) => {
   try {
     const validation = Validator.validateId(req.params.id);
-    if (!Validator.handleValidation(validation, res)) return;
+    if (!Validator.handleValidation(validation, res)) {
+      logger.warn(`Invalid profile ID: ${req.params.id}`);
+      return;
+    }
+    
+    logger.info(`Attempting to delete render profile with ID: ${req.params.id}`);
     
     // Check if render profile exists
     const renderProfile = GourceConfigService.getRenderProfileById(req.params.id);
     if (!renderProfile) {
+      logger.warn(`Render profile not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Render profile not found' });
     }
     
     // Protect default Gource config
     if (renderProfile.isDefault) {
+      logger.error(`Attempted to delete default render profile: ${req.params.id}`);
       return res.status(403).json({ error: 'The default Gource config file cannot be deleted' });
     }
     
@@ -277,19 +306,21 @@ const deleteRenderProfile = (req, res) => {
       const result = GourceConfigService.deleteRenderProfile(req.params.id);
       
       if (result) {
+        logger.success(`Deleted render profile: ${renderProfile.name} (ID: ${req.params.id})`);
         res.json({ message: 'Render profile deleted successfully' });
       } else {
+        logger.error(`Failed to delete render profile: ${req.params.id}`);
         res.status(500).json({ error: 'Failed to delete render profile' });
       }
     } catch (serviceError) {
       // Handle service-specific errors
+      logger.error(`Render profile deletion failed: ${serviceError.message}`);
       return res.status(400).json({ error: serviceError.message });
     }
   } catch (error) {
-    console.error('Error deleting render profile:', error);
+    logger.error('Failed to delete render profile', error);
     res.status(500).json({ 
-      error: 'Failed to delete render profile', 
-      details: error.message 
+      error: 'Failed to delete render profile'
     });
   }
 };

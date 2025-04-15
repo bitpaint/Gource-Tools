@@ -7,18 +7,24 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const RenderService = require('../services/renderService');
-const FFmpegService = require('../services/FFmpegService');
+const FFmpegService = require('../services/ffmpegService');
 const Validator = require('../validators/RequestValidator');
+const Logger = require('../utils/Logger');
+
+// Create a component logger
+const logger = Logger.createComponentLogger('RenderController');
 
 /**
  * Get all renders (history)
  */
 const getAllRenders = (req, res) => {
   try {
+    logger.info('Retrieving all renders');
     const renders = RenderService.getAllRenders();
+    logger.success(`Retrieved ${renders.length} render records`);
     res.json(renders);
   } catch (error) {
-    console.error('Error fetching all renders:', error);
+    logger.error('Failed to fetch all renders', error);
     res.status(500).json({ error: 'Failed to fetch renders' });
   }
 };
@@ -28,15 +34,15 @@ const getAllRenders = (req, res) => {
  */
 const getCompletedRenders = (req, res) => {
   try {
-    console.log('Fetching completed renders...');
+    logger.info('Fetching completed renders');
     const renders = RenderService.getAllRenders()
       .filter(render => render.status === 'completed')
       .sort((a, b) => new Date(b.startTime) - new Date(a.startTime));
     
-    console.log(`Found ${renders.length} completed renders`);
+    logger.success(`Found ${renders.length} completed renders`);
     res.json(renders);
   } catch (error) {
-    console.error('Error fetching completed renders:', error);
+    logger.error('Failed to fetch completed renders', error);
     res.status(500).json({ error: 'Failed to fetch completed renders' });
   }
 };
@@ -47,17 +53,23 @@ const getCompletedRenders = (req, res) => {
 const getRenderById = (req, res) => {
   try {
     const validation = Validator.validateId(req.params.id);
-    if (!Validator.handleValidation(validation, res)) return;
+    if (!Validator.handleValidation(validation, res)) {
+      logger.warn(`Invalid render ID: ${req.params.id}`);
+      return;
+    }
     
+    logger.info(`Retrieving render with ID: ${req.params.id}`);
     const render = RenderService.getRenderById(req.params.id);
     
     if (!render) {
+      logger.warn(`Render not found: ${req.params.id}`);
       return res.status(404).json({ error: 'Render not found' });
     }
     
+    logger.success(`Retrieved render: ${render.id}`);
     res.json(render);
   } catch (error) {
-    console.error('Error fetching render by ID:', error);
+    logger.error('Failed to fetch render by ID', error);
     res.status(500).json({ error: 'Failed to fetch render' });
   }
 };
@@ -68,20 +80,24 @@ const getRenderById = (req, res) => {
 const startRender = async (req, res) => {
   try {
     const validation = Validator.validateRequired(req.body, ['projectId']);
-    if (!Validator.handleValidation(validation, res)) return;
+    if (!Validator.handleValidation(validation, res)) {
+      logger.warn('Invalid request: missing required fields');
+      return;
+    }
     
-    const { projectId, customName } = req.body;
+    const { projectId, customName, renderProfileId } = req.body;
+    logger.render(`Starting new render for project: ${projectId}`);
     
     // Start render using RenderService
-    const render = await RenderService.startRender(projectId, customName);
+    const render = await RenderService.startRender(projectId, customName, { renderProfileId });
     
     // Send response with the created render
+    logger.success(`Render started: ${render.id}`);
     res.status(202).json(render);
   } catch (error) {
-    console.error('Error starting render:', error);
+    logger.error('Failed to start render', error);
     res.status(500).json({ 
-      error: 'Failed to start render', 
-      details: error.message 
+      error: 'Failed to start render'
     });
   }
 };
@@ -92,12 +108,14 @@ const startRender = async (req, res) => {
 const uploadMusic = (req, res) => {
   try {
     if (!req.file) {
+      logger.warn('Music upload failed: no file uploaded');
       return res.status(400).json({ error: 'No file uploaded' });
     }
     
     // Validate file type
     const allowedMimeTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg'];
     if (!allowedMimeTypes.includes(req.file.mimetype)) {
+      logger.warn(`Invalid file type: ${req.file.mimetype}`);
       return res.status(400).json({ 
         error: 'Invalid file type. Only MP3, WAV, and OGG audio files are allowed.' 
       });
@@ -110,6 +128,7 @@ const uploadMusic = (req, res) => {
     const musicDir = path.join(__dirname, '../../temp/music');
     if (!fs.existsSync(musicDir)) {
       fs.mkdirSync(musicDir, { recursive: true });
+      logger.file(`Created music directory: ${musicDir}`);
     }
     
     const targetPath = path.join(musicDir, fileName);
@@ -120,6 +139,7 @@ const uploadMusic = (req, res) => {
     // Create music file URL
     const musicUrl = `/temp/music/${fileName}`;
     
+    logger.success(`Uploaded music file: ${fileName}`);
     res.json({
       success: true,
       fileName,
@@ -127,7 +147,7 @@ const uploadMusic = (req, res) => {
       url: musicUrl
     });
   } catch (error) {
-    console.error('Error uploading music file:', error);
+    logger.error('Failed to upload music file', error);
     res.status(500).json({ error: 'Failed to upload music file' });
   }
 };

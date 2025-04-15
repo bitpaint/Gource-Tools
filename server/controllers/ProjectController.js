@@ -3,7 +3,7 @@
  * Handles HTTP requests related to project operations
  */
 
-const ProjectService = require('../services/ProjectService');
+const ProjectService = require('../services/projectService');
 const Validator = require('../validators/RequestValidator');
 
 /**

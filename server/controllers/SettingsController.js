@@ -3,7 +3,7 @@
  * Handles HTTP requests related to application settings
  */
 
-const SettingsService = require('../services/SettingsService');
+const SettingsService = require('../services/settingsService');
 const ErrorHandler = require('../utils/ErrorHandler');
 const Logger = require('../utils/Logger');
 

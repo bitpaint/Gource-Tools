@@ -5,112 +5,48 @@ const fs = require('fs');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig } = require('../config/defaultGourceConfig');
+const Database = require('../utils/Database');
+const ProjectService = require('../services/projectService');
 
-const adapter = new FileSync(path.join(__dirname, '../../db/db.json'));
-const db = low(adapter);
-
-// Fonction pour recharger la base de données
-function reloadDatabase() {
-  const dbPath = path.join(__dirname, '../../db/db.json');
-  const adapter = new FileSync(dbPath);
-  return low(adapter);
-}
-
-// Récupérer un projet avec tous ses détails (référentiels et profil de rendu)
+// Get a project with all its details (repositories and render profile)
 function getProjectWithDetails(projectId) {
-  if (!projectId) return null;
-  
-  // Recharger la base de données pour avoir les données les plus récentes
-  const freshDb = reloadDatabase();
-  
-  // Récupérer le projet
-  const project = freshDb.get('projects')
-    .find({ id: projectId.toString() })
-    .value();
-  
-  if (!project) return null;
-  
-  // Récupérer les détails des référentiels
-  const repositoryDetails = project.repositories.map(repoId => {
-    return freshDb.get('repositories')
-      .find({ id: repoId })
-      .value();
-  }).filter(repo => repo !== undefined);
-  
-  // Récupérer le profil de rendu
-  let renderProfile = null;
-  if (project.renderProfileId) {
-    renderProfile = freshDb.get('renderProfiles')
-      .find({ id: project.renderProfileId })
-      .value();
-  }
-  
-  if (!renderProfile) {
-    // Utiliser le profil par défaut si aucun profil n'est spécifié
-    renderProfile = freshDb.get('renderProfiles')
-      .find({ isDefault: true })
-      .value();
-  }
-  
-  return {
-    ...project,
-    repositoryDetails,
-    renderProfile
-  };
+  return ProjectService.getProjectWithDetails(projectId);
 }
 
 // Get all projects
 router.get('/', (req, res) => {
-  // Recharger la base de données pour avoir les données les plus récentes
-  const freshDb = reloadDatabase();
-  const projects = freshDb.get('projects').value();
+  const projects = ProjectService.getAllProjects();
   res.json(projects);
 });
 
 // Get a single project with repositories
 router.get('/:id', (req, res) => {
-  // Recharger la base de données pour avoir les données les plus récentes
-  const freshDb = reloadDatabase();
-  const project = freshDb.get('projects')
-    .find({ id: req.params.id })
-    .value();
+  const project = ProjectService.getProjectWithDetails(req.params.id);
 
   if (!project) {
     return res.status(404).json({ error: 'Project not found' });
   }
 
-  // Get repository details for each repository in the project
-  const repositories = project.repositories.map(repoId => {
-    return freshDb.get('repositories')
-      .find({ id: repoId })
-      .value();
-  }).filter(repo => repo !== undefined);
-
-  res.json({
-    ...project,
-    repositoryDetails: repositories
-  });
+  res.json(project);
 });
 
 // Create a new project
 router.post('/', (req, res) => {
   try {
     const { name, description, repositories, renderProfileId } = req.body;
+    const db = Database.getDatabase();
 
     // Debug logs
-    console.log('Création du projet - données reçues:');
+    console.log('Creating project - data received:');
     console.log('name:', name);
     console.log('description:', description);
     console.log('repositories (type):', typeof repositories, Array.isArray(repositories));
-    console.log('repositories (contenu):', repositories);
+    console.log('repositories (content):', repositories);
     console.log('renderProfileId:', renderProfileId);
 
-    // Recharger la base de données pour s'assurer d'avoir les données les plus récentes
-    const freshDb = reloadDatabase();
-    
-    // Afficher tous les repositories disponibles
-    const allRepos = freshDb.get('repositories').value();
-    console.log('Repositories disponibles dans la DB (après rechargement):', allRepos.map(r => ({ id: r.id, name: r.name })));
+    // Display all available repositories
+    const allRepos = db.get('repositories').value();
+    console.log('Available repositories in DB:', allRepos.map(r => ({ id: r.id, name: r.name })));
 
     // Validate input
     if (!name) {
@@ -123,7 +59,7 @@ router.post('/', (req, res) => {
     }
 
     // Check if project with same name already exists
-    const existingProject = freshDb.get('projects')
+    const existingProject = db.get('projects')
       .find({ name })
       .value();
 
@@ -134,21 +70,21 @@ router.post('/', (req, res) => {
     // Validate repositories if provided
     let validRepos = [];
     if (repositories && repositories.length > 0) {
-      console.log('Vérification des repositories:', repositories);
+      console.log('Checking repositories:', repositories);
       repositories.forEach(repoId => {
-        const repo = freshDb.get('repositories')
+        const repo = db.get('repositories')
           .find({ id: repoId.toString() })
           .value();
         
         if (repo) {
-          console.log('Repository valide trouvé:', repo.name);
+          console.log('Valid repository found:', repo.name);
           validRepos.push(repoId);
         } else {
-          console.log('Repository invalide avec ID:', repoId);
+          console.log('Invalid repository with ID:', repoId);
         }
       });
     }
-    console.log('Repositories valides:', validRepos);
+    console.log('Valid repositories:', validRepos);
 
     // Ensure at least one repository is valid
     if (validRepos.length === 0) {
@@ -158,13 +94,13 @@ router.post('/', (req, res) => {
     // Validate Gource config file if provided
     let finalRenderProfileId = renderProfileId;
     if (renderProfileId) {
-      const profileExists = freshDb.get('renderProfiles')
+      const profileExists = db.get('renderProfiles')
         .find({ id: renderProfileId })
         .value();
       
       if (!profileExists) {
         // If specified config file doesn't exist, try to use default config file
-        const defaultProfile = freshDb.get('renderProfiles')
+        const defaultProfile = db.get('renderProfiles')
           .find({ isDefault: true })
           .value();
         
@@ -176,7 +112,7 @@ router.post('/', (req, res) => {
       }
     } else {
       // If no config file specified, try to use default config file
-      const defaultProfile = freshDb.get('renderProfiles')
+      const defaultProfile = db.get('renderProfiles')
         .find({ isDefault: true })
         .value();
       
@@ -199,7 +135,7 @@ router.post('/', (req, res) => {
       lastModified: new Date().toISOString()
     };
 
-    freshDb.get('projects')
+    db.get('projects')
       .push(newProject)
       .write();
 
@@ -216,17 +152,16 @@ router.put('/:id', (req, res) => {
     const { name, description, repositories = [], renderProfileId } = req.body;
     
     // Debug logs
-    console.log('Mise à jour du projet - données reçues:');
+    console.log('Updating project - data received:');
     console.log('name:', name);
     console.log('description:', description);
     console.log('repositories (type):', typeof repositories, Array.isArray(repositories));
-    console.log('repositories (contenu):', repositories);
+    console.log('repositories (content):', repositories);
     console.log('renderProfileId:', renderProfileId);
     
-    // Recharger la base de données
-    const freshDb = reloadDatabase();
+    const db = Database.getDatabase();
     
-    const project = freshDb.get('projects')
+    const project = db.get('projects')
       .find({ id: req.params.id })
       .value();
 
@@ -246,7 +181,7 @@ router.put('/:id', (req, res) => {
 
     // Check if the name is being changed and if it already exists
     if (name && name !== project.name) {
-      const existingProject = freshDb.get('projects')
+      const existingProject = db.get('projects')
         .find({ name })
         .value();
 
@@ -257,19 +192,19 @@ router.put('/:id', (req, res) => {
 
     // Validate repositories - make sure they exist
     const validRepos = repositories.filter(repoId => {
-      const repo = freshDb.get('repositories')
+      const repo = db.get('repositories')
         .find({ id: repoId.toString() })
         .value();
       
       if (repo) {
-        console.log('Repository valide trouvé (mise à jour):', repo.name);
+        console.log('Valid repository found (update):', repo.name);
         return true;
       } else {
-        console.log('Repository invalide avec ID (mise à jour):', repoId);
+        console.log('Invalid repository with ID (update):', repoId);
         return false;
       }
     });
-    console.log('Repositories valides (mise à jour):', validRepos);
+    console.log('Valid repositories (update):', validRepos);
 
     // Ensure at least one repository is valid
     if (validRepos.length === 0) {
@@ -279,13 +214,13 @@ router.put('/:id', (req, res) => {
     // Validate Gource config file if provided
     let finalRenderProfileId = renderProfileId;
     if (renderProfileId) {
-      const profileExists = freshDb.get('renderProfiles')
+      const profileExists = db.get('renderProfiles')
         .find({ id: renderProfileId })
         .value();
       
       if (!profileExists) {
         // If specified config file doesn't exist, try to use default config file
-        const defaultProfile = freshDb.get('renderProfiles')
+        const defaultProfile = db.get('renderProfiles')
           .find({ isDefault: true })
           .value();
         
@@ -296,10 +231,10 @@ router.put('/:id', (req, res) => {
         }
       }
     } else if (renderProfileId === null) {
-      // Si on a explicitement demandé à retirer le profil
+      // If the profile was explicitly removed
       finalRenderProfileId = null;
     } else {
-      // Si renderProfileId n'est pas fourni, garder la valeur actuelle
+      // If renderProfileId is not provided, keep the current value
       finalRenderProfileId = project.renderProfileId;
     }
 
@@ -313,7 +248,7 @@ router.put('/:id', (req, res) => {
       lastModified: new Date().toISOString()
     };
 
-    freshDb.get('projects')
+    db.get('projects')
       .find({ id: req.params.id })
       .assign(updatedProject)
       .write();
@@ -328,10 +263,9 @@ router.put('/:id', (req, res) => {
 // Delete a project
 router.delete('/:id', (req, res) => {
   try {
-    // Recharger la base de données pour avoir les données les plus récentes
-    const freshDb = reloadDatabase();
+    const db = Database.getDatabase();
     
-    const project = freshDb.get('projects')
+    const project = db.get('projects')
       .find({ id: req.params.id })
       .value();
 
@@ -340,7 +274,7 @@ router.delete('/:id', (req, res) => {
     }
 
     // Remove from database
-    freshDb.get('projects')
+    db.get('projects')
       .remove({ id: req.params.id })
       .write();
 
@@ -353,5 +287,5 @@ router.delete('/:id', (req, res) => {
 
 module.exports = router;
 
-// Exporter également la fonction getProjectWithDetails
+// Also export the getProjectWithDetails function
 module.exports.getProjectWithDetails = getProjectWithDetails; 

@@ -3,8 +3,8 @@
   "version": "0.3a",
   "description": "Gource visualization tools for Git repositories",
   "scripts": {
-    "server": "cd server && npm start",
-    "client": "cd client && npm start",
+    "server": "cd server && \"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -Command npm start",
+    "client": "cd client && \"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -Command npm start",
     "start": "concurrently \"npm run server\" \"npm run client\"",
     "install-all": "npm install && cd server && npm install && cd ../client && npm install"
   },

@@ -23,27 +23,49 @@ if (!fs.existsSync(dbPath)) {
   logger.info('Created database directory');
 }
 
-// Initialize database with required collections
-const db = Database.initializeDatabase();
-logger.info('Database initialized');
+// Import the SINGLETON instance of the Database class
+const DatabaseInstance = require('./utils/Database');
+// Initialization is now handled within the Database class constructor
+logger.info('Database initialization triggered by require.');
+
+// Get the shared DB instance for operations within index.js
+const db = DatabaseInstance.getDatabase(); 
 
 // Create default config file if it doesn't exist
-const defaultProfileExists = db.get('renderProfiles')
-  .find({ isDefault: true })
-  .value();
+// Check if db instance is valid before proceeding
+if (!db) {
+    logger.error('Failed to get database instance in index.js. Cannot proceed with default profile check.');
+    process.exit(1); // Exit if DB is not available
+}
 
-if (!defaultProfileExists) {
-  // Import default configuration from external file
-  db.get('renderProfiles')
-    .push(defaultGourceConfig)
-    .write();
-    
-  logger.info('Created default Gource config file');
+try {
+    const defaultProfileExists = db.get('renderProfiles')
+      .find({ isDefault: true })
+      .value();
+
+    if (!defaultProfileExists) {
+      logger.info('Default Gource profile not found, creating...');
+      // Import default configuration from external file
+      db.get('renderProfiles')
+        .push(defaultGourceConfig)
+        .write(); // Need to write after push
+        
+      logger.success('Created default Gource config file');
+    } else {
+        logger.info('Default Gource profile already exists.');
+    }
+} catch (dbError) {
+    logger.error('Error checking/creating default profile:', dbError);
+    // Decide if this is fatal
 }
 
 // Initialize custom render profiles (Last Week, Last Month, Last Year)
-initCustomRenderProfiles();
-logger.info('Custom render profiles initialized');
+try {
+    initCustomRenderProfiles();
+    logger.info('Custom render profiles initialized/verified.');
+} catch(initError) {
+     logger.error('Error initializing custom profiles:', initError);
+}
 
 // Initialize API routes
 const repositoriesRouter = require('./routes/repositories');

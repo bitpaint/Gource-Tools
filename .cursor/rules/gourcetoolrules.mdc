@@ -1,0 +1,57 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+# Gource-Tools AI Coding Assistant Rules
+
+This document outlines the rules and guidelines for AI coding assistants working on the Gource-Tools project. Adhering to these rules ensures consistency, maintainability, and efficient collaboration.
+
+## 1. General Principles
+
+- **Understand the Goal:** Before making changes, ensure you understand the user's request and the overall architecture of the application. Ask clarifying questions if needed.
+- **Prioritize Existing Code:** Leverage existing services, utilities, and components whenever possible. Avoid duplicating functionality.
+- **Maintain Consistency:** Follow existing coding styles, naming conventions, and architectural patterns found in the codebase.
+- **Focus on Clarity:** Write clear, readable, and maintainable code. Add comments only for non-trivial logic.
+- **Cross-Platform Awareness:** While the app was initially optimized for Windows, strive for cross-platform compatibility where feasible, especially in core logic. Note any platform-specific code clearly.
+
+## 2. Backend Development (Node.js/Express)
+
+- **Service Layer:** All core business logic (Git operations, Gource/FFmpeg execution, data manipulation) should reside in the `server/services` directory. Controllers should primarily orchestrate calls to services.
+- **Database Access:**
+    - **ALWAYS** use the shared `Database` singleton instance (`require('../utils/Database')`) for all database interactions (LowDB).
+    - Access the database instance via `Database.getDatabase()`.
+    - **NEVER** create a new `lowdb` instance directly within services or controllers.
+    - Use the provided methods in `Database.js` (e.g., `getItemById`, `addItem`, `updateItem`, `removeItem`) for common operations.
+- **Error Handling:** Utilize the `ErrorHandler` utility for consistent error management and responses. Log errors using the `Logger`.
+- **Logging:** Use the `Logger` utility (`require('../utils/Logger')`) for all server-side logging. Create component-specific loggers (e.g., `Logger.createComponentLogger('MyService')`).
+- **Asynchronous Operations:** Use `async/await` for handling asynchronous operations (file system access, process spawning, API calls).
+- **Process Management:** Use utilities from `processUtils.js` for managing external processes like Gource and FFmpeg, especially for termination (`killProcessTree`).
+- **Configuration:** Access application settings (like API keys) through `settingsService.js` or environment variables (`process.env`), not hardcoded values.
+
+## 3. Frontend Development (React)
+
+- **Component Reusability:** Utilize existing UI components from `client/src/components`. Create new reusable components when necessary.
+- **State Management:** Follow existing patterns for state management (likely `useState`, `useEffect`, potentially Context API or a state management library if introduced later).
+- **API Interaction:** All backend communication should go through the abstracted API functions defined in `client/src/api/api.js`.
+- **UI Consistency:** Maintain the existing look and feel of the application. Use the established UI library/framework components and styling.
+
+## 4. Code Modifications
+
+- **Read Before Editing:** Before modifying a file, read the relevant sections to understand the context and avoid introducing conflicts.
+- **Small, Focused Changes:** Prefer smaller, incremental changes over large, monolithic ones.
+- **Testing (Conceptual):** While direct testing isn't possible, consider edge cases and potential errors when writing code. Ensure inputs are validated.
+
+## 5. Documentation
+
+- **README Updates:** If significant changes are made to the architecture, core functionality, or setup process, update the main [README.md](mdc:README.md) accordingly.
+- **Code Comments:** Add comments only for complex algorithms, non-obvious logic, or `// TODO:` markers. Avoid explaining self-evident code.
+
+## 6. Communication
+
+- **Language:** Code should be in English. UI should be in english., but variable/function names remain English. Documentation (like this file and README) should be in English.
+- **Clarity:** Explain *why* you are making a change before proposing it.
+- **Tool Usage:** Clearly state which tools you are using and why (e.g., "I will read the `repositoryService.js` file to understand how repositories are added").
+- **Confirmation:** If unsure about a requirement or approach, ask the user for clarification. 

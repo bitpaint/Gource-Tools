@@ -15,7 +15,9 @@ const RepositoryService = require("../services/repositoryService");
 const Database = require("../utils/Database");
 const Logger = require("../utils/Logger");
 const ErrorHandler = require("../utils/ErrorHandler");
-const ProjectService = require("../services/ProjectService");
+const ProjectService = require("../services/projectService");
+const express = require("express");
+const router = express.Router();
 
 // Create a component logger
 const logger = Logger.createComponentLogger("RepositoryController");
@@ -28,7 +30,7 @@ const NUM_CPUS = os.cpus().length;
 
 // Default configuration for optimized bulk imports
 const DEFAULT_MAX_CONCURRENT_CLONES = Math.max(4, Math.min(12, NUM_CPUS)); // Between 4 and 12, based on CPUs
-const DEFAULT_CLONE_DEPTH = 1; // Shallow clone by default to save bandwidth and time
+const DEFAULT_CLONE_DEPTH = 0; // Full clone to get complete history
 const THROUGHPUT_CHECK_INTERVAL = 1000; // Throughput check interval in ms
 
 // Clone status configuration and limits
@@ -60,8 +62,7 @@ if (process.env.GITHUB_TOKEN) {
  * Get a fresh database instance
  */
 function getDatabase() {
-  const adapter = new FileSync(path.join(__dirname, "../../db/db.json"));
-  return low(adapter);
+  return Database.getDatabase();
 }
 
 /**
@@ -89,8 +90,8 @@ function updateBulkImportStatus(id, updates) {
  */
 const getAllRepositories = async (req, res) => {
   try {
-    // Get fresh database instance
-    const db = getDatabase();
+    // Get the shared database instance
+    const db = Database.getDatabase(); // Use the imported singleton
 
     // Check if repositories exist but are not in the database
     const reposDir = path.join(__dirname, "../../repos");
@@ -240,7 +241,7 @@ const getRepositoryById = (req, res) => {
     const validation = Validator.validateId(req.params.id);
     if (!Validator.handleValidation(validation, res)) return;
 
-    const db = getDatabase();
+    const db = Database.getDatabase();
     const repository = db
       .get("repositories")
       .find({ id: req.params.id })
@@ -312,7 +313,7 @@ const addRepository = async (req, res) => {
     logger.info("Creating repository - received data:", { url, createProject });
 
     // Get fresh database
-    const db = getDatabase();
+    const db = Database.getDatabase();
 
     // Check if the input is just a username instead of a full repository URL
     // Simple username detection: no protocol, no slashes, no .git, etc.
@@ -604,10 +605,26 @@ async function processRepositoryClone(cloneId, url) {
         }
 
         // Create git instance
-        const git = simpleGit();
+        const git = simpleGit({
+           progress({ method, stage, progress }) {
+             // Update progress based on cloning stages
+             let cloneProgress = 20;
+             if (stage === 'receiving') cloneProgress = 20 + (progress * 0.6); // 20% to 80%
+             if (stage === 'resolving') cloneProgress = 80 + (progress * 0.1); // 80% to 90%
+             
+             updateCloneStatus(cloneId, {
+                progress: Math.min(90, Math.round(cloneProgress)), // Cap at 90 before finalization
+                message: `Cloning: ${stage} (${progress}%)`
+             });
+             // console.log(`git.${method} ${stage} stage ${progress}% complete`);
+           },
+        });
 
-        // Start clone
-        await git.clone(cloneUrl, repoPath);
+        // Start clone with full history (NO --mirror)
+        logger.info(`Cloning repository from ${cloneUrl} into ${repoPath}`);
+        await git.clone(cloneUrl, repoPath); // REMOVED ['--mirror'] option
+
+        // NO conversion needed anymore
 
         // Update status to show completion
         updateCloneStatus(cloneId, {
@@ -636,7 +653,7 @@ async function processRepositoryClone(cloneId, url) {
       });
 
       // Get fresh database instance
-      const db = getDatabase();
+      const db = Database.getDatabase();
 
       // Create repository entry
       const id = Date.now().toString();
@@ -934,7 +951,7 @@ async function processBulkImport(
           updateBulkImportStatus(bulkImportId, {
             message: `No repositories found for ${owner}, continuing...`,
           });
-          continue; // Passer à la source suivante
+          continue; // Proceed to the next source
         }
 
         // Start cloning repositories for this source
@@ -1015,7 +1032,7 @@ async function processBulkImport(
           await Promise.race(activePromises.values());
         }
 
-        // Mettre à jour le message pour indiquer que cette source est terminée
+        // Update the message to indicate this source is complete
         updateBulkImportStatus(bulkImportId, {
           message: `Completed importing from ${owner}, proceeding to next source...`,
         });
@@ -1025,7 +1042,7 @@ async function processBulkImport(
         updateBulkImportStatus(bulkImportId, {
           message: `Error with source ${currentSource}: ${sourceError.message}. Continuing to next source...`,
         });
-        // Continue avec la source suivante même en cas d'erreur
+        // Continue with the next source even if there's an error
       }
     }
 
@@ -1136,9 +1153,13 @@ async function processRepositoryCloneForBulkImport(
           );
         }
 
-        // Clone the repository
-        const git = simpleGit();
-        await git.clone(cloneUrl, repoPath, ["--depth", "1"]);
+        // Clone the repository (NO --mirror)
+        const git = simpleGit(); // Progress tracking might be added here too if desired
+        logger.info(`Cloning repository from ${cloneUrl} into ${repoPath}`);
+        await git.clone(cloneUrl, repoPath); // REMOVED ['--mirror'] option
+
+         // NO conversion needed anymore
+
       } catch (cloneError) {
         logger.error(
           `Error cloning repository ${owner}/${repoName}:`,
@@ -1151,7 +1172,7 @@ async function processRepositoryCloneForBulkImport(
     // Add to database
     try {
       // Get fresh database instance
-      const db = getDatabase();
+      const db = Database.getDatabase();
 
       // Check if already exists
       const existingRepo = db.get("repositories").find({ url }).value();
@@ -1275,7 +1296,7 @@ async function createProjectsFromRepositories(
  */
 const getDashboardStats = (req, res) => {
   try {
-    const db = getDatabase();
+    const db = Database.getDatabase();
 
     // Get counts
     const repoCount = db.get("repositories").size().value();
@@ -1367,7 +1388,7 @@ const deleteRepository = async (id) => {
   try {
     if (!id) return false;
 
-    const db = getDatabase();
+    const db = Database.getDatabase();
     const repository = db
       .get("repositories")
       .find({ id: id.toString() })

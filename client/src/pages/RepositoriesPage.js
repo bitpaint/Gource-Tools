@@ -126,29 +126,55 @@ const RepositoriesPage = () => {
   
   // Memoize fetchRepositories to avoid recreation on each render
   const fetchRepositories = useCallback(async () => {
+    console.log('[RepositoriesPage] Starting fetchRepositories...'); // Log Start
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      setError(null);
       const response = await repositoriesApi.getAll();
-      setRepositories(response.data);
+      console.log('[RepositoriesPage] API response received:', response);
       
-      // Group repositories by owner
-      const grouped = response.data.reduce((acc, repo) => {
-        const owner = repo.owner || 'unknown';
-        if (!acc[owner]) {
-          acc[owner] = [];
-        }
-        acc[owner].push(repo);
-        return acc;
-      }, {});
+      // Log data before setting state
+      console.log('[RepositoriesPage] Data received from API:', response.data);
       
-      setGroupedRepositories(grouped);
+      // Check if data is actually an array before setting
+      if (Array.isArray(response.data)) {
+          setRepositories(response.data);
+          // Group repositories by owner
+          const grouped = response.data.reduce((acc, repo) => {
+            const owner = repo.owner || 'unknown';
+            if (!acc[owner]) {
+              acc[owner] = [];
+            }
+            acc[owner].push(repo);
+            return acc;
+          }, {});
+          setGroupedRepositories(grouped);
+          console.log('[RepositoriesPage] State updated successfully.');
+      } else {
+          console.error('[RepositoriesPage] Invalid data received from API. Expected array, got:', response.data);
+          setError('Received invalid data from server.');
+          setRepositories([]); // Set to empty array on invalid data
+          setGroupedRepositories({});
+      }
+      
     } catch (err) {
-      console.error('Error fetching repositories:', err);
+      console.error('[RepositoriesPage] Error during fetchRepositories:', err);
+      // Log specific error details if available
+      if (err.response) {
+        console.error('[RepositoriesPage] API Error Response:', err.response.data);
+        console.error('[RepositoriesPage] API Error Status:', err.response.status);
+      } else if (err.request) {
+        console.error('[RepositoriesPage] API No Response:', err.request);
+      } else {
+        console.error('[RepositoriesPage] Error Message:', err.message);
+      }
       setError('Failed to load repositories. Please try again.');
       toast.error('Failed to load repositories');
+      setRepositories([]); // Ensure state is empty on error
+      setGroupedRepositories({});
     } finally {
       setLoading(false);
+      console.log('[RepositoriesPage] fetchRepositories finished.'); // Log End
     }
   }, []);  // Empty dependency array ensures this only changes when component mounts/unmounts
 

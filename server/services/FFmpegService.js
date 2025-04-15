@@ -9,6 +9,7 @@ const { spawn, execSync } = require('child_process');
 const crypto = require('crypto');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const Database = require('../utils/Database'); // Importer Database
 
 class FFmpegService {
   constructor() {
@@ -36,11 +37,12 @@ class FFmpegService {
   
   /**
    * Get a fresh database instance
+   * @deprecated Utiliser Database.getDatabase() à la place
    */
-  getDatabase() {
-    const adapter = new FileSync(this.dbPath);
-    return low(adapter);
-  }
+  // getDatabase() {
+  //   const adapter = new FileSync(this.dbPath);
+  //   return low(adapter);
+  // }
   
   /**
    * Update render status in database
@@ -48,7 +50,7 @@ class FFmpegService {
   updateRenderStatus(renderId, status, message = null, progress = null) {
     if (!renderId) return null;
     
-    const db = this.getDatabase();
+    const db = Database.getDatabase(); // Utiliser l'instance partagée
     const render = db.get('renders')
       .find({ id: renderId.toString() })
       .value();
@@ -89,7 +91,7 @@ class FFmpegService {
    */
   async generatePreview(renderId, filters) {
     // Get render from database
-    const db = this.getDatabase();
+    const db = Database.getDatabase(); // Utiliser l'instance partagée
     const render = db.get('renders')
       .find({ id: renderId })
       .value();
@@ -139,7 +141,7 @@ class FFmpegService {
    */
   async applyFilters(renderId, filters) {
     // Get render from database
-    const db = this.getDatabase();
+    const db = Database.getDatabase(); // Utiliser l'instance partagée
     const render = db.get('renders')
       .find({ id: renderId })
       .value();

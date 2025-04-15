@@ -1,6 +1,6 @@
 /**
- * Logger Utility
- * Provides structured logging functions
+ * Enhanced Logger Utility
+ * Provides structured logging with emojis for better readability
  */
 
 const path = require('path');
@@ -14,9 +14,30 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Define log format
-const logFormat = printf(({ level, message, timestamp, label }) => {
-  return `[${timestamp}] [${level.toUpperCase()}]${label ? ` [${label}]` : ''} ${message}`;
+// Emoji mapping for log levels
+const emojis = {
+  info: '🔵',
+  warn: '🟠',
+  error: '🔴',
+  debug: '🟣',
+  success: '✅',
+  start: '🚀',
+  complete: '✨',
+  config: '⚙️',
+  db: '💾',
+  network: '🌐',
+  git: '📦',
+  render: '🎬',
+  user: '👤',
+  system: '🖥️',
+  time: '⏱️',
+  file: '📄'
+};
+
+// Define enhanced log format with emojis
+const logFormat = printf(({ level, message, timestamp, label, emoji }) => {
+  const levelEmoji = emoji || emojis[level] || '';
+  return `${levelEmoji} [${timestamp.split('T')[1].split('.')[0]}] ${message}`;
 });
 
 // Create logger with file and console transport
@@ -87,7 +108,7 @@ const errorLogger = createLogger({
 });
 
 /**
- * Create a component-specific logger
+ * Create a component-specific logger with emojis
  * @param {string} component - Component name
  * @return {Object} Logger interface
  */
@@ -97,19 +118,29 @@ function createComponentLogger(component) {
     warn: (message) => serverLogger.warn(`[${component}] ${message}`),
     error: (message, error = null) => {
       if (error) {
-        serverLogger.error(`[${component}] ${message}`, { error: error instanceof Error ? error.stack : error });
-        errorLogger.error(`[${component}] ${message}`, { error: error instanceof Error ? error.stack : error });
+        const errorMsg = `[${component}] ${message}: ${error instanceof Error ? error.message : error}`;
+        serverLogger.error(errorMsg);
+        errorLogger.error(errorMsg);
       } else {
         serverLogger.error(`[${component}] ${message}`);
         errorLogger.error(`[${component}] ${message}`);
       }
     },
     debug: (message) => serverLogger.debug(`[${component}] ${message}`),
+    success: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.success }),
+    start: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.start }),
+    complete: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.complete }),
+    git: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.git }),
+    db: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.db }),
+    render: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.render }),
+    config: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.config }),
+    time: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.time }),
+    file: (message) => serverLogger.info({ message: `[${component}] ${message}`, emoji: emojis.file })
   };
 }
 
 /**
- * Create a render-specific logger
+ * Create a render-specific logger with emojis
  * @param {string} renderId - Render ID 
  * @return {Object} Logger interface
  */
@@ -119,14 +150,27 @@ function createRenderLogger(renderId) {
     warn: (message) => renderLogger.warn(`[Render ${renderId}] ${message}`),
     error: (message, error = null) => {
       if (error) {
-        renderLogger.error(`[Render ${renderId}] ${message}`, { error: error instanceof Error ? error.stack : error });
-        errorLogger.error(`[Render ${renderId}] ${message}`, { error: error instanceof Error ? error.stack : error });
+        const errorMsg = `[Render ${renderId}] ${message}: ${error instanceof Error ? error.message : error}`;
+        renderLogger.error(errorMsg);
+        errorLogger.error(errorMsg);
       } else {
         renderLogger.error(`[Render ${renderId}] ${message}`);
         errorLogger.error(`[Render ${renderId}] ${message}`);
       }
     },
     debug: (message) => renderLogger.debug(`[Render ${renderId}] ${message}`),
+    progress: (percent, stage) => renderLogger.info({ 
+      message: `[Render ${renderId}] ${stage || 'Progress'}: ${percent}%`, 
+      emoji: emojis.time 
+    }),
+    start: (message) => renderLogger.info({ 
+      message: `[Render ${renderId}] ${message}`, 
+      emoji: emojis.start 
+    }),
+    complete: (message) => renderLogger.info({ 
+      message: `[Render ${renderId}] ${message}`, 
+      emoji: emojis.complete 
+    })
   };
 }
 
@@ -135,5 +179,6 @@ module.exports = {
   renderLogger,
   errorLogger,
   createComponentLogger,
-  createRenderLogger
+  createRenderLogger,
+  emojis
 }; 

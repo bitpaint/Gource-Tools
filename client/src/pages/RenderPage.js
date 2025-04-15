@@ -41,8 +41,12 @@ const RenderPage = () => {
   
   // Form state
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [customName, setCustomName] = useState('');
   const [renderStarting, setRenderStarting] = useState(false);
+  
+  // Ajout d'un état pour la période temporelle
+  const [timePeriod, setTimePeriod] = useState('all');
   
   // Polling for render updates
   useEffect(() => {
@@ -100,7 +104,8 @@ const RenderPage = () => {
       setRenderStarting(true);
       const response = await rendersApi.startRender({
         projectId: selectedProjectId,
-        customName: customName.trim() || undefined
+        customName: customName.trim() || undefined,
+        renderProfileId: selectedProfileId || undefined
       });
       
       // Add the new render to the list
@@ -169,6 +174,18 @@ const RenderPage = () => {
     }
   };
 
+  const getProjectProfile = (projectId) => {
+    const project = projects.find(p => p.id === projectId);
+    
+    // If the project has no assigned profile
+    if (!project || !project.renderProfileId) {
+      // Find the default profile
+      return null;
+    }
+    
+    return project.renderProfileId;
+  };
+
   if (loading) {
     return (
       <Container maxWidth="xl" sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
@@ -208,7 +225,11 @@ const RenderPage = () => {
                   labelId="project-label"
                   id="project"
                   value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedProjectId(e.target.value);
+                    // Reset selected profile and set to project's default profile
+                    setSelectedProfileId(getProjectProfile(e.target.value) || '');
+                  }}
                   label="Select Project"
                   disabled={projects.length === 0 || renderStarting}
                 >
@@ -227,11 +248,26 @@ const RenderPage = () => {
               </FormControl>
               
               {selectedProjectId && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="body2" sx={{ mb: 0.5 }}>
-                    Using render profile: <strong>{getProfileName(selectedProjectId)}</strong>
-                  </Typography>
-                </Box>
+                <FormControl fullWidth sx={{ mb: 2 }}>
+                  <InputLabel id="profile-label">Render Profile</InputLabel>
+                  <Select
+                    labelId="profile-label"
+                    id="profile"
+                    value={selectedProfileId}
+                    onChange={(e) => setSelectedProfileId(e.target.value)}
+                    label="Render Profile"
+                    disabled={renderStarting}
+                  >
+                    <MenuItem value="">
+                      <em>Project Default ({getProfileName(selectedProjectId)})</em>
+                    </MenuItem>
+                    {renderProfiles.map((profile) => (
+                      <MenuItem key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               )}
               
               <TextField
@@ -297,12 +333,12 @@ const RenderPage = () => {
                         secondary={
                           <Box sx={{ mt: 1 }}>
                             <Box sx={{ mb: 0.5 }}>
-                              <Typography component="span" variant="body2" color="text.secondary">
+                              <Typography component="div" variant="body2" color="text.secondary">
                                 Project: {render.projectName}
                               </Typography>
                             </Box>
                             <Box sx={{ mb: 0.5 }}>
-                              <Typography component="span" variant="body2" color="text.secondary">
+                              <Typography component="div" variant="body2" color="text.secondary">
                                 Started: {' '}
                                 <Tooltip title={dateUtils.formatLocaleDate(render.startTime)}>
                                   <span>{formatDate(render.startTime)}</span>
@@ -311,7 +347,7 @@ const RenderPage = () => {
                             </Box>
                             {render.endTime && (
                               <Box sx={{ mb: 0.5 }}>
-                                <Typography component="span" variant="body2" color="text.secondary">
+                                <Typography component="div" variant="body2" color="text.secondary">
                                   Finished: {' '}
                                   <Tooltip title={dateUtils.formatLocaleDate(render.endTime)}>
                                     <span>{formatDate(render.endTime)}</span>
@@ -321,7 +357,7 @@ const RenderPage = () => {
                             )}
                             {render.error && (
                               <Box sx={{ mt: 1 }}>
-                                <Typography component="span" variant="body2" color="error">
+                                <Typography component="div" variant="body2" color="error">
                                   Error: {render.error}
                                 </Typography>
                               </Box>
@@ -335,7 +371,7 @@ const RenderPage = () => {
                                   />
                                 </Box>
                                 <Box sx={{ minWidth: 35 }}>
-                                  <Typography component="span" variant="body2" color="text.secondary">
+                                  <Typography component="div" variant="body2" color="text.secondary">
                                     {`${Math.round(render.progress || 0)}%`}
                                   </Typography>
                                 </Box>

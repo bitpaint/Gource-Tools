@@ -6,27 +6,41 @@
 const path = require('path');
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
+const Logger = require('./Logger'); // Import Logger
+
+const logger = Logger.createComponentLogger('Database');
 
 class Database {
   constructor() {
     this.dbPath = path.join(__dirname, '../../db/db.json');
+    // Initialize the single database instance here
+    try {
+      this.adapter = new FileSync(this.dbPath);
+      this.db = low(this.adapter);
+      logger.success('Database instance initialized successfully.');
+      this.initializeDatabase(); // Ensure collections exist on startup
+    } catch (error) {
+      logger.error('FATAL: Failed to initialize database!', error);
+      // Consider exiting the process if DB init fails
+      process.exit(1);
+    }
   }
 
   /**
-   * Get a fresh database instance
-   * @returns {Object} Database instance
+   * Get the shared database instance
+   * @returns {Object} Shared Database instance
    */
   getDatabase() {
-    const adapter = new FileSync(this.dbPath);
-    return low(adapter);
+    // Return the single instance initialized in the constructor
+    return this.db;
   }
 
   /**
    * Ensure all required collections exist in the database
-   * @returns {Object} Database instance
+   * Uses the shared db instance.
    */
   initializeDatabase() {
-    const db = this.getDatabase();
+    const db = this.getDatabase(); // Use the shared instance
     
     // Ensure all required collections exist
     const collections = [
@@ -37,14 +51,17 @@ class Database {
       'settings'
     ];
     
+    let changed = false;
     collections.forEach(collection => {
       if (!db.has(collection).value()) {
-        db.set(collection, []).write();
-        console.log(`Initialized collection: ${collection}`);
+        db.set(collection, []).write(); // Write is needed here for initialization
+        logger.info(`Initialized missing collection: ${collection}`);
+        changed = true;
       }
     });
-    
-    return db;
+    if (changed) {
+        logger.success('Database collections initialized/verified.');
+    }
   }
 
   /**
@@ -53,7 +70,7 @@ class Database {
    * @returns {Array} Collection data
    */
   getCollection(collectionName) {
-    const db = this.getDatabase();
+    const db = this.getDatabase(); // Use the shared instance
     return db.get(collectionName).value() || [];
   }
 
@@ -66,7 +83,7 @@ class Database {
   getItemById(collectionName, id) {
     if (!id) return null;
     
-    const db = this.getDatabase();
+    const db = this.getDatabase(); // Use the shared instance
     return db.get(collectionName)
       .find({ id: id.toString() })
       .value() || null;
@@ -79,13 +96,16 @@ class Database {
    * @returns {Object} Added item
    */
   addItem(collectionName, item) {
-    const db = this.getDatabase();
+    const db = this.getDatabase(); // Use the shared instance
     
-    db.get(collectionName)
+    // Perform the operation and then write
+    const result = db.get(collectionName)
       .push(item)
-      .write();
+      .value(); // Get the result of the operation
+    db.write(); // Write the changes to the file system
     
-    return item;
+    // Return the added item (last item in the result array)
+    return result && result.length > 0 ? result[result.length - 1] : null;
   }
 
   /**
@@ -98,23 +118,16 @@ class Database {
   updateItem(collectionName, id, updates) {
     if (!id) return null;
     
-    const db = this.getDatabase();
-    const item = db.get(collectionName)
-      .find({ id: id.toString() })
-      .value();
+    const db = this.getDatabase(); // Use the shared instance
+    const itemChain = db.get(collectionName).find({ id: id.toString() });
     
-    if (!item) return null;
+    if (!itemChain.value()) return null;
     
-    // Apply updates
-    db.get(collectionName)
-      .find({ id: id.toString() })
-      .assign(updates)
-      .write();
+    // Perform the update and then write
+    const updatedItem = itemChain.assign(updates).value();
+    db.write(); // Write the changes to the file system
     
-    // Get the updated item
-    return db.get(collectionName)
-      .find({ id: id.toString() })
-      .value();
+    return updatedItem;
   }
 
   /**
@@ -126,19 +139,20 @@ class Database {
   removeItem(collectionName, id) {
     if (!id) return false;
     
-    const db = this.getDatabase();
-    const item = db.get(collectionName)
-      .find({ id: id.toString() })
-      .value();
-    
-    if (!item) return false;
-    
+    const db = this.getDatabase(); // Use the shared instance
+    const itemChain = db.get(collectionName).find({ id: id.toString() });
+
+    if (!itemChain.value()) return false;
+
+    // Perform the remove operation and then write
     db.get(collectionName)
       .remove({ id: id.toString() })
-      .write();
-    
+      .value(); // Execute the remove operation
+    db.write(); // Write the changes to the file system
+
     return true;
   }
 }
 
+// Export a single instance of the Database class
 module.exports = new Database(); 

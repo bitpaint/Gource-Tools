@@ -1,116 +1,260 @@
 # Gource-Tools
 
-Outils pour visualiser l'évolution des dépôts Git avec Gource.
+Complete application to visualize, customize, and export Git repository evolution visualizations with Gource.
 
-## Modifications récentes
+## Overview
 
-### Configuration Gource améliorée
+Gource-Tools is an integrated solution for creating advanced Gource visualizations of Git projects. It allows managing multiple repositories, customizing renderings, and generating high-quality videos with post-processing options.
 
-Nous avons apporté plusieurs améliorations à la gestion des configurations Gource :
+The application provides an intuitive user interface to configure Gource visualizations without needing to master command lines, while still allowing for advanced customizations.
 
-1. **Réduction de l'élasticité par défaut** : L'élasticité a été réduite de 0.5 à 0.3 pour une visualisation plus stable.
+## Technical Architecture
 
-2. **Ajout de nouveaux paramètres** :
-   - `titleText` : Texte personnalisé pour le titre
-   - `showDates` : Affichage des dates dans la visualisation
-   - `disableProgress` : Option pour désactiver la barre de progression
-   - `disableAutoRotate` : Option pour désactiver la rotation automatique
-   - `showLines` : Option pour afficher/masquer les lignes fichier/utilisateur
-   - `followUsers` : Option pour que la caméra suive les utilisateurs
-   - `maxFilelag` : Délai maximal avant apparition des fichiers
-   - `multiSampling` : Anti-aliasing pour améliorer la qualité
-   - `bloom` : Effet de luminosité pour les éléments brillants
-   - `bloomIntensity` : Intensité de l'effet bloom
-   - `bloomMultiplier` : Multiplicateur de l'effet bloom
+### Application Structure
 
-3. **Amélioration de l'interface utilisateur** :
-   - Ajout d'un sélecteur de couleur pour définir la couleur d'arrière-plan
-   - Ajout d'info-bulles explicatives pour chaque paramètre
-   - Organisation des paramètres en onglets thématiques (Vidéo, Visualisation, Apparence, Temps, Filtrage, Avancé)
-   - Ajout de curseurs pour ajuster facilement les valeurs numériques
+The application follows a client-server architecture:
 
-4. **Documentation** :
-   - Documentation détaillée pour chaque paramètre
-   - Lien vers la documentation Gource pour les paramètres avancés
+- **Frontend**: React application with a complete user interface
+- **Backend**: Node.js Express server managing Git, Gource, and FFmpeg operations
 
-5. **Refactorisation** :
-   - Création de composants réutilisables (ColorPickerField, TooltipField, TooltipSlider, TooltipCheckbox)
-   - Utilitaires pour la conversion des formats de paramètres (camelCase <-> kebab-case)
-   - Génération de commandes Gource à partir des paramètres
+### Backend (Node.js/Express)
 
-### Visualisation multi-dépôts
+The server structure follows a layered architecture:
 
-L'application prend en charge la visualisation de plusieurs dépôts Git dans une même animation :
+1.  **Routes**: Define API endpoints (`/api/repositories`, `/api/projects`, `/api/renderProfiles`, etc.)
+2.  **Controllers**: Handle HTTP requests and coordinate operations
+3.  **Services**: Contain the main business logic
+4.  **Utilities**: Provide cross-cutting functionalities
 
-1. **Intégration transparente** : 
-   - Créez un projet contenant plusieurs dépôts Git
-   - L'application gère automatiquement la combinaison des logs
+#### Core Services
 
-2. **Rendu combiné** : 
-   - Tous les dépôts sont visualisés dans un même rendu Gource
-   - Conforme aux recommandations officielles de la [documentation Gource](https://github.com/acaudwell/Gource/wiki/Visualizing-Multiple-Repositories)
+-   **repositoryService.js**: Management and validation of Git repositories
+-   **projectService.js**: Organization of repositories into coherent projects
+-   **renderService.js**: Execution and management of Gource renderings
+-   **ffmpegService.js**: Video post-processing and effects application
+-   **gourceConfigService.js**: Management of Gource configuration profiles
+-   **settingsService.js**: Global application configuration
 
-3. **Distinction visuelle** : 
-   - Chaque dépôt est clairement identifié par son nom dans la visualisation
-   - Les fichiers de chaque dépôt sont préfixés par le nom du dépôt
+#### Key Utilities
 
-4. **Chronologie unifiée** : 
-   - Les activités de tous les dépôts sont combinées sur une timeline commune
-   - Tri chronologique de tous les événements pour une visualisation fluide
+-   **Database.js**: Singleton for data persistence with LowDB
+-   **Logger.js**: Structured logging system
+-   **ErrorHandler.js**: Centralized error management
+-   **processUtils.js**: Utilities for process management
 
-Cette fonctionnalité est idéale pour visualiser :
-- Des projets modulaires avec plusieurs composants
-- L'évolution parallèle de projets liés
-- L'activité globale d'une équipe sur plusieurs projets
+### Frontend (React)
 
-### Correction des problèmes de configuration (Juin 2023)
+The user interface is organized into functional pages:
 
-Nous avons résolu plusieurs problèmes liés aux configurations Gource personnalisées :
+-   **DashboardPage**: Overview of repositories, projects, and renderings
+-   **RepositoriesPage**: Management of Git repositories
+-   **ProjectsPage**: Organization of repositories into projects
+-   **ConfigFilesPage**: Creation and modification of render profiles
+-   **RenderPage**: Launching and monitoring renderings
+-   **FFmpegEditorPage**: Video post-processing
+-   **ExportsPage**: Viewing completed renderings
+-   **SettingsPage**: Global configuration
 
-1. **Uniformisation des paramètres** :
-   - Mappage complet entre les formats camelCase (côté client) et kebab-case (Gource)
-   - Tous les paramètres sont désormais correctement convertis dans les deux sens
+### Data Storage
 
-2. **Validation robuste** :
-   - Validation complète des paramètres numériques, booléens et textuels
-   - Détection et correction automatique des valeurs invalides
-   - Remplacement des valeurs undefined par des valeurs par défaut appropriées
+The application uses LowDB, a lightweight JSON-based database:
 
-3. **Amélioration des profils prédéfinis** :
-   - Correction des profils "Last Week", "Last Month" et "Last Year"
-   - Calcul dynamique des dates sur le serveur pour la compatibilité Windows/Linux
-   - Meilleure gestion des formats de date et des plages temporelles
+-   **Main Collections**:
+    -   `repositories`: Imported Git repositories
+    -   `projects`: Groupings of repositories for visualization
+    -   `renderProfiles`: Custom Gource configurations
+    -   `renders`: History and status of renderings
+    -   `settings`: Global configuration
 
-4. **Génération de fichiers de configuration améliorée** :
-   - Format précis respectant la syntaxe Gource
-   - Gestion correcte des paramètres booléens et flags
-   - Support complet des options de paramétrage Gource
+### Rendering Process
 
-5. **Compatibilité multiplateforme** :
-   - Support complet sous Windows et Linux
-   - Élimination des dépendances spécifiques au système d'exploitation
+The visualization process follows these steps:
+
+1.  **Log Generation**: Extraction of Git histories
+2.  **Log Combination**: Merging histories for multi-repository projects
+3.  **Gource Execution**: Application of visualization parameters
+4.  **Video Capture**: Recording the rendering with FFmpeg
+5.  **Post-processing** (optional): Applying effects, adding music, etc.
+
+## Key Features
+
+### 1. Git Repository Management
+
+-   Import local repositories
+-   Clone remote repositories (GitHub, GitLab, etc.)
+-   Bulk import all repositories from a GitHub user
+-   Automatic repository validation
+
+### 2. Project Organization
+
+-   Flexible grouping of repositories
+-   Creation of multi-repository visualizations
+-   Association of default render profiles
+
+### 3. Gource Configuration Profiles
+
+-   Creation and reuse of custom configurations
+-   Full parameterization of Gource options
+-   Built-in profiles for specific time periods (week, month, year)
+
+### 4. Rendering and Visualization
+
+-   Generation of custom visualizations
+-   Log combination for multi-repository projects
+-   Real-time monitoring of the rendering process
+
+### 5. Video Post-processing
+
+-   Adding titles, texts, and effects
+-   Incorporating music
+-   Transition effects (fade-in, fade-out)
+-   Video quality optimization
+
+### 6. Export and Sharing
+
+-   Generation of high-quality MP4 videos
+-   Rendering previews
+-   Management of exported files
+
+## Detailed Workflow
+
+### 1. Importing Repositories
+
+The application supports several import methods:
+
+-   **Local Repositories**: Selecting a folder containing a Git repository
+-   **Remote Repositories**: Cloning via URL (HTTPS or SSH)
+-   **GitHub Bulk Import**: Retrieving all repositories from a user or organization
+
+Each repository is verified to ensure it contains a valid Git history and is registered in the database.
+
+### 2. Creating Projects
+
+Projects allow grouping repositories for a common visualization:
+
+1.  Selection of one or more repositories
+2.  Configuration of a default render profile (optional)
+3.  Customization of metadata (name, description)
+
+### 3. Gource Configuration
+
+The application allows customizing all aspects of Gource visualizations:
+
+-   **Visual Appearance**: Colors, element sizes, visual effects
+-   **Camera Behavior**: Zoom, rotation, user tracking
+-   **Information Display**: Legends, dates, titles, file names
+-   **Filtering**: By extension, user, time period
+-   **Advanced Settings**: Performance, quality, specific behaviors
+
+Configurations can be saved as reusable profiles.
+
+### 4. Rendering Process
+
+The rendering of a visualization follows these steps:
+
+1.  **Preparation**: Creation of an isolated execution environment
+2.  **Log Generation**: Extraction of Git histories with appropriate formatting
+3.  **Gource Configuration**: Application of selected profile parameters
+4.  **Rendering**: Execution of Gource with capture via FFmpeg
+5.  **Finalization**: Saving metadata and the video file
+
+For multi-repository projects, logs are merged with file path prefixing.
+
+### 5. FFmpeg Post-processing
+
+After the initial rendering, effects can be applied:
+
+-   Adding texts and titles
+-   Incorporating audio tracks
+-   Transition effects (fade-in/out)
+-   Image quality optimization
+
+A real-time preview allows refining parameters before final application.
 
 ## Installation
 
-1. Cloner le dépôt
-2. Installer les dépendances du serveur : `cd server && npm install`
-3. Installer les dépendances du client : `cd client && npm install`
-4. Démarrer le serveur : `cd server && npm start`
-5. Démarrer le client : `cd client && npm start`
+### Prerequisites
 
-## Prérequis
+-   **Node.js** (v14+)
+-   **Git** (v2.x+)
+-   **Gource** (v0.51+)
+-   **FFmpeg** (v4.x+)
 
-- Node.js
-- Gource
-- Git
+### Setup
 
-## Utilisation
+1.  Clone the repository
+    ```bash
+    git clone https://github.com/your-username/Gource-Tools.git
+    cd Gource-Tools
+    ```
 
-1. Importez vos dépôts Git
-2. Créez ou modifiez une configuration Gource
-3. Générez des visualisations
-4. Exportez des vidéos
+2.  Install server dependencies
+    ```bash
+    cd server
+    npm install
+    ```
 
-## Licence
+3.  Install client dependencies
+    ```bash
+    cd ../client
+    npm install
+    ```
+
+4.  Create a `.env` file in the root directory with necessary environment variables
+    ```
+    PORT=5000
+    GITHUB_TOKEN=your_github_token (optional, for bulk import)
+    ```
+
+### Launching
+
+1.  Start the server
+    ```bash
+    cd server
+    npm start
+    ```
+
+2.  Start the client (in another terminal)
+    ```bash
+    cd client
+    npm start
+    ```
+
+3.  Access the application via `http://localhost:3000`
+
+## Database
+
+The application uses LowDB to store data in a JSON file (`/db/db.json`). Main collections:
+
+-   **repositories**: Imported Git repositories, with metadata and local paths
+-   **projects**: Groupings of repositories, with references to repository IDs
+-   **renderProfiles**: Saved Gource configurations
+-   **renders**: History of renderings with statuses and metadata
+-   **settings**: Global configuration (API tokens, preferences)
+
+The implementation uses a singleton (`Database.js`) to ensure consistent access to the database.
+
+## Recent Changes
+
+### June 2023: Configuration Issues Fixed
+
+-   Corrected parameter mapping between camelCase and kebab-case formats
+-   Improved parameter validation
+-   Fixed predefined profiles (Last Week, Last Month, Last Year)
+-   Enhanced cross-platform support
+
+### May 2023: Multi-Repository Visualization
+
+-   Support for visualizing multiple repositories in a single rendering
+-   Clear identification of repositories in the visualization
+-   Unified timeline for all repositories
+
+### April 2023: Enhanced Gource Configuration
+
+-   New customization parameters
+-   Improved user interface with sliders and color pickers
+-   Better organization of parameters into thematic tabs
+
+## License
 
 MIT 

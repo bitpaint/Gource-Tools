@@ -84,6 +84,7 @@ const ProjectsPage = () => {
 
   // Define fetchData using useCallback before it's used
   const fetchData = useCallback(async () => {
+    console.log('[ProjectsPage] Starting fetchData...'); // Log Start
     setLoading(true);
     setError(null);
     try {
@@ -93,29 +94,74 @@ const ProjectsPage = () => {
         renderProfilesApi.getAll()
       ]);
       
-      console.log('Repositories chargés:', reposRes.data);
+      // Log responses before setting state
+      console.log('[ProjectsPage] Projects API Response:', projectsRes);
+      console.log('[ProjectsPage] Repositories API Response:', reposRes);
+      console.log('[ProjectsPage] Profiles API Response:', profilesRes);
       
-      setProjects(projectsRes.data);
-      setRepositories(reposRes.data);
+      // Check projects data
+      if (Array.isArray(projectsRes.data)) {
+          console.log('[ProjectsPage] Projects Data:', projectsRes.data);
+          setProjects(projectsRes.data);
+      } else {
+          console.error('[ProjectsPage] Invalid projects data received:', projectsRes.data);
+          setError(prev => prev ? prev + ', Invalid projects data' : 'Invalid projects data');
+          setProjects([]);
+      }
+
+      // Check repositories data
+      if (Array.isArray(reposRes.data)) {
+          console.log('[ProjectsPage] Repositories Data:', reposRes.data);
+          setRepositories(reposRes.data);
+          // Grouper les dépôts par propriétaire
+          const grouped = reposRes.data.reduce((acc, repo) => {
+            const owner = repo.owner || 'unknown';
+            if (!acc[owner]) {
+              acc[owner] = [];
+            }
+            acc[owner].push(repo);
+            return acc;
+          }, {});
+          setGroupedRepositories(grouped);
+      } else {
+          console.error('[ProjectsPage] Invalid repositories data received:', reposRes.data);
+          setError(prev => prev ? prev + ', Invalid repositories data' : 'Invalid repositories data');
+          setRepositories([]);
+          setGroupedRepositories({});
+      }
       
-      // Grouper les dépôts par propriétaire
-      const grouped = reposRes.data.reduce((acc, repo) => {
-        const owner = repo.owner || 'unknown';
-        if (!acc[owner]) {
-          acc[owner] = [];
-        }
-        acc[owner].push(repo);
-        return acc;
-      }, {});
-      
-      setGroupedRepositories(grouped);
-      setRenderProfiles(profilesRes.data);
+      // Check profiles data
+      if (Array.isArray(profilesRes.data)) {
+          console.log('[ProjectsPage] Profiles Data:', profilesRes.data);
+          setRenderProfiles(profilesRes.data);
+      } else {
+          console.error('[ProjectsPage] Invalid profiles data received:', profilesRes.data);
+           setError(prev => prev ? prev + ', Invalid profiles data' : 'Invalid profiles data');
+          setRenderProfiles([]);
+      }
+      console.log('[ProjectsPage] State updated successfully.');
+
     } catch (err) {
-      console.error('Error fetching data:', err);
+      console.error('[ProjectsPage] Error during fetchData:', err);
+      // Log specific error details if available
+       if (err.response) {
+        console.error('[ProjectsPage] API Error Response:', err.response.data);
+        console.error('[ProjectsPage] API Error Status:', err.response.status);
+      } else if (err.request) {
+        console.error('[ProjectsPage] API No Response:', err.request);
+      } else {
+        console.error('[ProjectsPage] Error Message:', err.message);
+      }
       setError('Failed to load data. Please try again.');
       toast.error('Failed to load data');
+      // Ensure state is empty on error
+      setProjects([]);
+      setRepositories([]);
+      setGroupedRepositories({});
+      setRenderProfiles([]);
     } finally {
       setLoading(false);
+      console.log('[ProjectsPage] fetchData finished.'); // Log End
     }
   }, []);
 
