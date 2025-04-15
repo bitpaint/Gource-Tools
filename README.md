@@ -100,6 +100,7 @@ The visualization process follows these steps:
 -   **User Profiles**: Users can create, edit, and delete their own custom profiles.
 -   **Default Profile Management**: Any profile (system or user) can be designated as the default for new projects via the "Config Files" page. The default profile is automatically selected when creating a new project.
 -   **Duplication**: Any profile can be duplicated to create a new customizable user profile.
+-   **Enhanced Input Controls**: All date inputs provide intuitive YYYY-MM-DD formatting, numeric fields can be completely cleared, and values are only validated when needed.
 
 ### 4. Rendering and Visualization
 
@@ -154,6 +155,16 @@ The application allows customizing all aspects of Gource visualizations:
 Configurations can be saved as reusable profiles.
 System profiles provide quick presets for common timeframes, while user profiles allow full customization.
 The configuration management page allows creating, duplicating, deleting (user profiles only), and setting any profile as the application default. The table view truncates long descriptions and shows dynamic speeds ('auto') correctly.
+
+#### User Interface Enhancements
+
+The configuration interface includes several user experience improvements:
+
+- **Intuitive Date Inputs**: Date fields use a simplified YYYY-MM-DD format with automatic formatting as you type, eliminating the need for browser date pickers
+- **Relative Date Options**: Start dates can be configured relative to the current date (e.g., "30 days from today") for dynamic visualizations
+- **Flexible Numeric Inputs**: All numeric settings can be completely cleared rather than being forced to default values, providing more control
+- **Clear Visual Feedback**: Each field provides appropriate visual feedback when being modified or when containing invalid values
+- **Comprehensive Help**: Every setting includes detailed tooltips explaining its function, accepted values, and effect on the visualization
 
 ### 4. Rendering Process
 
