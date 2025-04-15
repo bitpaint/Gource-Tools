@@ -14,7 +14,7 @@ const { v4: uuidv4 } = require('uuid');
 const { killProcessTree } = require('../utils/processUtils');
 const os = require('os');
 const axios = require('axios');
-const { convertToGourceArgs } = require('../../shared/gourceConfig');
+const { convertToGourceArgs } = require('../../client/src/shared/gourceConfig');
 const GourceConfigService = require('./gourceConfigService');
 const config = require('../config/config');
 const Logger = require('../utils/Logger');
@@ -39,10 +39,11 @@ let RepositoryService = null;
 // Helper function to parse date strings (YYYY-MM-DD or relative)
 function calculateStartDate(startDateSetting) {
   if (typeof startDateSetting === 'string' && startDateSetting.startsWith('relative-')) {
-    const match = startDateSetting.match(/^relative-(\d+)([dwmy])$/);
-    if (match) {
-      const value = parseInt(match[1], 10);
-      const unit = match[2];
+    // Try the standard format first (relative-Xu where X is number, u is unit)
+    const standardMatch = startDateSetting.match(/^relative-(\d+)([dwmy])$/);
+    if (standardMatch) {
+      const value = parseInt(standardMatch[1], 10);
+      const unit = standardMatch[2];
       const now = new Date();
       switch (unit) {
         case 'd':
@@ -61,6 +62,57 @@ function calculateStartDate(startDateSetting) {
           logger.warn(`Invalid relative date unit: ${unit}`);
           return null; // Invalid unit
       }
+      // Format as YYYY-MM-DD HH:MM:SS for Gource
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 00:00:00`;
+    } 
+    
+    // Try the UI format with dashes: relative-X-units (e.g., relative-2-years)
+    const uiFormatMatch = startDateSetting.match(/^relative-(\d+)-([a-z]+)s?$/);
+    if (uiFormatMatch) {
+      const value = parseInt(uiFormatMatch[1], 10);
+      const unitStr = uiFormatMatch[2];
+      const now = new Date();
+      
+      // Map unit string to a single character for processing
+      let unitChar;
+      switch (unitStr.toLowerCase()) {
+        case 'day':
+        case 'days': 
+          unitChar = 'd';
+          break;
+        case 'week':
+        case 'weeks':
+          unitChar = 'w';
+          break;
+        case 'month':
+        case 'months':
+          unitChar = 'm';
+          break;
+        case 'year':
+        case 'years':
+          unitChar = 'y';
+          break;
+        default:
+          logger.warn(`Unrecognized time unit: ${unitStr} in ${startDateSetting}`);
+          return null;
+      }
+      
+      // Apply the time offset
+      switch (unitChar) {
+        case 'd':
+          now.setDate(now.getDate() - value);
+          break;
+        case 'w':
+          now.setDate(now.getDate() - value * 7);
+          break;
+        case 'm':
+          now.setMonth(now.getMonth() - value);
+          break;
+        case 'y':
+          now.setFullYear(now.getFullYear() - value);
+          break;
+      }
+      
       // Format as YYYY-MM-DD HH:MM:SS for Gource
       return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 00:00:00`;
     } else {
@@ -327,7 +379,7 @@ const startRender = async (projectId, customName = null, options = {}) => {
   
   // Handle time period filtering
   if (options.timePeriod && options.timePeriod !== 'all') {
-    const { calculateDatesFromPeriod } = require('../../shared/gourceConfig');
+    const { calculateDatesFromPeriod } = require('../../client/src/shared/gourceConfig');
     const dates = calculateDatesFromPeriod(options.timePeriod);
     options.startDate = dates.startDate;
     options.stopDate = dates.stopDate;

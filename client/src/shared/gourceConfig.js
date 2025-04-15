@@ -1,6 +1,6 @@
 /**
  * Shared module for Gource configurations
- * Used by both client and server
+ * Copied from the root /shared directory to comply with CRA import rules.
  * This file serves as a single source of truth for Gource default settings
  */
 
@@ -359,7 +359,29 @@ function convertToGourceArgs(settings) {
   // Map camelCase keys in settings to kebab-case arguments
   const settingKeys = Object.keys(settings);
 
+  // Process title and titleText first, to ensure they're handled properly
+  if (settings.title !== undefined && settings.title !== null) {
+    if (typeof settings.title === 'boolean') {
+      if (settings.title) {
+        // If title is true and titleText exists, use that for the title
+        if (settings.titleText && typeof settings.titleText === 'string' && settings.titleText.trim() !== '') {
+          args += ` --title "${settings.titleText.replace(/"/g, '\\"')}"`;
+        } else {
+          // Otherwise just enable the title flag
+          args += ` --title`;
+        }
+      }
+    } else if (typeof settings.title === 'string' && settings.title.trim() !== '') {
+      // If title is a string, use it directly with quotes
+      args += ` --title "${settings.title.replace(/"/g, '\\"')}"`;
+    }
+  }
+
+  // Now process other settings, but skip title and titleText since we handled them above
   for (const key of settingKeys) {
+    // Skip title and titleText as we've already handled them
+    if (key === 'title' || key === 'titleText') continue;
+    
     const value = settings[key];
 
     // Skip if value is null, undefined, or empty string (unless it's a boolean flag where presence matters)
@@ -383,16 +405,6 @@ function convertToGourceArgs(settings) {
     if (key === 'hide' && Array.isArray(value)) {
       if (value.length > 0) {
         args += ` ${gourceArg} ${value.join(',')}`;
-      }
-      continue;
-    }
-
-    // Handle the 'title' argument which can be boolean or string
-    if (key === 'title') {
-      if (typeof value === 'string' && value.trim() !== '') {
-        args += ` ${gourceArg} "${value.replace(/"/g, '\\"')}"`; // Add quotes for title text
-      } else if (value === true) {
-        args += ` ${gourceArg}`; // Add flag if just true
       }
       continue;
     }
@@ -449,8 +461,8 @@ function convertToGourceArgs(settings) {
   return args.trim();
 }
 
-// Export for CommonJS modules (server side)
-module.exports = {
+// Use standard ES Module exports for the client-side (CRA)
+export {
   defaultGourceConfig,
   defaultSettings,
   settingsDescriptions,

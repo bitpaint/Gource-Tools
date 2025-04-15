@@ -4,7 +4,7 @@
  */
 
 const Database = require('../utils/Database');
-const { defaultGourceConfig, convertToGourceArgs } = require('../../shared/gourceConfig');
+const { defaultGourceConfig, convertToGourceArgs } = require('../../client/src/shared/gourceConfig');
 const Logger = require('../utils/Logger');
 
 // Create a component logger
