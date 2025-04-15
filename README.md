@@ -96,6 +96,9 @@ The visualization process follows these steps:
 -   Creation and reuse of custom configurations
 -   Full parameterization of Gource options
 -   Built-in profiles for specific time periods (week, month, year)
+-   **Dynamic System Profiles**: Includes pre-configured profiles like "Everything in 1 min", "Last Week/Month/Year in 1 min". These profiles automatically calculate the start date and visualization speed (`secondsPerDay`) to fit the desired timeframe and video duration. System profiles cannot be edited or deleted.
+-   **User Profiles**: Users can create, edit, and delete their own custom profiles.
+-   **Default Profile Management**: Users can designate one of their custom profiles as the default profile for new projects via the "Config Files" page.
 
 ### 4. Rendering and Visualization
 
@@ -147,16 +150,19 @@ The application allows customizing all aspects of Gource visualizations:
 -   **Advanced Settings**: Performance, quality, specific behaviors
 
 Configurations can be saved as reusable profiles.
+System profiles provide quick presets for common timeframes, while user profiles allow full customization.
 
 ### 4. Rendering Process
 
 The rendering of a visualization follows these steps:
 
 1.  **Preparation**: Creation of an isolated execution environment
-2.  **Log Generation**: Extraction of Git histories with appropriate formatting
-3.  **Gource Configuration**: Application of selected profile parameters
-4.  **Rendering**: Execution of Gource with capture via FFmpeg
-5.  **Finalization**: Saving metadata and the video file
+2.  **Log Generation**: Extraction of the *complete* Git histories for all selected repositories.
+3.  **Log Combination**: Merging histories for multi-repository projects, prefixing file paths to avoid conflicts.
+4.  **Parameter Calculation**: If using a dynamic profile, calculates the effective start date and `secondsPerDay` based on the full log and profile settings (e.g., "relative-30d", "auto-60s").
+5.  **Gource Configuration**: Application of selected profile parameters, including calculated dynamic values. Time filtering (start/stop dates) is applied here via Gource arguments, not during log generation.
+6.  **Rendering**: Execution of Gource using the combined log and final parameters, with capture via FFmpeg.
+7.  **Finalization**: Saving metadata and the video file.
 
 For multi-repository projects, logs are merged with file path prefixing.
 
@@ -307,21 +313,23 @@ This section details the purpose and functionality of key files within the appli
 - **`gourceConfig.js`**: Contains shared logic and data structures related to Gource configuration, used by both frontend and backend (e.g., mapping Gource options, parameter descriptions, argument conversion).
 
 ## Recent Changes
-
-### June 2023: Configuration Issues Fixed
+---
 
 -   Corrected parameter mapping between camelCase and kebab-case formats
 -   Improved parameter validation
--   Fixed predefined profiles (Last Week, Last Month, Last Year)
+-   Implemented dynamic system profiles ("Everything in 1 min", "Last Week/Month/Year in 1 min") with automatic date and speed calculation.
+-   Fixed date formatting for Gource arguments.
+-   Refactored rendering pipeline to generate full logs first and apply time filters via Gource arguments.
+-   Added functionality to set a custom user profile as the application default.
 -   Enhanced cross-platform support
 
-### May 2023: Multi-Repository Visualization
+---
 
 -   Support for visualizing multiple repositories in a single rendering
 -   Clear identification of repositories in the visualization
 -   Unified timeline for all repositories
 
-### April 2023: Enhanced Gource Configuration
+---
 
 -   New customization parameters
 -   Improved user interface with sliders and color pickers

@@ -46,7 +46,7 @@ import {
   RotateRight
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { projectsApi, repositoriesApi, renderProfilesApi } from '../api/api';
+import { projectsApi, repositoriesApi, renderProfilesApi, settingsApi } from '../api/api';
 
 const ProjectsPage = () => {
   const [projects, setProjects] = useState([]);
@@ -75,6 +75,9 @@ const ProjectsPage = () => {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState(null);
   const [deletingProject, setDeletingProject] = useState(false);
+
+  // State for the application's default profile ID
+  const [defaultProfileId, setDefaultProfileId] = useState(null);
 
   // Remove repository from project dialog state
   const [openRemoveRepoDialog, setOpenRemoveRepoDialog] = useState(false);
@@ -186,6 +189,18 @@ const ProjectsPage = () => {
   // Load data on component mount
   useEffect(() => {
     fetchData();
+    // Fetch the default profile ID when the component mounts
+    settingsApi.getDefaultProfileId()
+      .then(response => {
+        setDefaultProfileId(response.data.defaultProjectProfileId);
+        console.log('[ProjectsPage] Default profile ID fetched:', response.data.defaultProjectProfileId);
+      })
+      .catch(err => {
+        console.error('[ProjectsPage] Error fetching default profile ID:', err);
+        // Don't necessarily block loading, but log the error
+        // setError('Failed to load default profile setting.'); 
+        // toast.error('Failed to load default profile setting');
+      });
   }, [fetchData]);
 
   // Project handlers
@@ -214,15 +229,16 @@ const ProjectsPage = () => {
         });
       } else {
         // Trouver la configuration par défaut
-        const defaultProfile = renderProfiles.find(profile => profile.isDefault === true);
-        const defaultProfileId = defaultProfile ? defaultProfile.id : '';
+        // Use the fetched defaultProfileId from settings
+        const defaultProfileIdToUse = defaultProfileId || ''; // Fallback if fetch failed
+        console.log('[ProjectsPage] Using default profile ID for new project:', defaultProfileIdToUse);
         
         setIsEditing(false);
         setCurrentProject({
           id: null,
           name: '',
           repositories: [],
-          renderProfileId: defaultProfileId
+          renderProfileId: defaultProfileIdToUse
         });
       }
       setOpenProjectDialog(true);
@@ -820,17 +836,14 @@ const ProjectsPage = () => {
               <InputLabel id="render-profile-label">Gource Config File</InputLabel>
               <Select
                 labelId="render-profile-label"
-                id="render-profile"
-                value={currentProject.renderProfileId}
-                onChange={(e) => setCurrentProject({...currentProject, renderProfileId: e.target.value})}
+                id="renderProfileId"
+                value={currentProject.renderProfileId || ''}
+                onChange={(e) => setCurrentProject({ ...currentProject, renderProfileId: e.target.value })}
                 input={<OutlinedInput label="Gource Config File" />}
               >
-                <MenuItem value="">
-                  <em>None</em>
-                </MenuItem>
                 {renderProfiles.map((profile) => (
                   <MenuItem key={profile.id} value={profile.id}>
-                    {profile.name}
+                    {profile.name} {profile.isSystemProfile && '(System)'}
                   </MenuItem>
                 ))}
               </Select>

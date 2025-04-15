@@ -37,13 +37,13 @@ import {
   Delete as DeleteIcon,
   HelpOutline,
   Search as SearchIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils, settingsApi } from '../api/api';
 import { defaultSettings, settingsDescriptions } from '../shared/defaultGourceConfig';
 import { 
-  convertToCamelCase,
   getCommonResolutions,
   getCameraModes,
   convertFormToApiParams,
@@ -80,15 +80,6 @@ function TabPanel(props) {
 // Utiliser les fonctions importées plutôt que de définir des constantes redondantes
 const cameraModes = getCameraModes();
 const commonResolutions = getCommonResolutions();
-
-// Options for relative date dropdown
-const relativeDateOptions = [
-  { value: 'relative-7d', label: 'Last 7 Days' },
-  { value: 'relative-30d', label: 'Last 30 Days' },
-  { value: 'relative-1M', label: 'Last 1 Month' }, // Use M for month to avoid conflict if needed
-  { value: 'relative-3M', label: 'Last 3 Months' },
-  { value: 'relative-1y', label: 'Last Year' },
-];
 
 const ConfigFilesPage = () => {
   const [profiles, setProfiles] = useState([]);
@@ -266,6 +257,32 @@ const ConfigFilesPage = () => {
       }
     } finally {
       setDeletingProfile(false);
+    }
+  };
+
+  // Handler for duplicating a profile
+  const handleDuplicateProfile = async (profileToDuplicate) => {
+    const newProfileName = `${profileToDuplicate.name} (Copy)`;
+    // Ensure the new profile isn't marked as a system profile
+    const newProfileSettings = { ...profileToDuplicate.settings };
+
+    const newProfile = {
+      name: newProfileName,
+      description: profileToDuplicate.description || '',
+      settings: newProfileSettings, // Use the existing settings
+      isSystemProfile: false // Duplicated profiles are always user profiles
+    };
+
+    try {
+      setLoading(true); // Reuse loading state for visual feedback
+      const response = await renderProfilesApi.create(newProfile);
+      setProfiles([...profiles, response.data]);
+      toast.success(`Profile "${profileToDuplicate.name}" duplicated successfully as "${newProfileName}"`);
+    } catch (err) {
+      console.error('Error duplicating profile:', err);
+      toast.error(err.response?.data?.error || 'Failed to duplicate config file');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -469,7 +486,22 @@ const ConfigFilesPage = () => {
                 filteredProfiles.map((profile) => (
                   <TableRow key={profile.id}>
                     <TableCell>{profile.name}</TableCell>
-                    <TableCell>{profile.description || 'No description'}{profile.isSystemProfile && ' (System)'}</TableCell>
+                    <TableCell>
+                      <Tooltip title={profile.description || ''} placement="top-start">
+                        <Typography 
+                          noWrap 
+                          sx={{
+                            maxWidth: '300px', // Adjust max-width as needed
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            display: 'block' // Ensure Typography behaves like a block element for ellipsis
+                          }}
+                        >
+                          {profile.description || 'No description'}{profile.isSystemProfile && ' (System)'}
+                        </Typography>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell>
                       <Box sx={{ 
                         display: 'flex', 
@@ -491,21 +523,38 @@ const ConfigFilesPage = () => {
                     <TableCell>{getProfileSetting(profile, 'seconds-per-day') || '1'}</TableCell>
                     <TableCell>{formatDate(profile.updatedAt)}</TableCell>
                     <TableCell>
-                      <IconButton color="primary" onClick={() => handleOpenProfileDialog(profile)}>
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton color="error" onClick={() => handleOpenDeleteDialog(profile)}>
-                        <DeleteIcon />
-                      </IconButton>
-                      {profile.isSystemProfile && 
-                        <Tooltip title="System profiles cannot be deleted.">
-                          <span>
-                            <IconButton disabled={true}>
-                              <DeleteIcon />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      }
+                      {/* Edit Button */}
+                      <Tooltip title={profile.isSystemProfile ? "System profiles cannot be edited" : "Edit profile"}>
+                        <span> {/* Span needed for tooltip on disabled button */}
+                          <IconButton 
+                            color="primary" 
+                            onClick={() => handleOpenProfileDialog(profile)}
+                            disabled={profile.isSystemProfile}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+
+                      {/* Duplicate Button */}
+                      <Tooltip title="Duplicate profile">
+                         <IconButton color="default" onClick={() => handleDuplicateProfile(profile)}>
+                           <ContentCopyIcon />
+                         </IconButton>
+                      </Tooltip>
+
+                      {/* Delete Button - Show only one, disable for system profiles */}
+                      <Tooltip title={profile.isSystemProfile ? "System profiles cannot be deleted" : "Delete profile"}>
+                        <span> {/* Span needed for tooltip on disabled button */}
+                          <IconButton 
+                            color="error" 
+                            onClick={() => handleOpenDeleteDialog(profile)} 
+                            disabled={profile.isSystemProfile}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                     </TableCell>
                     <TableCell align="center">
                       {profile.id === defaultProfileId ? (
@@ -513,19 +562,16 @@ const ConfigFilesPage = () => {
                           <CheckCircleIcon color="success" />
                         </Tooltip>
                       ) : (
-                         !profile.isSystemProfile && (
-                           <Tooltip title="Set as default profile for new projects">
-                             <Button 
-                               size="small" 
-                               onClick={() => handleSetDefaultProfile(profile.id)}
-                               startIcon={<CheckCircleIcon sx={{ color: 'action.disabled' }} />}
-                             >
-                               Set Default
-                             </Button>
-                           </Tooltip>
-                         )
-                       )
-                      }
+                        <Tooltip title="Set as default profile for new projects">
+                          <Button 
+                            size="small" 
+                            onClick={() => handleSetDefaultProfile(profile.id)}
+                            startIcon={<CheckCircleIcon sx={{ color: 'action.disabled' }} />}
+                          >
+                            Set Default
+                          </Button>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

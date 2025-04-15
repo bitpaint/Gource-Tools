@@ -10,6 +10,9 @@ const { Octokit } = require('@octokit/rest');
 const Logger = require('../utils/Logger');
 const Database = require('../utils/Database'); // Import Database utility
 
+// Import custom profiles to find the default
+const customRenderProfiles = require('../config/customRenderProfiles');
+
 // Create a component logger
 const logger = Logger.createComponentLogger('SettingsService');
 
@@ -27,12 +30,18 @@ class SettingsService {
       const db = Database.getDatabase();
       if (!db.has('settings').value()) {
         logger.info('Initializing settings collection in database...');
-        // Find the profile marked as default in customRenderProfiles
-        const customProfiles = require('../config/customRenderProfiles');
-        const defaultProfile = customProfiles.find(p => p.isDefault === true);
-        const defaultId = defaultProfile ? defaultProfile.id : null;
+        // Find the profile explicitly marked as default (should be 'Everything in 1min')
+        let defaultProfile = customRenderProfiles.find(p => p.isDefault === true);
+        let defaultId = defaultProfile ? defaultProfile.id : null;
         if (!defaultId) {
-            logger.warn('No profile marked as isDefault=true found in customRenderProfiles.js. Default Project Profile ID will be null.');
+          // Fallback: Try to find 'Everything in 1min' by name if isDefault flag is missing
+          const fallbackProfile = customRenderProfiles.find(p => p.name === 'Everything in 1min');
+          defaultId = fallbackProfile ? fallbackProfile.id : null;
+          if (defaultId) {
+            logger.warn('No profile marked as isDefault=true. Falling back to \'Everything in 1min\' by name.');
+          } else {
+            logger.error('CRITICAL: Cannot find default profile (\'Everything in 1min\') by flag or name. Default Project Profile ID will be null.');
+          }
         }
         db.defaults({ settings: { defaultProjectProfileId: defaultId } }).write();
         logger.info(`Initialized settings with defaultProjectProfileId: ${defaultId}`);
@@ -162,6 +171,94 @@ class SettingsService {
     }
   }
 
+  /**
+   * Validate GitHub token
+   * @param {string} token - GitHub token to validate
+   * @returns {Promise<Object>} Validation result
+   */
+  async validateGithubToken(token) {
+    try {
+      if (!token) {
+        return { valid: false, message: 'No token provided' };
+      }
+      
+      if (token.length < 30) {
+        return { valid: false, message: 'Invalid token format' };
+      }
+      
+      const octokit = new Octokit({ auth: token });
+      const { data } = await octokit.users.getAuthenticated();
+      
+      if (data && data.login) {
+        return { 
+          valid: true, 
+          username: data.login,
+          message: `Token valid for user: ${data.login}` 
+        };
+      }
+      
+      return { valid: false, message: 'Invalid token' };
+    } catch (error) {
+      logger.error('Error validating GitHub token', error);
+      return { 
+        valid: false, 
+        message: `Token validation failed: ${error.message}` 
+      };
+    }
+  }
+
+  /**
+   * Get the ID of the default render profile for new projects.
+   * @returns {string | null} The ID of the default profile or null.
+   */
+  getDefaultProjectProfileId() {
+      try {
+          const db = Database.getDatabase();
+          const settings = db.get('settings').value();
+          return settings ? settings.defaultProjectProfileId : null;
+      } catch (error) {
+          logger.error('Error getting default project profile ID:', error);
+          return null; // Return null on error
+      }
+  }
+
+  /**
+   * Set the ID of the default render profile for new projects.
+   * @param {string | null} profileId - The ID of the profile to set as default.
+   * @returns {Promise<Object>} Result
+   */
+  async setDefaultProjectProfileId(profileId) {
+      try {
+          // Optional: Validate if the profileId actually exists in renderProfiles?
+          const db = Database.getDatabase();
+          const profileExists = db.get('renderProfiles').find({ id: profileId }).value();
+          if (!profileId) { // Allowing setting back to null/none
+             logger.info('Setting default project profile ID to null.');
+          } else if (!profileExists) {
+              logger.warn(`Attempted to set non-existent profile ID (${profileId}) as default. Setting to null instead.`);
+              profileId = null; // Or throw an error?
+          }
+
+          db.get('settings').assign({ defaultProjectProfileId: profileId }).write();
+          logger.success(`Default project profile ID set to: ${profileId}`);
+          return { success: true, defaultProjectProfileId: profileId };
+      } catch (error) {
+          logger.error('Error setting default project profile ID:', error);
+          throw new Error('Failed to set default project profile ID');
+      }
+  }
+}
+
+module.exports = new SettingsService(); 
+          return { success: true, defaultProjectProfileId: profileId };
+      } catch (error) {
+          logger.error('Error setting default project profile ID:', error);
+          throw new Error('Failed to set default project profile ID');
+      }
+  }
+}
+
+module.exports = new SettingsService(); 
   /**
    * Validate GitHub token
    * @param {string} token - GitHub token to validate
