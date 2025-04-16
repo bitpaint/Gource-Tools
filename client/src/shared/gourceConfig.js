@@ -25,7 +25,6 @@ const defaultSettings = {
   maxUserCount: 0,
   titleText: '',
   showDates: true,
-  dateFormat: '%d %B %Y', // Added date format for "3 January 2009" style
   disableProgress: false,
   disableAutoRotate: false,
   showLines: true,
@@ -143,7 +142,6 @@ const settingsDescriptions = {
   maxUserCount: "Limits the maximum number of users displayed (0 = no limit)",
   titleText: "Custom title text (empty = use project name)",
   showDates: "Shows dates in the visualization",
-  dateFormat: "Format for displaying dates (e.g., '%d %B %Y' for '3 January 2009')",
   disableProgress: "Disables the progress bar",
   disableAutoRotate: "Disables automatic camera rotation",
   showLines: "Shows lines connecting files to users",
@@ -468,12 +466,6 @@ function convertToGourceArgs(settings) {
           console.warn(`Invalid date format for ${key}: ${value}. Skipping.`);
         }
       }
-      continue;
-    }
-
-    // Special handling for dateFormat to ensure proper quoting
-    if (key === 'dateFormat') {
-      args += ` ${gourceArg} "${value}"`; // Ensure dateFormat is quoted
       continue;
     }
 
