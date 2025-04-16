@@ -91,16 +91,11 @@ function cleanDatabase() {
     // Save settings and API keys
     const settings = db.get('settings').value() || {};
     
-    // Get the default profile if it exists
-    const defaultProfile = db.get('renderProfiles')
-      .find({ isDefault: true })
-      .value();
-    
     // Reset the database
     db.set('repositories', [])
       .set('projects', [])
       .set('renders', [])
-      .set('renderProfiles', defaultProfile ? [defaultProfile] : [defaultGourceConfig])
+      .set('renderProfiles', [])
       .write();
     
     // Restore settings

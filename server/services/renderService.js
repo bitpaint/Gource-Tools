@@ -19,24 +19,22 @@ const GourceConfigService = require('./gourceConfigService');
 const config = require('../config/config');
 const Logger = require('../utils/Logger');
 const Database = require('../utils/Database'); // Import Database utility
-const generateGourceLog = require('./logGeneratorService');
-const ffmpegService = require('./ffmpegService');
-const projectService = require('./projectService'); // To get project details
-const { defaultSettings, convertToGourceArgs } = require('../../client/src/shared/gourceConfig');
-const dateUtils = require('../utils/dateUtils'); // Import date utils
-const { getProjectById } = require('./projectService'); // Import getProjectById
 
 // Create a component logger
 const logger = Logger.createComponentLogger('RenderService');
-const db = Database.getDatabase();
 
-// Ensure renders collection exists
-if (!db.has('renders').value()) {
-  db.set('renders', []).write();
-}
+// Define paths
+const dbPath = path.join(__dirname, '../../db/db.json');
+const exportsDir = path.join(__dirname, '../../exports');
+const tempDir = path.join(__dirname, '../../temp');
+const logsDir = path.join(__dirname, '../../logs');
+let pid = null;
 
-// Keep track of running Gource processes
-const runningGourceProcesses = new Map();
+// Import ProjectService module
+const ProjectService = require('./projectService');
+
+// Import RepositoryService after this service's declaration to avoid circular dependency
+let RepositoryService = null;
 
 // Helper function to parse date strings (YYYY-MM-DD or relative)
 function calculateStartDate(startDateSetting) {
@@ -357,7 +355,7 @@ const startRender = async (projectId, customName = null, options = {}) => {
   }
   
   // Get project details
-  const project = projectService.getProjectWithDetails(projectId);
+  const project = ProjectService.getProjectWithDetails(projectId);
   if (!project) {
     throw new Error('Project not found');
   }
@@ -405,7 +403,7 @@ const startRender = async (projectId, customName = null, options = {}) => {
     stopDate: options.stopDate || null,
     timePeriod: options.timePeriod || 'all',
     // Store render profile ID if provided
-    gourceConfigId: options.gourceConfigId || null
+    renderProfileId: options.renderProfileId || null
   };
   
   // Add render to database
@@ -477,54 +475,49 @@ const processRender = async (project, render, options = {}) => {
     
     // --- Corrected Render Profile Selection Logic ---
     const db = Database.getDatabase();
-    let selectedConfigId = null;
-    let gourceConfig = null;
-    let configSource = 'unknown';
+    let selectedProfileId = null;
+    let renderProfile = null;
 
     // 1. Use the profile specified for this specific render if available
-    if (render.gourceConfigId) {
-      selectedConfigId = render.gourceConfigId;
-      gourceConfig = db.get('renderProfiles').find({ id: selectedConfigId }).value();
-      if (gourceConfig) {
-        logger.config(`Using explicitly specified Gource config: ${gourceConfig.name} (ID: ${selectedConfigId})`);
-        configSource = 'render_specific';
+    if (render.renderProfileId) {
+      selectedProfileId = render.renderProfileId;
+      renderProfile = db.get('renderProfiles').find({ id: selectedProfileId }).value();
+      if (renderProfile) {
+        logger.config(`Using explicitly specified render profile: ${renderProfile.name} (ID: ${selectedProfileId})`);
       } else {
-        logger.warn(`Specified Gource config ID ${selectedConfigId}, but it was not found.`);
-        selectedConfigId = null; // Reset if not found
+        logger.warn(`Specified render profile ID ${selectedProfileId} not found.`);
+        selectedProfileId = null; // Reset if not found
       }
     }
 
-    // 2. If no valid render-specific config, check the project's default config
-    if (!gourceConfig && project.gourceConfigId) {
-      selectedConfigId = project.gourceConfigId;
-      gourceConfig = db.get('renderProfiles').find({ id: selectedConfigId }).value();
-      if (gourceConfig) {
-        logger.config(`Using project's default Gource config: ${gourceConfig.name} (ID: ${selectedConfigId})`);
-        configSource = 'project_default';
+    // 2. If no specific profile used or found, use the project's default profile
+    if (!renderProfile && project.renderProfileId) {
+      selectedProfileId = project.renderProfileId;
+      renderProfile = db.get('renderProfiles').find({ id: selectedProfileId }).value();
+      if (renderProfile) {
+        logger.config(`Using project's default render profile: ${renderProfile.name} (ID: ${selectedProfileId})`);
       } else {
-        logger.warn(`Project specified Gource config ID ${selectedConfigId}, but it was not found.`);
-        selectedConfigId = null; // Reset if not found
+        logger.warn(`Project's default render profile ID ${selectedProfileId} not found.`);
+        selectedProfileId = null; // Reset if not found
       }
     }
     
-    // 3. If still no config, use the application-wide default config
-    if (!gourceConfig) {
-      // Use the renamed function if available, otherwise adapt (assuming default is marked)
-      gourceConfig = db.get('renderProfiles').find({ isDefault: true }).value();
-      if (gourceConfig) {
-        selectedConfigId = gourceConfig.id;
-        logger.config(`Using application default Gource config: ${gourceConfig.name} (ID: ${selectedConfigId})`);
-        configSource = 'application_default';
+    // 3. If still no profile, find the application's default profile
+    if (!renderProfile) {
+      logger.info("No specific or project profile found, looking for application default profile.");
+      renderProfile = db.get('renderProfiles').find({ isDefault: true }).value();
+      if (renderProfile) {
+        selectedProfileId = renderProfile.id;
+        logger.config(`Using application default render profile: ${renderProfile.name} (ID: ${selectedProfileId})`);
       } else {
-        logger.warn('No default Gource config found. Falling back to Gource internal defaults.');
-        // Return Gource default settings from shared config if no DB default found
-        return { ...defaultSettings, configSource: 'gource_internal_defaults', configId: null }; 
+        logger.error(`No default render profile found for render: ${render.id}. Cannot proceed.`);
+        throw new Error(`No render profile could be determined for render ${render.id}`);
       }
     }
     // --- End Corrected Logic ---
 
     // Use the selected render profile's settings
-    let initialSettings = { ...(gourceConfig.settings || {}) };
+    let initialSettings = { ...(renderProfile.settings || {}) };
     
     // Ensure default dateFormat if missing from loaded profile
     if (!initialSettings.dateFormat) {
@@ -606,10 +599,10 @@ const startGourceRender = async (render, logFilePath, outputDir) => {
     // --- This profile selection logic is now handled correctly in processRender ---
     // --- Keeping it here for reference during cleanup, but it's not actively used ---
     let renderProfileId;
-    if (render.gourceConfigId) {
-      renderProfileId = render.gourceConfigId;
+    if (render.renderProfileId) {
+      renderProfileId = render.renderProfileId;
     } else {
-      renderProfileId = project.gourceConfigId;
+      renderProfileId = project.renderProfileId;
     }
     
     const renderProfile = renderProfileId 

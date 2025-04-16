@@ -70,7 +70,7 @@ try {
 // Initialize API routes
 const repositoriesRouter = require('./routes/repositories');
 const projectsRouter = require('./routes/projects');
-const configFilesRoutes = require('./routes/configFiles');
+const configFilesRouter = require('./routes/configFiles');
 const rendersRouter = require('./routes/renders');
 const settingsRouter = require('./routes/settings');
 
@@ -99,7 +99,7 @@ try {
 // API Routes
 app.use('/api/repositories', repositoriesRouter);
 app.use('/api/projects', projectsRouter);
-app.use('/api/gource-configs', configFilesRoutes);
+app.use('/api/renderProfiles', configFilesRouter);
 app.use('/api/renders', rendersRouter);
 app.use('/api/settings', settingsRouter);
 

@@ -7,12 +7,6 @@ const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig } = require('../config/defaultGourceConfig');
 const Database = require('../utils/Database');
 const ProjectService = require('../services/projectService');
-const { getProjectById } = require('../services/projectService');
-const { validateProjectData } = require('../validators/projectValidator');
-const Logger = require('../utils/Logger');
-
-const logger = Logger.createComponentLogger('ProjectsRoute');
-const db = Database.getDatabase();
 
 // Get a project with all its details (repositories and render profile)
 function getProjectWithDetails(projectId) {
@@ -20,98 +14,274 @@ function getProjectWithDetails(projectId) {
 }
 
 // Get all projects
-router.get('/', (req, res, next) => {
-  try {
-    const projects = ProjectService.getAllProjectsWithDetails();
-    res.json(projects);
-  } catch (error) {
-    logger.error('Error fetching projects:', error);
-    next(error);
-  }
+router.get('/', (req, res) => {
+  const projects = ProjectService.getAllProjects();
+  res.json(projects);
 });
 
 // Get a single project with repositories
-router.get('/:id', (req, res, next) => {
-  try {
-    const project = getProjectById(req.params.id);
-    if (!project) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    res.json(project);
-  } catch (error) {
-    logger.error(`Error fetching project ${req.params.id}:`, error);
-    next(error);
+router.get('/:id', (req, res) => {
+  const project = ProjectService.getProjectWithDetails(req.params.id);
+
+  if (!project) {
+    return res.status(404).json({ error: 'Project not found' });
   }
+
+  res.json(project);
 });
 
 // Create a new project
-router.post('/', validateProjectData, (req, res, next) => {
+router.post('/', (req, res) => {
   try {
-    const { name, description, repositories, gourceConfigId } = req.body;
-    logger.info(`Received create project request: Name=${name}, ConfigID=${gourceConfigId}`);
-    
-    const projectData = {
+    const { name, description, repositories, renderProfileId } = req.body;
+    const db = Database.getDatabase();
+
+    // Debug logs
+    console.log('Creating project - data received:');
+    console.log('name:', name);
+    console.log('description:', description);
+    console.log('repositories (type):', typeof repositories, Array.isArray(repositories));
+    console.log('repositories (content):', repositories);
+    console.log('renderProfileId:', renderProfileId);
+
+    // Display all available repositories
+    const allRepos = db.get('repositories').value();
+    console.log('Available repositories in DB:', allRepos.map(r => ({ id: r.id, name: r.name })));
+
+    // Validate input
+    if (!name) {
+      return res.status(400).json({ error: 'Project name is required' });
+    }
+
+    // Verify repositories are provided and valid
+    if (!repositories || !Array.isArray(repositories) || repositories.length === 0) {
+      return res.status(400).json({ error: 'At least one repository is required' });
+    }
+
+    // Check if project with same name already exists
+    const existingProject = db.get('projects')
+      .find({ name })
+      .value();
+
+    if (existingProject) {
+      return res.status(400).json({ error: 'A project with this name already exists' });
+    }
+
+    // Validate repositories if provided
+    let validRepos = [];
+    if (repositories && repositories.length > 0) {
+      console.log('Checking repositories:', repositories);
+      repositories.forEach(repoId => {
+        const repo = db.get('repositories')
+          .find({ id: repoId.toString() })
+          .value();
+        
+        if (repo) {
+          console.log('Valid repository found:', repo.name);
+          validRepos.push(repoId);
+        } else {
+          console.log('Invalid repository with ID:', repoId);
+        }
+      });
+    }
+    console.log('Valid repositories:', validRepos);
+
+    // Ensure at least one repository is valid
+    if (validRepos.length === 0) {
+      return res.status(400).json({ error: 'No valid repositories provided' });
+    }
+
+    // Validate Gource config file if provided
+    let finalRenderProfileId = renderProfileId;
+    if (renderProfileId) {
+      const profileExists = db.get('renderProfiles')
+        .find({ id: renderProfileId })
+        .value();
+      
+      if (!profileExists) {
+        // If specified config file doesn't exist, try to use default config file
+        const defaultProfile = db.get('renderProfiles')
+          .find({ isDefault: true })
+          .value();
+        
+        if (defaultProfile) {
+          finalRenderProfileId = defaultProfile.id;
+        } else {
+          finalRenderProfileId = null;
+        }
+      }
+    } else {
+      // If no config file specified, try to use default config file
+      const defaultProfile = db.get('renderProfiles')
+        .find({ isDefault: true })
+        .value();
+      
+      if (defaultProfile) {
+        finalRenderProfileId = defaultProfile.id;
+      }
+    }
+
+    // Generate project ID
+    const id = Date.now().toString();
+
+    // Create new project
+    const newProject = {
+      id,
       name,
-      description,
-      repositories,
-      gourceConfigId
+      description: description || '',
+      repositories: validRepos,
+      renderProfileId: finalRenderProfileId,
+      dateCreated: new Date().toISOString(),
+      lastModified: new Date().toISOString()
     };
 
-    const newProject = ProjectService.createProject(projectData);
+    db.get('projects')
+      .push(newProject)
+      .write();
+
     res.status(201).json(newProject);
   } catch (error) {
-    logger.error('Error creating project:', error);
-    if (error.message.includes('already exists')) {
-      return res.status(409).json({ error: error.message });
-    }
-    next(error);
+    console.error('Error creating project:', error);
+    res.status(500).json({ error: 'Failed to create project', details: error.message });
   }
 });
 
 // Update a project
-router.put('/:id', validateProjectData, (req, res, next) => {
+router.put('/:id', (req, res) => {
   try {
-    const projectId = req.params.id;
-    const { name, description, repositories = [], gourceConfigId } = req.body;
-    logger.info(`Received update request for project ${projectId}: Name=${name}, ConfigID=${gourceConfigId}`);
+    const { name, description, repositories = [], renderProfileId } = req.body;
+    
+    // Debug logs
+    console.log('Updating project - data received:');
+    console.log('name:', name);
+    console.log('description:', description);
+    console.log('repositories (type):', typeof repositories, Array.isArray(repositories));
+    console.log('repositories (content):', repositories);
+    console.log('renderProfileId:', renderProfileId);
+    
+    const db = Database.getDatabase();
+    
+    const project = db.get('projects')
+      .find({ id: req.params.id })
+      .value();
 
-    const existingProject = getProjectById(projectId);
-    if (!existingProject) {
+    if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
-    const projectData = {
-      name,
-      description,
-      repositories,
-      gourceConfigId
+    // Validate input
+    if (name === '') {
+      return res.status(400).json({ error: 'Project name cannot be empty' });
+    }
+
+    // Verify repositories are provided and valid
+    if (!repositories || !Array.isArray(repositories) || repositories.length === 0) {
+      return res.status(400).json({ error: 'At least one repository is required' });
+    }
+
+    // Check if the name is being changed and if it already exists
+    if (name && name !== project.name) {
+      const existingProject = db.get('projects')
+        .find({ name })
+        .value();
+
+      if (existingProject && existingProject.id !== project.id) {
+        return res.status(400).json({ error: 'A project with this name already exists' });
+      }
+    }
+
+    // Validate repositories - make sure they exist
+    const validRepos = repositories.filter(repoId => {
+      const repo = db.get('repositories')
+        .find({ id: repoId.toString() })
+        .value();
+      
+      if (repo) {
+        console.log('Valid repository found (update):', repo.name);
+        return true;
+      } else {
+        console.log('Invalid repository with ID (update):', repoId);
+        return false;
+      }
+    });
+    console.log('Valid repositories (update):', validRepos);
+
+    // Ensure at least one repository is valid
+    if (validRepos.length === 0) {
+      return res.status(400).json({ error: 'No valid repositories provided' });
+    }
+
+    // Validate Gource config file if provided
+    let finalRenderProfileId = renderProfileId;
+    if (renderProfileId) {
+      const profileExists = db.get('renderProfiles')
+        .find({ id: renderProfileId })
+        .value();
+      
+      if (!profileExists) {
+        // If specified config file doesn't exist, try to use default config file
+        const defaultProfile = db.get('renderProfiles')
+          .find({ isDefault: true })
+          .value();
+        
+        if (defaultProfile) {
+          finalRenderProfileId = defaultProfile.id;
+        } else {
+          finalRenderProfileId = null;
+        }
+      }
+    } else if (renderProfileId === null) {
+      // If the profile was explicitly removed
+      finalRenderProfileId = null;
+    } else {
+      // If renderProfileId is not provided, keep the current value
+      finalRenderProfileId = project.renderProfileId;
+    }
+
+    // Update project
+    const updatedProject = {
+      ...project,
+      name: name || project.name,
+      description: description !== undefined ? description : project.description,
+      repositories: validRepos,
+      renderProfileId: finalRenderProfileId,
+      lastModified: new Date().toISOString()
     };
 
-    const updatedProject = ProjectService.updateProject(projectId, projectData);
-    if (!updatedProject) {
-      return res.status(404).json({ error: 'Project not found during update' });
-    }
+    db.get('projects')
+      .find({ id: req.params.id })
+      .assign(updatedProject)
+      .write();
+
     res.json(updatedProject);
   } catch (error) {
-    logger.error(`Error updating project ${req.params.id}:`, error);
-    if (error.message.includes('already exists')) {
-      return res.status(409).json({ error: error.message });
-    }
-    next(error);
+    console.error('Error updating project:', error);
+    res.status(500).json({ error: 'Failed to update project', details: error.message });
   }
 });
 
 // Delete a project
-router.delete('/:id', (req, res, next) => {
+router.delete('/:id', (req, res) => {
   try {
-    const deleted = ProjectService.deleteProject(req.params.id);
-    if (!deleted) {
+    const db = Database.getDatabase();
+    
+    const project = db.get('projects')
+      .find({ id: req.params.id })
+      .value();
+
+    if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
-    res.status(204).send();
+
+    // Remove from database
+    db.get('projects')
+      .remove({ id: req.params.id })
+      .write();
+
+    res.json({ message: 'Project deleted successfully' });
   } catch (error) {
-    logger.error(`Error deleting project ${req.params.id}:`, error);
-    next(error);
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: 'Failed to delete project', details: error.message });
   }
 });
 

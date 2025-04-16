@@ -135,13 +135,13 @@ export const projectsApi = {
   delete: (id) => api.delete(`/projects/${id}`),
 };
 
-// Gource Configs API
-export const gourceConfigsApi = {
-  getAll: () => api.get('/gource-configs'),
-  getById: (id) => api.get(`/gource-configs/${id}`),
-  create: (configData) => api.post('/gource-configs', configData),
-  update: (id, configData) => api.put(`/gource-configs/${id}`, configData),
-  delete: (id) => api.delete(`/gource-configs/${id}`),
+// Gource Config Files API
+export const renderProfilesApi = {
+  getAll: () => api.get('/renderProfiles'),
+  getById: (id) => api.get(`/renderProfiles/${id}`),
+  create: (data) => api.post('/renderProfiles', data),
+  update: (id, data) => api.put(`/renderProfiles/${id}`, data),
+  delete: (id) => api.delete(`/renderProfiles/${id}`),
 };
 
 // Renders API
@@ -166,15 +166,15 @@ export const rendersApi = {
 export const settingsApi = {
   get: () => api.get('/settings'),
   update: (data) => api.put('/settings', data),
-  getDefaultGourceConfigId: () => api.get('/settings/default-gource-config-id'),
-  setDefaultGourceConfigId: (configId) => api.put('/settings/default-gource-config-id', { configId }),
+  getDefaultProfileId: () => api.get('/settings/default-profile'),
+  setDefaultProfileId: (profileId) => api.put('/settings/default-profile', { profileId }),
 };
 
 // Create an object for default export
 const apiExports = {
   repositories: repositoriesApi,
   projects: projectsApi,
-  gourceConfigs: gourceConfigsApi,
+  renderProfiles: renderProfilesApi,
   renders: rendersApi,
   settings: settingsApi,
 };

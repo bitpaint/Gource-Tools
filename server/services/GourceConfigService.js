@@ -11,96 +11,90 @@ const Logger = require('../utils/Logger');
 const logger = Logger.createComponentLogger('GourceConfigService');
 
 /**
- * Get a Gource config by ID
- * @param {string} id - ID of the Gource config to retrieve
- * @returns {Object|null} Gource config or null if not found
+ * Get a render profile by ID
+ * @param {string} id - ID of the render profile to retrieve
+ * @returns {Object|null} Render profile or null if not found
  */
-const getGourceConfigById = (id) => {
+const getRenderProfileById = (id) => {
   if (!id) return null;
   
   // Use the shared DB instance
   const db = Database.getDatabase();
   
-  // Access the 'renderProfiles' collection (keeping the name for now)
   return db.get('renderProfiles')
     .find({ id: id.toString() })
     .value() || null;
 };
 
 /**
- * Get the default Gource config
- * @returns {Object|null} Default Gource config or null if not found
+ * Get the default render profile
+ * @returns {Object|null} Default render profile or null if not found
  */
-const getDefaultGourceConfig = () => {
+const getDefaultRenderProfile = () => {
   // Use the shared DB instance
   const db = Database.getDatabase();
   
-  // Access the 'renderProfiles' collection
   return db.get('renderProfiles')
     .find({ isDefault: true })
     .value() || null;
 };
 
 /**
- * Get all Gource configs
- * @returns {Array} List of all Gource configs
+ * Get all render profiles
+ * @returns {Array} List of all render profiles
  */
-const getAllGourceConfigs = () => {
+const getAllRenderProfiles = () => {
   // Use the shared DB instance
   const db = Database.getDatabase();
   
-  // Access the 'renderProfiles' collection
   return db.get('renderProfiles').value() || [];
 };
 
 /**
- * Create a new Gource config
- * @param {Object} configData - Gource config data
- * @returns {Object} Created Gource config
+ * Create a new render profile
+ * @param {Object} profileData - Render profile data
+ * @returns {Object} Created render profile
  */
-const createGourceConfig = (configData) => {
-  if (!configData.name) {
-    throw new Error('Gource config name is required');
+const createRenderProfile = (profileData) => {
+  if (!profileData.name) {
+    throw new Error('Profile name is required');
   }
   
   // Use the shared DB instance
   const db = Database.getDatabase();
   
-  // Check if config with the same name exists
-  // Access the 'renderProfiles' collection
-  const existingConfig = db.get('renderProfiles')
-    .find({ name: configData.name })
+  // Check if profile with the same name exists
+  const existingProfile = db.get('renderProfiles')
+    .find({ name: profileData.name })
     .value();
   
-  if (existingConfig) {
-    throw new Error(`Gource config with name "${configData.name}" already exists`);
+  if (existingProfile) {
+    throw new Error(`Render profile with name "${profileData.name}" already exists`);
   }
   
-  // Create Gource config
-  const newConfig = {
+  // Create render profile
+  const newProfile = {
     id: Date.now().toString(),
-    name: configData.name,
-    description: configData.description || '',
-    settings: configData.settings || {},
-    isDefault: !!configData.isDefault,
-    // isSystemConfig should likely be false for user-created configs
-    isSystemConfig: configData.isSystemConfig === true ? true : false, 
+    name: profileData.name,
+    description: profileData.description || '',
+    settings: profileData.settings || {},
+    isDefault: !!profileData.isDefault,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
   
-  // Add to database ('renderProfiles' collection)
+  // Add to database
   db.get('renderProfiles')
-    .push(newConfig)
+    .push(newProfile)
     .write();
   
-  return newConfig;
+  return newProfile;
 };
 
-// Export functions with new names
+// Export functions
 module.exports = {
-  getGourceConfigById,
-  getDefaultGourceConfig,
-  getAllGourceConfigs,
-  createGourceConfig
+  getRenderProfileById,
+  getDefaultRenderProfile,
+  getAllRenderProfiles,
+  createRenderProfile
 }; 
