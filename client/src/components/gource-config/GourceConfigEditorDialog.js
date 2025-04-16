@@ -12,6 +12,9 @@ import {
   Grid,
   Paper,
   IconButton,
+  TextField,
+  Box,
+  AppBar,
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
 
@@ -103,21 +106,21 @@ const GourceConfigEditorDialog = ({
   open,
   onClose,
   onSave,
-  currentProfile,
-  setCurrentProfile,
+  currentConfig,
+  setCurrentConfig,
   isEditing,
-  savingProfile,
+  savingConfig,
   settingsDescriptions
 }) => {
   // Track the active tab
-  const [tabValue, setTabValue] = useState(0);
+  const [activeTab, setActiveTab] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState('');
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [titleValidationFailed, setTitleValidationFailed] = useState(false);
   
   // Handle tab change
   const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
+    setActiveTab(newValue);
   };
 
   // Apply Preset Handler
@@ -128,7 +131,7 @@ const GourceConfigEditorDialog = ({
     }
     const preset = presets[presetKey];
     setSelectedPreset(presetKey);
-    setCurrentProfile(prev => ({
+    setCurrentConfig(prev => ({
       ...prev,
       // Merge preset settings with existing ones, preset values override
       settings: {
@@ -138,12 +141,42 @@ const GourceConfigEditorDialog = ({
     }));
   };
 
-  // Handle profile name and description changes
-  const handleProfileInfoChange = (type, value) => {
-    setCurrentProfile(prev => ({
-      ...prev,
-      [type]: value
-    }));
+  // Handle input changes - update currentConfig state
+  const handleInputChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    const settingValue = type === 'checkbox' ? checked : value;
+    
+    // Check if the field name contains a dot (nested setting)
+    if (name.includes('.')) {
+        const [parentKey, childKey] = name.split('.');
+        setCurrentConfig(prevConfig => ({
+            ...prevConfig,
+            settings: {
+                ...prevConfig.settings,
+                [parentKey]: {
+                    ...prevConfig.settings[parentKey],
+                    [childKey]: settingValue
+                }
+            }
+        }));
+    } else {
+        // Handle top-level fields (name, description) and settings fields
+        if (name === 'name' || name === 'description') {
+            setCurrentConfig(prevConfig => ({
+                ...prevConfig,
+                [name]: value
+            }));
+        } else {
+             // Assume it's a setting if not name or description
+            setCurrentConfig(prevConfig => ({
+                ...prevConfig,
+                settings: {
+                    ...prevConfig.settings,
+                    [name]: settingValue
+                }
+            }));
+        }
+    }
   };
 
   // Handle save with validation
@@ -151,12 +184,12 @@ const GourceConfigEditorDialog = ({
     setAttemptedSave(true);
     
     // Check if name is provided
-    const isNameValid = Boolean(currentProfile.name);
+    const isNameValid = Boolean(currentConfig.name);
     
     // Check if title is enabled but text is empty
     const isTitleValid = !(
-      currentProfile.settings.title && 
-      (!currentProfile.settings.titleText || currentProfile.settings.titleText.trim() === '')
+      currentConfig.settings.title && 
+      (!currentConfig.settings.titleText || currentConfig.settings.titleText.trim() === '')
     );
     
     setTitleValidationFailed(!isTitleValid);
@@ -166,13 +199,13 @@ const GourceConfigEditorDialog = ({
       onSave();
     } else if (!isTitleValid) {
       // If title validation fails, switch to the General & Video tab
-      setTabValue(0);
+      setActiveTab(0);
     }
   };
 
   // Internal settings change handler
   const handleInternalSettingsChange = (key, value) => {
-    if (!currentProfile) return;
+    if (!currentConfig) return;
 
     let processedValue = value;
     if (typeof value === 'object' && value !== null && value.target) {
@@ -180,7 +213,7 @@ const GourceConfigEditorDialog = ({
     }
 
     // Create a mutable copy of the settings
-    const settingsToUpdate = { ...currentProfile.settings };
+    const settingsToUpdate = { ...currentConfig.settings };
 
     // Store the directly changed value first
     settingsToUpdate[key] = processedValue;
@@ -224,8 +257,8 @@ const GourceConfigEditorDialog = ({
     }
     // --- End Centralized Date Logic ---
 
-    setCurrentProfile({
-      ...currentProfile,
+    setCurrentConfig({
+      ...currentConfig,
       settings: settingsToUpdate,
     });
   };
@@ -269,7 +302,7 @@ const GourceConfigEditorDialog = ({
           <Grid item xs={12} sm={3} md={2.5}>
             <Paper elevation={1} sx={{ height: '100%' }}>
               <Tabs 
-                value={tabValue} 
+                value={activeTab} 
                 onChange={handleTabChange} 
                 aria-label="gource config settings tabs"
                 orientation="vertical"
@@ -300,68 +333,68 @@ const GourceConfigEditorDialog = ({
           {/* Right content area for tab panels */}
           <Grid item xs={12} sm={9} md={9.5}>
             {/* Tab Panels - Pass the renamed handler */} 
-            <GourceTabPanel value={tabValue} index={0}>
+            <GourceTabPanel value={activeTab} index={0}>
               {/* Pass profile info and preset to the General tab */}
               <GourceGeneralVideoTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
-                profileName={currentProfile?.name || ''}
-                profileDescription={currentProfile?.description || ''}
-                onProfileInfoChange={handleProfileInfoChange}
-                isSystemProfile={currentProfile?.isSystemProfile}
+                profileName={currentConfig?.name || ''}
+                profileDescription={currentConfig?.description || ''}
+                onProfileInfoChange={handleInputChange}
+                isSystemProfile={currentConfig?.isSystemProfile}
                 selectedPreset={selectedPreset}
                 onPresetChange={handleApplyPreset}
                 presets={presets}
-                showNameError={attemptedSave && !currentProfile?.name}
+                showNameError={attemptedSave && !currentConfig?.name}
                 showTitleError={titleValidationFailed}
                 isEditing={isEditing}
               />
             </GourceTabPanel>
             
-            <GourceTabPanel value={tabValue} index={1}>
+            <GourceTabPanel value={activeTab} index={1}>
               <GourceTimelineSpeedTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
               />
             </GourceTabPanel>
             
-            <GourceTabPanel value={tabValue} index={2}>
+            <GourceTabPanel value={activeTab} index={2}>
               <GourceVisualStyleTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
               />
             </GourceTabPanel>
             
-            <GourceTabPanel value={tabValue} index={3}>
+            <GourceTabPanel value={activeTab} index={3}>
               <GourceCameraNavTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
               />
             </GourceTabPanel>
 
-            <GourceTabPanel value={tabValue} index={4}>
+            <GourceTabPanel value={activeTab} index={4}>
               <GourceUsersFilesTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
               />
             </GourceTabPanel>
 
-            <GourceTabPanel value={tabValue} index={5}>
+            <GourceTabPanel value={activeTab} index={5}>
               <GourceCaptionsOverlaysTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
               />
             </GourceTabPanel>
 
-            <GourceTabPanel value={tabValue} index={6}>
+            <GourceTabPanel value={activeTab} index={6}>
               <GourceAdvancedOutputTab 
-                settings={currentProfile.settings || {}} 
+                settings={currentConfig.settings || {}} 
                 onSettingsChange={handleInternalSettingsChange}
                 settingsDescriptions={settingsDescriptions}
               />
@@ -370,14 +403,14 @@ const GourceConfigEditorDialog = ({
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={savingProfile}>Cancel</Button>
+        <Button onClick={onClose} disabled={savingConfig}>Cancel</Button>
         <Button 
           onClick={handleSave} 
           variant="contained" 
-          disabled={savingProfile || currentProfile?.isSystemProfile}
-          startIcon={savingProfile ? <CircularProgress size={16} color="inherit" /> : null}
+          disabled={savingConfig || currentConfig?.isSystemProfile}
+          startIcon={savingConfig ? <CircularProgress size={16} color="inherit" /> : null}
         >
-          {savingProfile ? 'Saving...' : (currentProfile?.isSystemProfile ? 'Cannot Save System Profile' : 'Save')}
+          {savingConfig ? 'Saving...' : (currentConfig?.isSystemProfile ? 'Cannot Save System Profile' : 'Save')}
         </Button>
       </DialogActions>
     </Dialog>

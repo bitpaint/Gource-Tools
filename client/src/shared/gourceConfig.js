@@ -11,8 +11,8 @@ const defaultSettings = {
   secondsPerDay: 1,
   autoSkipSeconds: 0.1,
   elasticity: 0.3,
-  title: true,
-  key: true,
+  title: false,
+  key: false,
   background: '#000000',
   fontScale: 1.0,
   cameraMode: 'overview',
@@ -20,94 +20,93 @@ const defaultSettings = {
   timeScale: 1.0,
   highlightUsers: false,
   hideUsers: '',
-  hideFilesRegex: '',
-  hideRoot: false,
+  hideProgress: true,
+  hideMouse: true,
+  hideFilenames: true,
+  hideRoot: true,
+  hideFiles: false,
+  hideDirnames: false,
+  hideUsernames: false,
+  hideDate: false,
+  hideTree: false,
+  hideBloom: false,
   maxUserCount: 0,
   titleText: '',
-  showDates: true,
-  disableProgress: false,
+  showDates: false,
+  disableProgress: true,
   disableAutoRotate: false,
   showLines: true,
   followUsers: false,
   maxFilelag: 0.5,
   multiSampling: true,
-  bloom: false,
-  bloomIntensity: 0.4,
+  bloom: true,
+  bloomIntensity: 0.5,
   bloomMultiplier: 0.7,
   extraArgs: '',
-  // Ajout des paramètres de filtre temporel
-  timePeriod: 'all', // Peut être 'all', 'week', 'month', 'year'
-  startDate: '', // Date de début au format YYYY-MM-DD
-  stopDate: '', // Date de fin au format YYYY-MM-DD
-  // Added Time/Position settings
-  startPosition: '', // 0.0-1.0 or 'random'
-  stopPosition: '', // 0.0-1.0
-  stopAtTime: 0, // Seconds, 0 for disabled
+  dateFormat: '%Y-%m-%d',
+  timePeriod: 'all',
+  startDate: '',
+  stopDate: '',
+  startPosition: '',
+  stopPosition: '',
+  stopAtTime: 0,
   loop: false,
-  loopDelaySeconds: 3,
-  // Font sizes
+  loopDelaySeconds: 5,
   fontSize: 16,
   filenameFontSize: 14,
-  dirnameFontSize: 14,
-  userFontSize: 14,
-  // Colors
+  dirnameFontSize: 20,
+  userFontSize: 13,
   fontColor: '#FFFFFF',
   dirColor: '#FFFFFF',
   highlightColor: '#FF0000',
   selectionColor: '#FFFF00',
   filenameColor: '#FFFFFF',
-  // Appearance Extras
   transparent: false,
-  dirNameDepth: 0,
-  dirNamePosition: 0.5,
+  dirNameDepth: 1,
+  dirNamePosition: 1.0,
   filenameTime: 4.0,
-  // File options
-  maxFiles: 0, // 0 for unlimited
-  fileIdleTime: 0, // Seconds
-  fileIdleTimeAtEnd: 0, // Seconds
+  maxFiles: 0,
+  fileIdleTime: 0,
+  fileIdleTimeAtEnd: 0,
   fileExtensions: false,
   fileExtensionFallback: false,
-  // User / Avatar options
-  useUserImageDir: true, // Enable by default
-  defaultUserImage: '', // Path to default image
+  useUserImageDir: true,
+  defaultUserImage: '',
   fixedUserSize: false,
   colourImages: false,
   userFriction: 0.67,
   maxUserSpeed: 500,
-  // Background / Logo
-  backgroundImage: '', // Path to background image
-  logo: '', // Path to logo image
-  logoOffset: '', // Format XxY
-  // Added Group 1 Settings
+  backgroundImage: '',
+  logo: '',
+  logoOffset: '',
   fullscreen: false,
-  screenNum: 0, // 0 for primary screen usually
+  screenNum: 0,
   noVsync: false,
-  windowPosition: '', // Format XxY
+  windowPosition: '',
   frameless: false,
-  cropAxis: '', // 'vertical' or 'horizontal'
-  padding: 1.1,
-  stopAtEnd: false,
+  cropAxis: '',
+  padding: 1.15,
+  stopAtEnd: true,
   dontStop: false,
   disableAutoSkip: false,
   realtime: false,
   noTimeTravel: false,
   highlightDirs: false,
   disableInput: false,
-  hashSeed: '', // String or Number
-  // Added Group 2 Settings
-  userShowFilter: '', // Regex
-  fileShowFilter: '', // Regex
-  highlightUser: '', // Specific username
-  captionFile: '', // Path to caption file
-  captionSize: 12, // Font size
+  hashSeed: '',
+  userShowFilter: '',
+  fileFilter: '(\\.svg$|\\/node_modules\\/)',
+  fileShowFilter: '',
+  highlightUser: '',
+  captionFile: '',
+  captionSize: 12,
   captionColour: '#FFFFFF',
-  captionDuration: 10.0, // Seconds
-  captionOffset: 0, // Horizontal offset
-  // Added Last Group Settings
-  fontFile: '', // Path to font file (.ttf, .otf)
-  followUser: '', // Specific username to follow
-  outputCustomLog: '', // Path to output custom log file
-  gitBranch: '' // Specify branch for Gource's internal log generation (limited use here)
+  captionDuration: 10.0,
+  captionOffset: 0,
+  fontFile: '',
+  followUser: '',
+  outputCustomLog: '',
+  gitBranch: ''
 };
 
 // Default configuration profile
@@ -128,8 +127,8 @@ const settingsDescriptions = {
   secondsPerDay: "Number of seconds allocated to each day of activity",
   autoSkipSeconds: "Automatically skips periods of inactivity longer than this value (in seconds)",
   elasticity: "Controls the elasticity of connections between files and users (0.0-1.0)",
-  title: "Displays the project title at the top of the visualization",
-  key: "Displays the legend for file types",
+  title: "Displays the project title at the top of the visualization (Now disabled by default)",
+  key: "Displays the legend for file types (Now hidden by default)",
   background: "Background color of the visualization",
   fontScale: "Relative size of text in the visualization",
   cameraMode: "Camera mode: 'overview', 'track' (follows activity), 'follow' (follows users)",
@@ -148,62 +147,54 @@ const settingsDescriptions = {
   followUsers: "Camera follows active users",
   maxFilelag: "Maximum delay before files appear (in seconds)",
   multiSampling: "Enables anti-aliasing for better image quality",
-  bloom: "Adds a bloom effect to bright elements",
-  bloomIntensity: "Intensity of the bloom effect (0.0-1.0)",
+  bloom: "Adds a bloom effect to bright elements (Now enabled by default)",
+  bloomIntensity: "Intensity of the bloom effect (0.0-1.0, default 0.5)",
   bloomMultiplier: "Multiplier for the bloom effect (0.0-1.0)",
   extraArgs: "Additional arguments to pass directly to Gource",
-  // Descriptions des nouveaux paramètres
+  dateFormat: "Format string for the date display (strftime format, e.g., '%Y-%m-%d')",
   timePeriod: "Time period filter: 'all', 'week' (last 7 days), 'month' (last 30 days), 'year' (last 365 days)",
   startDate: "Start date for the visualization (format: YYYY-MM-DD)",
   stopDate: "End date for the visualization (format: YYYY-MM-DD)",
-  // Added Time/Position descriptions
   startPosition: "Start at a specific position (0.0 to 1.0, or 'random')",
   stopPosition: "Stop at a specific position (0.0 to 1.0)",
   stopAtTime: "Stop rendering after a specific number of seconds (0 to disable)",
   loop: "Loop the visualization when it ends",
-  loopDelaySeconds: "Seconds to pause before looping (default: 3)",
-  // Font sizes
+  loopDelaySeconds: "Seconds to pause before looping (default: 5)",
   fontSize: "Default font size (for title, date)",
   filenameFontSize: "Font size for filenames",
-  dirnameFontSize: "Font size for directory names",
-  userFontSize: "Font size for user names",
-  // Colors
+  dirnameFontSize: "Font size for directory names (default: 20)",
+  userFontSize: "Font size for user names (default: 13)",
   fontColor: "Default font color (for title, date)",
   dirColor: "Font color for directory names",
   highlightColor: "Font color for highlighted users/directories",
   selectionColor: "Font color for selected users/files",
-  // Added Appearance Extras descriptions
   transparent: "Make the background transparent (useful for overlays)",
   filenameColor: "Font color for filenames",
-  dirNameDepth: "Draw directory names down to this depth (0 for default)",
-  dirNamePosition: "Position directory names along the edge (0.0 to 1.0)",
+  dirNameDepth: "Draw directory names down to this depth (default: 1)",
+  dirNamePosition: "Position directory names along the edge (0.0 to 1.0, default: 1.0)",
   filenameTime: "Duration filenames remain on screen (seconds)",
-  // File options
   maxFiles: "Maximum number of files displayed (0 for unlimited)",
   fileIdleTime: "Time files remain on screen after activity (seconds, default 0)",
   fileIdleTimeAtEnd: "Time files remain on screen at the very end (seconds, default 0)",
   fileExtensions: "Show only file extensions instead of full filenames",
   fileExtensionFallback: "Use filename if extension is missing (requires --file-extensions)",
-  // User / Avatar options
   useUserImageDir: "Attempt to load user avatars from the ./avatars directory",
   defaultUserImage: "Path to an image file to use if a specific user avatar is not found",
   fixedUserSize: "Users avatars maintain a fixed size instead of scaling",
   colourImages: "Apply coloring to user avatars",
   userFriction: "Rate at which users slow down after moving (0.0 to 1.0)",
   maxUserSpeed: "Maximum speed users can travel (units per second)",
-  // Background / Logo
   backgroundImage: "Path to an image file to use as the background",
   logo: "Path to an image file to display as a foreground logo",
   logoOffset: "Offset position of the logo (format: XxY, e.g., 10x10)",
-  // Added Group 1 Descriptions
   fullscreen: "Run Gource in fullscreen mode",
   screenNum: "Select the screen number for fullscreen mode",
   noVsync: "Disable vertical sync (can cause tearing)",
   windowPosition: "Initial window position (format: XxY, e.g., 100x50)",
   frameless: "Run Gource in a borderless window",
   cropAxis: "Crop the view on an axis ('vertical' or 'horizontal')",
-  padding: "Camera view padding around the content (default: 1.1)",
-  stopAtEnd: "Stop simulation automatically at the end of the log",
+  padding: "Camera view padding around the content (default: 1.15)",
+  stopAtEnd: "Stop simulation automatically at the end of the log (Now enabled by default)",
   dontStop: "Keep running (camera rotating) after the log ends",
   disableAutoSkip: "Prevent automatically skipping periods of inactivity",
   realtime: "Attempt to playback at realtime speed",
@@ -211,7 +202,6 @@ const settingsDescriptions = {
   highlightDirs: "Highlight the names of all directories",
   disableInput: "Disable keyboard and mouse input during visualization",
   hashSeed: "Seed for the hash function (affects layout)",
-  // Added Group 2 Descriptions
   userShowFilter: "Show only usernames matching this regex",
   fileShowFilter: "Show only file paths matching this regex",
   highlightUser: "Highlight a specific user by name",
@@ -220,11 +210,14 @@ const settingsDescriptions = {
   captionColour: "Font color for captions (hex)",
   captionDuration: "Default duration captions remain on screen (seconds)",
   captionOffset: "Horizontal offset for captions",
-  // Added Last Group Descriptions
   fontFile: "Path to a font file (.ttf, .otf) to use for text rendering",
   followUser: "Camera will automatically follow this specific user",
   outputCustomLog: "Output a Gource custom format log file during processing (useful for debugging)",
-  gitBranch: "Specify git branch when Gource generates its own log (limited use when providing custom log)"
+  gitBranch: "Specify git branch when Gource generates its own log (limited use when providing custom log)",
+  hideProgress: "Hides the progress bar (Now hidden by default)",
+  hideMouse: "Hides the mouse cursor (Now hidden by default)",
+  hideFilenames: "Hides filenames (Now hidden by default)",
+  fileFilter: "Regular expression to hide certain file paths (default hides .svg and node_modules)"
 };
 
 /**
@@ -396,24 +389,26 @@ function convertToGourceArgs(settings) {
       hideElements.push(hideValue);
     }
   }
-
-  // Process title and titleText first, to ensure they're handled properly
-  if (settings.title !== undefined && settings.title !== null) {
-    if (typeof settings.title === 'boolean') {
-      if (settings.title) {
-        // If title is true and titleText exists, use that for the title
-        if (settings.titleText && typeof settings.titleText === 'string' && settings.titleText.trim() !== '') {
-          args += ` --title "${settings.titleText.replace(/"/g, '\\"')}"`;
-        } else {
-          // Otherwise just enable the title flag
-          args += ` --title`;
-        }
-      }
-    } else if (typeof settings.title === 'string' && settings.title.trim() !== '') {
-      // If title is a string, use it directly with quotes
-      args += ` --title "${settings.title.replace(/"/g, '\\"')}"`;
+  // Explicitly add 'title' to hide if settings.title is false
+  if (settings.title === false) {
+    if (!hideElements.includes('title')) { // Avoid adding duplicates if hideTitle was a theoretical setting
+       hideElements.push('title');
     }
   }
+
+  // Process title and titleText first, to ensure they're handled properly
+  // Only add --title flag if settings.title is explicitly true
+  if (settings.title === true) {
+    // If title is true and titleText exists, use that for the title
+    if (settings.titleText && typeof settings.titleText === 'string' && settings.titleText.trim() !== '') {
+      args += ` --title "${settings.titleText.replace(/"/g, '\\"')}"`;
+    } else {
+      // Otherwise just enable the title flag (Gource uses default name or similar)
+      // We don't add value-less --title here, handled by hide logic if false
+      // Potentially, Gource defaults to showing something if --title is absent and not hidden
+      // Let's rely on the hide logic above for explicit hiding
+    }
+  } // No else block needed, hiding is handled above
 
   // Now process other settings, skipping those we've already handled
   for (const key of Object.keys(settings)) {

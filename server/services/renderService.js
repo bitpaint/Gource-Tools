@@ -19,22 +19,24 @@ const GourceConfigService = require('./gourceConfigService');
 const config = require('../config/config');
 const Logger = require('../utils/Logger');
 const Database = require('../utils/Database'); // Import Database utility
+const generateGourceLog = require('./logGeneratorService');
+const ffmpegService = require('./ffmpegService');
+const projectService = require('./projectService'); // To get project details
+const { defaultSettings, convertToGourceArgs } = require('../../client/src/shared/gourceConfig');
+const dateUtils = require('../utils/dateUtils'); // Import date utils
+const { getProjectById } = require('./projectService'); // Import getProjectById
 
 // Create a component logger
 const logger = Logger.createComponentLogger('RenderService');
+const db = Database.getDatabase();
 
-// Define paths
-const dbPath = path.join(__dirname, '../../db/db.json');
-const exportsDir = path.join(__dirname, '../../exports');
-const tempDir = path.join(__dirname, '../../temp');
-const logsDir = path.join(__dirname, '../../logs');
-let pid = null;
+// Ensure renders collection exists
+if (!db.has('renders').value()) {
+  db.set('renders', []).write();
+}
 
-// Import ProjectService module
-const ProjectService = require('./projectService');
-
-// Import RepositoryService after this service's declaration to avoid circular dependency
-let RepositoryService = null;
+// Keep track of running Gource processes
+const runningGourceProcesses = new Map();
 
 // Helper function to parse date strings (YYYY-MM-DD or relative)
 function calculateStartDate(startDateSetting) {
@@ -355,7 +357,7 @@ const startRender = async (projectId, customName = null, options = {}) => {
   }
   
   // Get project details
-  const project = ProjectService.getProjectWithDetails(projectId);
+  const project = projectService.getProjectWithDetails(projectId);
   if (!project) {
     throw new Error('Project not found');
   }
@@ -403,7 +405,7 @@ const startRender = async (projectId, customName = null, options = {}) => {
     stopDate: options.stopDate || null,
     timePeriod: options.timePeriod || 'all',
     // Store render profile ID if provided
-    renderProfileId: options.renderProfileId || null
+    gourceConfigId: options.gourceConfigId || null
   };
   
   // Add render to database
@@ -475,49 +477,60 @@ const processRender = async (project, render, options = {}) => {
     
     // --- Corrected Render Profile Selection Logic ---
     const db = Database.getDatabase();
-    let selectedProfileId = null;
-    let renderProfile = null;
+    let selectedConfigId = null;
+    let gourceConfig = null;
+    let configSource = 'unknown';
 
     // 1. Use the profile specified for this specific render if available
-    if (render.renderProfileId) {
-      selectedProfileId = render.renderProfileId;
-      renderProfile = db.get('renderProfiles').find({ id: selectedProfileId }).value();
-      if (renderProfile) {
-        logger.config(`Using explicitly specified render profile: ${renderProfile.name} (ID: ${selectedProfileId})`);
+    if (render.gourceConfigId) {
+      selectedConfigId = render.gourceConfigId;
+      gourceConfig = db.get('renderProfiles').find({ id: selectedConfigId }).value();
+      if (gourceConfig) {
+        logger.config(`Using explicitly specified Gource config: ${gourceConfig.name} (ID: ${selectedConfigId})`);
+        configSource = 'render_specific';
       } else {
-        logger.warn(`Specified render profile ID ${selectedProfileId} not found.`);
-        selectedProfileId = null; // Reset if not found
+        logger.warn(`Specified Gource config ID ${selectedConfigId}, but it was not found.`);
+        selectedConfigId = null; // Reset if not found
       }
     }
 
-    // 2. If no specific profile used or found, use the project's default profile
-    if (!renderProfile && project.renderProfileId) {
-      selectedProfileId = project.renderProfileId;
-      renderProfile = db.get('renderProfiles').find({ id: selectedProfileId }).value();
-      if (renderProfile) {
-        logger.config(`Using project's default render profile: ${renderProfile.name} (ID: ${selectedProfileId})`);
+    // 2. If no valid render-specific config, check the project's default config
+    if (!gourceConfig && project.gourceConfigId) {
+      selectedConfigId = project.gourceConfigId;
+      gourceConfig = db.get('renderProfiles').find({ id: selectedConfigId }).value();
+      if (gourceConfig) {
+        logger.config(`Using project's default Gource config: ${gourceConfig.name} (ID: ${selectedConfigId})`);
+        configSource = 'project_default';
       } else {
-        logger.warn(`Project's default render profile ID ${selectedProfileId} not found.`);
-        selectedProfileId = null; // Reset if not found
+        logger.warn(`Project specified Gource config ID ${selectedConfigId}, but it was not found.`);
+        selectedConfigId = null; // Reset if not found
       }
     }
     
-    // 3. If still no profile, find the application's default profile
-    if (!renderProfile) {
-      logger.info("No specific or project profile found, looking for application default profile.");
-      renderProfile = db.get('renderProfiles').find({ isDefault: true }).value();
-      if (renderProfile) {
-        selectedProfileId = renderProfile.id;
-        logger.config(`Using application default render profile: ${renderProfile.name} (ID: ${selectedProfileId})`);
+    // 3. If still no config, use the application-wide default config
+    if (!gourceConfig) {
+      // Use the renamed function if available, otherwise adapt (assuming default is marked)
+      gourceConfig = db.get('renderProfiles').find({ isDefault: true }).value();
+      if (gourceConfig) {
+        selectedConfigId = gourceConfig.id;
+        logger.config(`Using application default Gource config: ${gourceConfig.name} (ID: ${selectedConfigId})`);
+        configSource = 'application_default';
       } else {
-        logger.error(`No default render profile found for render: ${render.id}. Cannot proceed.`);
-        throw new Error(`No render profile could be determined for render ${render.id}`);
+        logger.warn('No default Gource config found. Falling back to Gource internal defaults.');
+        // Return Gource default settings from shared config if no DB default found
+        return { ...defaultSettings, configSource: 'gource_internal_defaults', configId: null }; 
       }
     }
     // --- End Corrected Logic ---
 
     // Use the selected render profile's settings
-    let initialSettings = { ...(renderProfile.settings || {}) };
+    let initialSettings = { ...(gourceConfig.settings || {}) };
+    
+    // Ensure default dateFormat if missing from loaded profile
+    if (!initialSettings.dateFormat) {
+      initialSettings.dateFormat = '%Y-%m-%d';
+      logger.info(`Profile missing dateFormat, applying default: ${initialSettings.dateFormat}`);
+    }
     
     // Merge render-specific dates (if any) into the initial settings *before* dynamic calculation
     if (render.startDate) initialSettings.startDate = render.startDate;
@@ -593,10 +606,10 @@ const startGourceRender = async (render, logFilePath, outputDir) => {
     // --- This profile selection logic is now handled correctly in processRender ---
     // --- Keeping it here for reference during cleanup, but it's not actively used ---
     let renderProfileId;
-    if (render.renderProfileId) {
-      renderProfileId = render.renderProfileId;
+    if (render.gourceConfigId) {
+      renderProfileId = render.gourceConfigId;
     } else {
-      renderProfileId = project.renderProfileId;
+      renderProfileId = project.gourceConfigId;
     }
     
     const renderProfile = renderProfileId 
@@ -1042,7 +1055,42 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
     const logFile = logFilePath.replace(/\\/g, '\\\\');
     const videoFile = outputFilePath.replace(/\\/g, '\\\\');
     
-    // Create batch file with appropriate commands
+    // Create the version of args specifically for the batch script
+    let finalGourceArgsForBatch = finalGourceArgs;
+    if (settings.dateFormat) {
+        const escapedDateFormatValue = settings.dateFormat.replace(/%/g, '%%');
+        // Construct the arguments to find/replace carefully
+        const originalArgWithValue = `--date-format ${settings.dateFormat}`; // Unquoted
+        const originalArgWithQuotedValue = `--date-format "${settings.dateFormat}"`; // Quoted
+        // Target replacement: escaped value, UNQUOTED for batch script robustness
+        const escapedArgWithValue = `--date-format ${escapedDateFormatValue}`; 
+
+        // Prioritize replacing the quoted version if present in the original args
+        if (finalGourceArgsForBatch.includes(originalArgWithQuotedValue)) {
+             finalGourceArgsForBatch = finalGourceArgsForBatch.replace(originalArgWithQuotedValue, escapedArgWithValue);
+             logger.info('Replaced quoted date format with escaped unquoted version for batch.');
+        } else if (finalGourceArgsForBatch.includes(originalArgWithValue)) {
+             // Otherwise replace the unquoted version
+             finalGourceArgsForBatch = finalGourceArgsForBatch.replace(originalArgWithValue, escapedArgWithValue);
+             logger.info('Replaced unquoted date format with escaped unquoted version for batch.');
+        } else {
+             // Log if neither was found - indicates an issue upstream in convertToGourceArgs or mapping
+             logger.warn(`Could not find date format argument ('${settings.dateFormat}' or '"${settings.dateFormat}"') in Gource args string to escape for batch file.`);
+        }
+    }
+    
+    // Escape fileFilter for batch by adding quotes around its value
+    if (settings.fileFilter) {
+        const originalFileFilterArg = `--file-filter ${settings.fileFilter}`;
+        const escapedFileFilterArg = `--file-filter "${settings.fileFilter}"`; // Add quotes
+        if (finalGourceArgsForBatch.includes(originalFileFilterArg)) {
+            finalGourceArgsForBatch = finalGourceArgsForBatch.replace(originalFileFilterArg, escapedFileFilterArg);
+            logger.info('Quoted fileFilter value for batch script.');
+        }
+        // Note: No need to handle an already quoted version typically
+    }
+    
+    // Create batch file with appropriate commands using finalGourceArgsForBatch
     const batchScript = [
       '@echo off',
       'echo Starting Gource rendering...',
@@ -1050,7 +1098,8 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
       `echo Output file: "${outputFilePath}"`, 
       '',
       'REM Execute Gource and pipe to FFmpeg',
-      `gource --log-format custom ${finalGourceArgs} --output-ppm-stream - "${logFilePath}" | ffmpeg -y -i - -r ${framerate} -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "${outputFilePath}"`,
+      // Use the args with escaped date format for the batch file
+      `gource --log-format custom ${finalGourceArgsForBatch} --output-ppm-stream - "${logFilePath}" | ffmpeg -y -i - -r ${framerate} -c:v libx264 -preset fast -crf 18 -pix_fmt yuv420p "${outputFilePath}"`,
       '',
       'if %ERRORLEVEL% neq 0 (',
       '  echo Error: Gource or FFmpeg failed with error code %ERRORLEVEL%',

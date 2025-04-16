@@ -5,6 +5,8 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const Database = require('../utils/Database');
 const Logger = require('../utils/Logger');
+const gourceConfigService = require('../services/gourceConfigService');
+const { validateGourceConfigData } = require('../validators/gourceConfigValidator');
 
 // Create loggers
 const logger = Logger.createComponentLogger('ConfigFilesRouter');
@@ -158,6 +160,90 @@ router.delete('/:id', (req, res) => {
   } catch (error) {
     logger.error('Failed to delete render profile', error);
     res.status(500).json({ error: 'Failed to delete render profile' });
+  }
+});
+
+// GET all Gource configs
+router.get('/gource-configs', (req, res, next) => {
+  try {
+    const configs = gourceConfigService.getAllGourceConfigs();
+    res.json(configs);
+  } catch (error) {
+    logger.error('Error fetching Gource configs:', error);
+    next(error);
+  }
+});
+
+// GET a single Gource config by ID
+router.get('/gource-configs/:id', (req, res, next) => {
+  try {
+    const config = gourceConfigService.getGourceConfigById(req.params.id);
+    if (!config) {
+      return res.status(404).json({ error: 'Gource config not found' });
+    }
+    res.json(config);
+  } catch (error) {
+    logger.error(`Error fetching Gource config ${req.params.id}:`, error);
+    next(error);
+  }
+});
+
+// POST create a new Gource config
+router.post('/gource-configs', (req, res, next) => {
+  try {
+    const newConfig = gourceConfigService.createGourceConfig(req.body);
+    res.status(201).json(newConfig);
+  } catch (error) {
+    logger.error('Error creating Gource config:', error);
+    if (error.message.includes('already exists')) {
+      return res.status(409).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+// PUT update an existing Gource config
+router.put('/gource-configs/:id', (req, res, next) => {
+  try {
+    const configId = req.params.id;
+    const existingConfig = gourceConfigService.getGourceConfigById(configId);
+    if (existingConfig && existingConfig.isSystemConfig) {
+      return res.status(403).json({ error: 'System Gource configurations cannot be modified.' });
+    }
+    
+    const updatedConfig = { ...req.body, id: configId };
+    if (!updatedConfig) {
+      return res.status(404).json({ error: 'Gource config not found' });
+    }
+    
+    res.json(updatedConfig);
+  } catch (error) {
+    logger.error(`Error updating Gource config ${req.params.id}:`, error);
+    if (error.message.includes('already exists')) {
+      return res.status(409).json({ error: error.message });
+    }
+    next(error);
+  }
+});
+
+// DELETE a Gource config
+router.delete('/gource-configs/:id', (req, res, next) => {
+  try {
+    const configId = req.params.id;
+    const existingConfig = gourceConfigService.getGourceConfigById(configId);
+    if (existingConfig && existingConfig.isSystemConfig) {
+      return res.status(403).json({ error: 'System Gource configurations cannot be deleted.' });
+    }
+    
+    const deleted = existingConfig ? true : false;
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Gource config not found' });
+    }
+    res.status(204).send();
+  } catch (error) {
+    logger.error(`Error deleting Gource config ${req.params.id}:`, error);
+    next(error);
   }
 });
 

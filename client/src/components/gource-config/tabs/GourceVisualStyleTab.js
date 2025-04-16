@@ -67,6 +67,15 @@ const GourceVisualStyleTab = ({ settings, onSettingsChange, settingsDescriptions
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <TooltipField
+            label="Date Format"
+            value={settings.dateFormat || ''}
+            onChange={(e) => onSettingsChange('dateFormat', e.target.value)}
+            tooltip={settingsDescriptions.dateFormat || 'Gource date format (strftime).'}
+            placeholder="e.g., %Y-%m-%d"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <TooltipField
             label="Filename Time (Seconds)"
             type="number"
             value={settings.filenameTime !== undefined ? settings.filenameTime : 4.0}

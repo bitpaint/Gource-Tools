@@ -1,5 +1,5 @@
 /**
- * This file defines additional profiles for specific renderings
+ * This file defines the initial system Gource configurations.
  */
 
 // Function to get ISO date string for X days ago
@@ -31,36 +31,58 @@ function getStartOfYear() {
   return date.toISOString().split('T')[0];
 }
 
-// -- Custom Render Profiles --
-const customRenderProfiles = [
+// Define the default settings common to system configurations
+const defaultSystemSettings = {
+  resolution: '1920x1080',
+  framerate: 60,
+  stopAtEnd: true,
+  loopDelaySeconds: 5,
+  padding: 1.15,
+  bloom: true,
+  bloomIntensity: 0.5,
+  hideProgress: true,
+  hideMouse: true,
+  hideFilenames: true,
+  hideRoot: true,
+  cameraMode: 'overview',
+  userFontSize: 13,
+  dirnameFontSize: 20,
+  dirNamePosition: 1.0,
+  dirNameDepth: 1,
+  fileFilter: '(\\.svg$|\\/node_modules\\/)',
+  dateFormat: '%Y-%m-%d',
+  key: false,
+};
+
+// -- System Gource Configurations --
+const systemGourceConfigs = [
   {
     id: 'everything_1m',
     name: 'Everything in 1 min',
     description: 'Visualize the entire project history compressed into approximately 1 minute.',
-    isDefault: true, // Mark this as the default profile
-    isSystemProfile: true, // Cannot be edited or deleted by user
+    isDefault: true, // Mark this as the default config
+    isSystemConfig: true, // Cannot be edited or deleted by user
     settings: {
-      // Key setting: Dynamic calculation based on project duration
-      secondsPerDay: 'auto-60s', 
-      // Sensible defaults for a quick overview
+      ...defaultSystemSettings,
+      secondsPerDay: 'auto-60s',
       outputFramerate: 30,
       autoSkipSeconds: 0.1,
-      hide: ['date'], // Hide date for faster pace
+      hide: ['date'],
       bloomMultiplier: 1.2,
       title: '{projectName} - Full History ({duration} min)',
-      stopPosition: '1.0' // Ensure it plays till the end
+      stopPosition: '1.0',
+      hideProgress: false, hideMouse: false, hideFilenames: false, hideRoot: false, hideDate: true
     }
   },
   {
     id: 'last_week_1m',
     name: 'Last Week in 1 min',
     description: 'Visualize the last 7 days of activity compressed into approximately 1 minute.',
-    isSystemProfile: true,
+    isSystemConfig: true,
     settings: {
-      // Key settings: Relative start date and dynamic speed
+      ...defaultSystemSettings,
       startDate: 'relative-7d',
       secondsPerDay: 'auto-60s',
-      // Other settings
       outputFramerate: 30,
       autoSkipSeconds: 0.1,
       title: '{projectName} - Last 7 Days ({duration} min)',
@@ -71,8 +93,9 @@ const customRenderProfiles = [
     id: 'last_month_1m',
     name: 'Last Month in 1 min',
     description: 'Visualize the last 30 days of activity compressed into approximately 1 minute.',
-    isSystemProfile: true,
+    isSystemConfig: true,
     settings: {
+      ...defaultSystemSettings,
       startDate: 'relative-30d',
       secondsPerDay: 'auto-60s',
       outputFramerate: 30,
@@ -85,16 +108,18 @@ const customRenderProfiles = [
     id: 'last_year_1m',
     name: 'Last Year in 1 min',
     description: 'Visualize the last 365 days of activity compressed into approximately 1 minute.',
-    isSystemProfile: true,
+    isSystemConfig: true,
     settings: {
+      ...defaultSystemSettings,
       startDate: 'relative-365d',
       secondsPerDay: 'auto-60s',
       outputFramerate: 30,
       autoSkipSeconds: 0.1,
-      title: '{projectName} - Last 365 Days ({duration} min)',
+      title: '{projectName} - Last Year ({duration} min)',
       stopPosition: '1.0'
     }
   }
+  // Add more system configs here if needed
 ];
 
-module.exports = customRenderProfiles; 
+module.exports = systemGourceConfigs; 

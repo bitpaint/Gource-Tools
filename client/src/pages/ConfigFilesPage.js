@@ -5,7 +5,6 @@ import {
   Button,
   Paper,
   Box,
-  Grid,
   Alert,
   TextField,
   CircularProgress,
@@ -33,7 +32,11 @@ import {
   ContentCopy as ContentCopyIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { renderProfilesApi, dateUtils, settingsApi } from '../api/api';
+import { 
+  gourceConfigsApi, 
+  dateUtils, 
+  settingsApi 
+} from '../api/api';
 import { defaultSettings, settingsDescriptions } from '../shared/defaultGourceConfig';
 import { convertFormToApiParams, convertApiToFormParams } from '../utils/gourceUtils';
 
@@ -41,18 +44,18 @@ import { convertFormToApiParams, convertApiToFormParams } from '../utils/gourceU
 import GourceConfigEditorDialog from '../components/gource-config/GourceConfigEditorDialog';
 
 const ConfigFilesPage = () => {
-  const [profiles, setProfiles] = useState([]);
+  const [gourceConfigs, setGourceConfigs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // State for default profile ID
-  const [defaultProfileId, setDefaultProfileId] = useState(null);
+  // State for default config ID
+  const [defaultConfigId, setDefaultConfigId] = useState(null);
 
   // Profile dialog state
-  const [openProfileDialog, setOpenProfileDialog] = useState(false);
+  const [openConfigDialog, setOpenConfigDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentProfile, setCurrentProfile] = useState({
+  const [currentConfig, setCurrentConfig] = useState({
     id: null,
     name: '',
     description: '',
@@ -60,210 +63,205 @@ const ConfigFilesPage = () => {
       ...convertApiToFormParams({ ...defaultSettings }),
       useRelativeStartDate: false,
       relativeStartDateValue: ''
-    }
+    },
+    isSystemConfig: false
   });
-  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
   
   // Delete dialog state
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [profileToDelete, setProfileToDelete] = useState(null);
-  const [deletingProfile, setDeletingProfile] = useState(false);
+  const [configToDelete, setConfigToDelete] = useState(null);
+  const [deletingConfig, setDeletingConfig] = useState(false);
 
-  // Load profiles and default setting on component mount
+  // Load configs and default setting on component mount
   useEffect(() => {
-    fetchProfiles();
-    fetchDefaultProfileId();
+    fetchGourceConfigs();
+    fetchDefaultConfigId();
   }, []);
 
-  const fetchProfiles = async () => {
+  const fetchGourceConfigs = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await renderProfilesApi.getAll();
-      setProfiles(response.data);
+      const response = await gourceConfigsApi.getAll();
+      setGourceConfigs(response.data);
     } catch (err) {
-      console.error('Error fetching profiles:', err);
-      setError('Failed to load config files. Please try again.');
-      toast.error('Failed to load config files');
+      console.error('Error fetching Gource configs:', err);
+      setError('Failed to load Gource config files. Please try again.');
+      toast.error('Failed to load Gource config files');
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch the current default profile ID
-  const fetchDefaultProfileId = async () => {
+  // Fetch the current default config ID
+  const fetchDefaultConfigId = async () => {
     try {
-      const response = await settingsApi.getDefaultProfileId();
-      setDefaultProfileId(response.data.defaultProjectProfileId);
+      const response = await settingsApi.getDefaultGourceConfigId();
+      setDefaultConfigId(response.data.defaultProjectGourceConfigId);
     } catch (err) {
-      console.error('Error fetching default profile ID:', err);
-      toast.error('Failed to load default profile setting');
+      console.error('Error fetching default Gource config ID:', err);
+      toast.error('Failed to load default Gource config setting');
     }
   };
 
   // Profile handlers
-  const handleOpenProfileDialog = (profile = null) => {
-    if (profile) {
+  const handleOpenConfigDialog = (config = null) => {
+    if (config) {
       setIsEditing(true);
-      // Convertir les paramètres API au format du formulaire
-      const formParams = convertApiToFormParams({ ...profile.settings });
-      setCurrentProfile({
-        id: profile.id,
-        name: profile.name,
-        description: profile.description || '',
-        settings: formParams
+      const formParams = convertApiToFormParams({ ...config.settings });
+      setCurrentConfig({
+        id: config.id,
+        name: config.name,
+        description: config.description || '',
+        settings: formParams,
+        isSystemConfig: config.isSystemConfig || false
       });
     } else {
       setIsEditing(false);
-      setCurrentProfile({
+      const initialFormSettings = convertApiToFormParams({ ...defaultSettings });
+      initialFormSettings.title = false; // Ensure title is false for new configs
+      
+      setCurrentConfig({
         id: null,
         name: '',
         description: '',
         settings: {
-          ...convertApiToFormParams({ ...defaultSettings }),
+          ...initialFormSettings,
           useRelativeStartDate: false,
           relativeStartDateValue: ''
-        }
+        },
+        isSystemConfig: false
       });
     }
-    setOpenProfileDialog(true);
+    setOpenConfigDialog(true);
   };
 
-  const handleCloseProfileDialog = () => {
-    setOpenProfileDialog(false);
+  const handleCloseConfigDialog = () => {
+    setOpenConfigDialog(false);
   };
 
-  const handleSaveProfile = async () => {
-    if (!currentProfile.name) {
-      toast.error('Profile name is required');
+  const handleSaveConfig = async () => {
+    if (!currentConfig.name) {
+      toast.error('Gource config name is required');
       return;
     }
 
     try {
-      setSavingProfile(true);
+      setSavingConfig(true);
+      const apiParams = convertFormToApiParams(currentConfig.settings);
       
-      // Convertir les paramètres de formulaire au format API
-      const apiParams = convertFormToApiParams(currentProfile.settings);
-      
-      // Vérification de débogage
-      console.log('Paramètres originaux:', currentProfile.settings);
-      console.log('Paramètres convertis pour API:', apiParams);
-      
-      // Utiliser les paramètres convertis
-      const profileToSave = {
-        ...currentProfile,
+      const configToSave = {
+        ...currentConfig,
         settings: apiParams
       };
       
+      let response;
       if (isEditing) {
-        // Update existing profile
-        const response = await renderProfilesApi.update(profileToSave.id, profileToSave);
-        
-        // Update profiles array
-        const updatedProfiles = profiles.map(profile => 
-          profile.id === profileToSave.id ? response.data : profile
+        response = await gourceConfigsApi.update(configToSave.id, configToSave);
+        const updatedConfigs = gourceConfigs.map(cfg => 
+          cfg.id === configToSave.id ? response.data : cfg
         );
-        setProfiles(updatedProfiles);
-        
-        toast.success('Config file updated successfully');
+        setGourceConfigs(updatedConfigs);
+        toast.success('Gource config file updated successfully');
       } else {
-        // Create new profile
-        const response = await renderProfilesApi.create(profileToSave);
-        setProfiles([...profiles, response.data]);
-        toast.success('Config file created successfully');
+        response = await gourceConfigsApi.create(configToSave);
+        setGourceConfigs([...gourceConfigs, response.data]);
+        toast.success('Gource config file created successfully');
       }
       
-      handleCloseProfileDialog();
+      handleCloseConfigDialog();
     } catch (err) {
-      console.error('Error saving profile:', err);
-      toast.error(err.response?.data?.error || 'Failed to save config file');
+      console.error('Error saving Gource config:', err);
+      toast.error(err.response?.data?.error || 'Failed to save Gource config file');
     } finally {
-      setSavingProfile(false);
+      setSavingConfig(false);
     }
   };
 
   // Delete profile handlers
-  const handleOpenDeleteDialog = (profile) => {
-    setProfileToDelete(profile);
+  const handleOpenDeleteDialog = (config) => {
+    setConfigToDelete(config);
     setOpenDeleteDialog(true);
   };
 
   const handleCloseDeleteDialog = () => {
     setOpenDeleteDialog(false);
-    setProfileToDelete(null);
+    setConfigToDelete(null);
   };
 
-  const handleDeleteProfile = async () => {
-    if (!profileToDelete) return;
+  const handleDeleteConfig = async () => {
+    if (!configToDelete) return;
     
+    if (configToDelete.isSystemConfig) {
+        toast.error('System Gource configurations cannot be deleted.');
+        handleCloseDeleteDialog();
+        return;
+    }
+
     try {
-      setDeletingProfile(true);
-      await renderProfilesApi.delete(profileToDelete.id);
+      setDeletingConfig(true);
+      await gourceConfigsApi.delete(configToDelete.id);
       
-      setProfiles(profiles.filter(profile => profile.id !== profileToDelete.id));
-      toast.success('Config file deleted successfully');
+      setGourceConfigs(gourceConfigs.filter(cfg => cfg.id !== configToDelete.id));
+      toast.success('Gource config file deleted successfully');
       handleCloseDeleteDialog();
     } catch (err) {
-      console.error('Error deleting profile:', err);
-      
-      // Specific error message for default profile
-      if (err.response?.data?.error === 'The default Gource config file cannot be deleted') {
-        toast.error('The default Gource config file cannot be deleted');
+      console.error('Error deleting Gource config:', err);
+      if (err.response?.data?.error === 'System Gource configurations cannot be deleted.') {
+         toast.error('System Gource configurations cannot be deleted.');
       } else {
-        toast.error('Failed to delete config file');
+         toast.error('Failed to delete Gource config file');
       }
     } finally {
-      setDeletingProfile(false);
+      setDeletingConfig(false);
     }
   };
 
-  // Handler for duplicating a profile
-  const handleDuplicateProfile = async (profileToDuplicate) => {
-    const newProfileName = `${profileToDuplicate.name} (Copy)`;
-    // Ensure the new profile isn't marked as a system profile
-    const newProfileSettings = { ...profileToDuplicate.settings };
+  // Handler for duplicating a config
+  const handleDuplicateConfig = async (configToDuplicate) => {
+    const newConfigName = `${configToDuplicate.name} (Copy)`;
+    const newConfigSettings = { ...configToDuplicate.settings };
 
-    const newProfile = {
-      name: newProfileName,
-      description: profileToDuplicate.description || '',
-      settings: newProfileSettings, // Use the existing settings
-      isSystemProfile: false // Duplicated profiles are always user profiles
+    const newConfig = {
+      name: newConfigName,
+      description: configToDuplicate.description || '',
+      settings: newConfigSettings,
+      isSystemConfig: false
     };
 
     try {
-      setLoading(true); // Reuse loading state for visual feedback
-      const response = await renderProfilesApi.create(newProfile);
-      setProfiles([...profiles, response.data]);
-      toast.success(`Profile "${profileToDuplicate.name}" duplicated successfully as "${newProfileName}"`);
+      setLoading(true);
+      const response = await gourceConfigsApi.create(newConfig);
+      setGourceConfigs([...gourceConfigs, response.data]);
+      toast.success(`Gource config "${configToDuplicate.name}" duplicated successfully as "${newConfigName}"`);
     } catch (err) {
-      console.error('Error duplicating profile:', err);
-      toast.error(err.response?.data?.error || 'Failed to duplicate config file');
+      console.error('Error duplicating Gource config:', err);
+      toast.error(err.response?.data?.error || 'Failed to duplicate Gource config file');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handler for setting a profile as the default
-  const handleSetDefaultProfile = async (profileId) => {
-    // Optimistic update
-    const previousDefaultId = defaultProfileId;
-    setDefaultProfileId(profileId);
+  // Handler for setting a config as the default
+  const handleSetDefaultConfig = async (configId) => {
+    const previousDefaultId = defaultConfigId;
+    setDefaultConfigId(configId);
 
     try {
-      await settingsApi.setDefaultProfileId(profileId);
-      toast.success('Default project profile updated successfully');
+      await settingsApi.setDefaultGourceConfigId(configId);
+      toast.success('Default project Gource config updated successfully');
     } catch (err) {
-      // Revert on error
-      setDefaultProfileId(previousDefaultId);
-      console.error('Error setting default profile:', err);
-      toast.error('Failed to set default profile');
+      setDefaultConfigId(previousDefaultId);
+      console.error('Error setting default Gource config:', err);
+      toast.error('Failed to set default Gource config');
     }
   };
 
-  // Filtered profiles based on search query
-  const filteredProfiles = profiles.filter(profile => 
-    profile.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (profile.description && profile.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  // Filtered configs based on search query
+  const filteredConfigs = gourceConfigs.filter(config => 
+    config.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (config.description && config.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const formatDate = (dateString) => {
@@ -279,19 +277,18 @@ const ConfigFilesPage = () => {
     );
   }
 
-  // Utility function to display profile properties with dashes
-  const getProfileSetting = (profile, key) => {
-    // For properties with dashes, use bracket notation
+  // Utility function to display config properties with dashes
+  const getConfigSetting = (config, key) => {
     if (key.includes('-')) {
-      return profile.settings[key];
+      return config.settings[key];
     }
-    return profile.settings[key];
+    return config.settings[key];
   };
 
   return (
     <Container maxWidth="xl">
       <Typography variant="h4" component="h1" gutterBottom>
-        Config Files
+        Gource Config Files
       </Typography>
       <Typography variant="subtitle1" gutterBottom>
         Create and manage Gource configuration files
