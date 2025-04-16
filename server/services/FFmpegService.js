@@ -13,9 +13,10 @@ const Database = require('../utils/Database'); // Importer Database
 
 class FFmpegService {
   constructor() {
-    this.dbPath = path.join(__dirname, '../../db/db.json');
-    this.exportsDir = path.join(__dirname, '../../exports');
-    this.tempDir = path.join(__dirname, '../../temp');
+    const __rootdir = path.resolve(path.dirname(__dirname), '../');
+    this.dbPath = path.join(__rootdir, 'db/db.json');
+    this.exportsDir = path.join(__rootdir, 'exports');
+    this.tempDir = path.join(__rootdir, 'temp');
     this.previewsDir = path.join(this.tempDir, 'previews');
     
     // Create required directories if they don't exist

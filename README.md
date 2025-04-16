@@ -307,15 +307,15 @@ This section details the purpose and functionality of key files within the appli
 *   `RepositoryController.js`: Contains the logic for handling repository-related HTTP requests, interacting with `RepositoryService` and `Database`.
 *   `ProjectController.js`: Logic for handling project-related HTTP requests, using `ProjectService`.
 *   `ConfigController.js`: Logic for handling Gource configuration profile requests, using `GourceConfigService`.
-*   `RenderController.js`: Logic for handling render requests (start, status), using `RenderService` and `FFmpegService`.
+*   `RenderController.js`: Logic for handling render requests (start, status), using `RenderService` and `FFmpegService`. Updated to use a consistent export path configuration.
 *   `SettingsController.js`: Logic for handling settings requests, using `SettingsService`.
 
 #### Services (`server/services/`)
 
 *   `repositoryService.js`: Core logic for Git operations (cloning, validation, log generation) and repository data management.
 *   `projectService.js`: Core logic for creating, updating, deleting, and retrieving project data.
-*   `renderService.js`: Manages the entire Gource rendering pipeline, including log combination, Gource execution via `child_process`, status updates, and interaction with `FFmpegService`.
-*   `ffmpegService.js`: Handles video post-processing using FFmpeg (adding audio, titles, effects, generating previews).
+*   `renderService.js`: Manages the entire Gource rendering pipeline, including log combination, Gource execution via `child_process`, status updates, and interaction with `FFmpegService`. Updated to use a consistent export path configuration.
+*   `ffmpegService.js`: Handles video post-processing using FFmpeg (adding audio, titles, effects, generating previews). Updated to use a consistent export path configuration.
 *   `gourceConfigService.js`: Manages the retrieval and creation of Gource render profiles stored in the database.
 *   `settingsService.js`: Manages loading, saving, and validating application settings (GitHub token, default profile ID).
 
@@ -375,6 +375,7 @@ This section details the purpose and functionality of key files within the appli
 *   Updated `purge.js` to delete the database file correctly.
 *   Fixed `settingsService.js` initialization logic.
 *   Ensured consistent behavior across server startup, purge, and UI regarding default profiles.
+*   **Updated export path configuration**: Standardized the export directory path across `renderService.js`, `ffmpegService.js`, and `RenderController.js` to ensure consistency and reliability in file handling.
 
 ---
 

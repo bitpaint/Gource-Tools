@@ -10,9 +10,20 @@ const RenderService = require('../services/renderService');
 const FFmpegService = require('../services/ffmpegService');
 const Validator = require('../validators/RequestValidator');
 const Logger = require('../utils/Logger');
+const Database = require('../utils/Database');
+const { v4: uuidv4 } = require('uuid');
 
 // Create a component logger
 const logger = Logger.createComponentLogger('RenderController');
+
+// Define path to exports directory
+const __rootdir = path.resolve(path.dirname(__dirname), '../');
+const exportsDir = path.join(__rootdir, 'exports');
+// Ensure exports directory exists
+if (!fs.existsSync(exportsDir)) {
+  fs.mkdirSync(exportsDir, { recursive: true });
+  logger.file(`Created exports directory: ${exportsDir}`);
+}
 
 /**
  * Get all renders (history)
@@ -76,29 +87,130 @@ const getRenderById = (req, res) => {
 
 /**
  * Start a new render
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
  */
 const startRender = async (req, res) => {
   try {
-    const validation = Validator.validateRequired(req.body, ['projectId']);
-    if (!Validator.handleValidation(validation, res)) {
-      logger.warn('Invalid request: missing required fields');
-      return;
+    // Validate input
+    if (!req.body.projectId) {
+      return res.status(400).json({ error: 'Project ID is required' });
     }
     
-    const { projectId, customName, renderProfileId } = req.body;
-    logger.render(`Starting new render for project: ${projectId}`);
+    const db = Database.getDatabase();
+    const project = db.get('projects')
+      .find({ id: req.body.projectId })
+      .value();
     
-    // Start render using RenderService
-    const render = await RenderService.startRender(projectId, customName, { renderProfileId });
+    if (!project) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
     
-    // Send response with the created render
-    logger.success(`Render started: ${render.id}`);
-    res.status(202).json(render);
+    // Verify the project has at least one repository
+    if (!project.repositories || project.repositories.length === 0) {
+      return res.status(400).json({ error: 'Project has no repositories' });
+    }
+    
+    // Get repository details
+    const repositories = db.get('repositories').value();
+    const projectRepos = project.repositories
+      .map(repoId => repositories.find(r => r.id === repoId))
+      .filter(r => r !== undefined);
+    
+    if (projectRepos.length === 0) {
+      return res.status(400).json({ error: 'Project has no valid repositories' });
+    }
+    
+    // Attach repository details to the project for convenience
+    project.repositoryDetails = projectRepos;
+    
+    // Get render profile if one is specified
+    let renderProfileId = req.body.renderProfileId || project.renderProfileId;
+    let renderProfile = null;
+    
+    if (renderProfileId) {
+      renderProfile = db.get('renderProfiles')
+        .find({ id: renderProfileId })
+        .value();
+    }
+    
+    if (!renderProfile) {
+      // Find default render profile
+      renderProfile = db.get('renderProfiles')
+        .find({ isDefault: true })
+        .value();
+      
+      if (renderProfile) {
+        renderProfileId = renderProfile.id;
+      }
+    }
+    
+    // Generate a unique output file name
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${req.body.customName || project.name}_${timestamp}.mp4`;
+    const filePath = path.join(exportsDir, fileName);
+    
+    // Create render object
+    const id = uuidv4();
+    const render = {
+      id,
+      projectId: project.id,
+      projectName: project.name,
+      renderProfileId: renderProfileId,
+      fileName,
+      filePath,
+      startTime: new Date().toISOString(),
+      endTime: null,
+      status: 'preparing',
+      message: 'Render created',
+      progress: 0,
+      error: null
+    };
+    
+    // Check if we need to apply start date and end date from the request body
+    if (req.body.startDate) {
+      render.startDate = req.body.startDate;
+    }
+    
+    if (req.body.endDate || req.body.stopDate) {
+      render.stopDate = req.body.endDate || req.body.stopDate;
+    }
+    
+    // Save render to database
+    db.get('renders')
+      .push(render)
+      .write();
+    
+    // Log render creation
+    logger.render(`Created new render job: ${id} for project: ${project.name}`);
+    
+    // Ensure logs are generated BEFORE starting the render (using LogService)
+    // This step is now handled by processRender
+    
+    // Start render process asynchronously
+    setTimeout(async () => {
+      try {
+        await RenderService.processRender(project, render);
+      } catch (error) {
+        logger.error(`Error processing render ${id}: ${error.message}`);
+        
+        // Update render status on error
+        db.get('renders')
+          .find({ id })
+          .assign({
+            status: 'failed',
+            message: error.message,
+            endTime: new Date().toISOString()
+          })
+          .write();
+      }
+    }, 100);
+    
+    // Return the render object
+    res.json(render);
   } catch (error) {
-    logger.error('Failed to start render', error);
-    res.status(500).json({ 
-      error: 'Failed to start render'
-    });
+    logger.error('Error starting render:', error);
+    res.status(500).json({ error: error.message || 'Error starting render' });
   }
 };
 
@@ -241,13 +353,6 @@ const applyFFmpegFilters = async (req, res) => {
  */
 const openExportsFolder = async (req, res) => {
   try {
-    const exportsDir = path.join(__dirname, '../../exports');
-    
-    // Ensure directory exists
-    if (!fs.existsSync(exportsDir)) {
-      fs.mkdirSync(exportsDir, { recursive: true });
-    }
-    
     // Open folder using the system's default file explorer
     const { exec } = require('child_process');
     

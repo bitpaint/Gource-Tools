@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const RepositoryController = require('../controllers/RepositoryController');
+const RepositoryController = require('../controllers/repositoryController');
 const Database = require('../utils/Database');
 
 // Get all repositories
@@ -23,6 +23,53 @@ router.post('/', RepositoryController.addRepository);
 
 // Start bulk import
 router.post('/bulk-import', RepositoryController.bulkImport);
+
+/**
+ * @route POST /api/repositories/update/:id
+ * @desc Update a repository and regenerate its log
+ * @access Public
+ */
+router.post('/update/:id', async (req, res) => {
+  try {
+    // ID validation
+    if (!req.params.id) {
+      return res.status(400).json({ success: false, message: 'Repository ID required' });
+    }
+    
+    // Get the repository from database
+    const db = Database.getDatabase();
+    const repository = db.get("repositories")
+      .find({ id: req.params.id.toString() })
+      .value();
+    
+    if (!repository) {
+      return res.status(404).json({ success: false, message: 'Repository not found' });
+    }
+    
+    // First pull the latest changes
+    console.log(`Updating repository: ${repository.name} (ID: ${repository.id})`);
+    const pullResult = await RepositoryController.pullRepository(req.params.id);
+    
+    // Then generate the log file
+    console.log(`Generating log for repository: ${repository.name} (ID: ${repository.id})`);
+    const LogService = require('../services/logService');
+    const logResult = await LogService.generateRepoLog(repository);
+    
+    return res.json({ 
+      success: true, 
+      message: 'Repository updated and log generated successfully',
+      pullResult,
+      logResult
+    });
+  } catch (error) {
+    console.error('Error updating repository:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Error updating repository and generating log',
+      error: error.message
+    });
+  }
+});
 
 /**
  * @route DELETE /api/repositories/:id
