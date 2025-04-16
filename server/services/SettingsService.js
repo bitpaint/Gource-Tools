@@ -30,11 +30,10 @@ class SettingsService {
       const db = Database.getDatabase();
       if (!db.has('settings').value()) {
         logger.info('Initializing settings collection in database...');
-        // Find the profile explicitly marked as default (should be 'Everything in 1min')
+        // Logic to find the default ID (copied below)
         let defaultProfile = customRenderProfiles.find(p => p.isDefault === true);
         let defaultId = defaultProfile ? defaultProfile.id : null;
         if (!defaultId) {
-          // Fallback: Try to find 'Everything in 1min' by name if isDefault flag is missing
           const fallbackProfile = customRenderProfiles.find(p => p.name === 'Everything in 1min');
           defaultId = fallbackProfile ? fallbackProfile.id : null;
           if (defaultId) {
@@ -49,8 +48,24 @@ class SettingsService {
          // Ensure the defaultProjectProfileId key exists even if settings collection was already there
          const currentSettings = db.get('settings').value();
          if (typeof currentSettings.defaultProjectProfileId === 'undefined') {
-             logger.warn('defaultProjectProfileId missing in existing settings collection. Initializing to null.');
-             db.get('settings').assign({ defaultProjectProfileId: null }).write();
+             logger.warn('defaultProjectProfileId missing in existing settings collection. Initializing...');
+             // Find the default ID using the same logic as above
+             let defaultProfile = customRenderProfiles.find(p => p.isDefault === true);
+             let defaultId = defaultProfile ? defaultProfile.id : null;
+             if (!defaultId) {
+               const fallbackProfile = customRenderProfiles.find(p => p.name === 'Everything in 1min');
+               defaultId = fallbackProfile ? fallbackProfile.id : null;
+               if (defaultId) {
+                 logger.warn('No profile marked as isDefault=true. Falling back to \'Everything in 1min\' by name.');
+               } else {
+                 logger.error('CRITICAL: Cannot find default profile (\'Everything in 1min\') by flag or name. Default Project Profile ID will remain missing or null.');
+                 // Don't write null if we couldn't find it, leave it as is or let subsequent code handle it.
+                 defaultId = null; // Explicitly set to null if truly not found
+               }
+             }
+             // Assign the found default ID (or null if absolutely not found)
+             db.get('settings').assign({ defaultProjectProfileId: defaultId }).write();
+             logger.info(`Initialized missing defaultProjectProfileId to: ${defaultId}`);
          }
       }
     } catch (error) {

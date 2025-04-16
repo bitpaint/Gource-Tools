@@ -106,7 +106,8 @@ const defaultSettings = {
   fontFile: '',
   followUser: '',
   outputCustomLog: '',
-  gitBranch: ''
+  gitBranch: '',
+  hide: []
 };
 
 // Default configuration profile
@@ -262,6 +263,7 @@ function calculateDatesFromPeriod(period) {
  */
 function convertToGourceArgs(settings) {
   const AVATAR_DIR_PATH = './avatars'; // Define the fixed relative path
+
   if (!settings) {
     return '';
   }
@@ -371,73 +373,56 @@ function convertToGourceArgs(settings) {
     framerate: '--output-framerate' // Output option
   };
 
-  // "hide" elements mapping - from our UI settings to Gource command line parameters
-  // We need to convert these boolean flags into a comma-separated list for --hide
-  const hideElementsMapping = {
-    hideRoot: 'root',
-    hideUsers: 'users',
-    hideFiles: 'files',
-    hideFilenames: 'filenames',
-    hideDirnames: 'dirnames',
-    hideUsernames: 'usernames',
-    hideDate: 'date',
-    hideProgress: 'progress',
-    hideMouse: 'mouse',
-    hideTree: 'tree',
-    hideBloom: 'bloom'
-  };
-
-  // Process hide elements first to collect them
-  let hideElements = [];
-  for (const [settingKey, hideValue] of Object.entries(hideElementsMapping)) {
-    // If the setting exists and is true, add the element to hide
-    if (settings[settingKey] === true) {
-      hideElements.push(hideValue);
-    }
+  // --- NEW HIDE LOGIC --- 
+  let elementsToHide = [];
+  // Check if the direct 'hide' array exists in settings
+  if (Array.isArray(settings.hide) && settings.hide.length > 0) {
+    elementsToHide = [...settings.hide]; // Use the array directly
   }
   // Explicitly add 'title' to hide if settings.title is false
   if (settings.title === false) {
-    if (!hideElements.includes('title')) { // Avoid adding duplicates if hideTitle was a theoretical setting
-       hideElements.push('title');
+    if (!elementsToHide.includes('title')) {
+      elementsToHide.push('title');
     }
   }
 
   // Process title and titleText first, to ensure they're handled properly
   // Only add --title flag if settings.title is explicitly true
   if (settings.title === true) {
-    // If title is true and titleText exists, use that for the title
     if (settings.titleText && typeof settings.titleText === 'string' && settings.titleText.trim() !== '') {
       args += ` --title "${settings.titleText.replace(/"/g, '\\"')}"`;
     } else {
-      // Otherwise just enable the title flag (Gource uses default name or similar)
-      // We don't add value-less --title here, handled by hide logic if false
-      // Potentially, Gource defaults to showing something if --title is absent and not hidden
-      // Let's rely on the hide logic above for explicit hiding
+      // Gource shows default title if --title is absent and not hidden.
+      // No need to add a value-less --title flag here.
     }
-  } // No else block needed, hiding is handled above
+  }
 
-  // Now process other settings, skipping those we've already handled
+  // Now process other settings, skipping those we've already handled (or are part of the new hide logic)
   for (const key of Object.keys(settings)) {
-    // Skip already processed settings
-    if (key === 'title' || key === 'titleText' || key in hideElementsMapping) continue;
+    // Skip title/titleText (handled above) and the 'hide' array itself
+    if (key === 'title' || key === 'titleText' || key === 'hide') continue; 
     
     const value = settings[key];
 
-    // Skip if value is null, undefined, or empty string
-    if (value === null || value === undefined || value === '') continue;
+    // Skip if value is null, undefined, or empty string (unless it's a boolean we might need)
+    if (value === null || value === undefined || (value === '' && typeof value !== 'boolean')) continue;
 
     const gourceArg = mapping[key];
     if (!gourceArg) {
-      // Not every UI setting maps to a Gource parameter, so we'll just skip unmapped ones
+      // Skip unmapped settings
       continue;
     }
 
-    // Handle boolean flags (arguments without values)
+    // Handle boolean flags 
     if (typeof value === 'boolean') {
-      // For boolean flags, we only include the argument if true
       if (value) {
-        args += ` ${gourceArg}`;
+        // Add only if true (e.g., --highlight-users)
+        // We don't add --hide-something=true, that's handled by the hide array logic now.
+        if (!gourceArg.startsWith('--hide-') && !gourceArg.startsWith('--disable-')){
+             args += ` ${gourceArg}`;
+        }
       }
+      // Don't add anything if false (e.g., --highlight-users=false is implicit)
       continue;
     }
 
@@ -474,9 +459,11 @@ function convertToGourceArgs(settings) {
     args += ` ${gourceArg} ${value}`;
   }
 
-  // Add collected hide elements if any
-  if (hideElements.length > 0) {
-    args += ` --hide ${hideElements.join(',')}`;
+  // Add collected hide elements if any, using the new logic
+  if (elementsToHide.length > 0) {
+    // Ensure no duplicates before joining
+    const uniqueHideElements = [...new Set(elementsToHide)];
+    args += ` --hide ${uniqueHideElements.join(',')}`;
   }
   
   // Ensure framerate is present for output

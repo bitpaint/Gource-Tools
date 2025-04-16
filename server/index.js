@@ -6,7 +6,6 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const Database = require('./utils/Database');
 const Logger = require('./utils/Logger');
-const { defaultGourceConfig } = require('./config/defaultGourceConfig');
 const initCustomRenderProfiles = require('./config/initRenderProfiles');
 
 // Create a logger for the server
@@ -31,40 +30,21 @@ logger.info('Database initialization triggered by require.');
 // Get the shared DB instance for operations within index.js
 const db = DatabaseInstance.getDatabase(); 
 
-// Create default config file if it doesn't exist
 // Check if db instance is valid before proceeding
 if (!db) {
-    logger.error('Failed to get database instance in index.js. Cannot proceed with default profile check.');
+    logger.error('Failed to get database instance in index.js. Cannot proceed with initialization.');
     process.exit(1); // Exit if DB is not available
 }
 
-try {
-    const defaultProfileExists = db.get('renderProfiles')
-      .find({ isDefault: true })
-      .value();
-
-    if (!defaultProfileExists) {
-      logger.info('Default Gource profile not found, creating...');
-      // Import default configuration from external file
-      db.get('renderProfiles')
-        .push(defaultGourceConfig)
-        .write(); // Need to write after push
-        
-      logger.success('Created default Gource config file');
-    } else {
-        logger.info('Default Gource profile already exists.');
-    }
-} catch (dbError) {
-    logger.error('Error checking/creating default profile:', dbError);
-    // Decide if this is fatal
-}
-
-// Initialize custom render profiles (Last Week, Last Month, Last Year)
+// Initialize/Verify custom render profiles (which includes the default)
+// MUST run before any logic that might depend on the default profile existing.
 try {
     initCustomRenderProfiles();
     logger.info('Custom render profiles initialized/verified.');
 } catch(initError) {
      logger.error('Error initializing custom profiles:', initError);
+     // Decide if this is fatal, maybe exit?
+     process.exit(1);
 }
 
 // Initialize API routes

@@ -36,14 +36,11 @@ const newDefaultSettings = {
   resolution: '1920x1080',
   framerate: 60,
   stopAtEnd: true,
-  loopDelaySeconds: 5,
+  loopDelaySeconds: 10,
   padding: 1.15,
   bloom: true,
   bloomIntensity: 0.5,
-  hideProgress: true,
-  hideMouse: true,
-  hideFilenames: true,
-  hideRoot: true,
+  hide: ["progress", "mouse", "filenames", "root"],
   hideFiles: false,
   cameraMode: 'overview',
   userFontSize: 13,
@@ -55,7 +52,6 @@ const newDefaultSettings = {
   key: false,
   highlightDirs: true,
   highlightUsers: true,
-  // Include other relevant defaults if needed, but focus on user request
 };
 
 // -- Custom Render Profiles --
@@ -64,7 +60,7 @@ const customRenderProfiles = [
     id: 'everything_1m',
     name: 'Everything in 1 min',
     description: 'Visualize the entire project history compressed into approximately 1 minute.',
-    isDefault: true, // Mark this as the default profile
+    isDefault: true, // Ensure this is the only one set to true
     isSystemProfile: true, // Cannot be edited or deleted by user
     settings: {
       // Merge new defaults, keeping specific overrides
@@ -73,12 +69,10 @@ const customRenderProfiles = [
       secondsPerDay: 'auto-60s', 
       outputFramerate: 30, // Override default framerate
       autoSkipSeconds: 0.1, // Specific value
-      hide: ['date'], // Override hide settings
+      // Use ONLY the default hide array now, don't add 'date'
+      hide: newDefaultSettings.hide, 
       bloomMultiplier: 1.2, // Specific value
-      title: '{projectName} - Full History ({duration} min)', // Specific title
       stopPosition: '1.0', // Specific setting
-      // Ensure boolean hide flags from defaults don't conflict with explicit hide array
-      hideProgress: false, hideMouse: false, hideFilenames: false, hideRoot: false, hideDate: true 
     }
   },
   {
@@ -94,9 +88,7 @@ const customRenderProfiles = [
       secondsPerDay: 'auto-60s',
       outputFramerate: 30,
       autoSkipSeconds: 0.1,
-      title: '{projectName} - Last 7 Days ({duration} min)',
       stopPosition: '1.0'
-      // Inherits hide settings from new defaults unless explicitly set here
     }
   },
   {
@@ -112,9 +104,7 @@ const customRenderProfiles = [
       secondsPerDay: 'auto-60s',
       outputFramerate: 30,
       autoSkipSeconds: 0.1,
-      title: '{projectName} - Last 30 Days ({duration} min)',
       stopPosition: '1.0'
-      // Inherits hide settings from new defaults unless explicitly set here
     }
   },
   {
@@ -130,25 +120,7 @@ const customRenderProfiles = [
       secondsPerDay: 'auto-60s',
       outputFramerate: 30,
       autoSkipSeconds: 0.1,
-      title: '{projectName} - Last Year ({duration} min)',
       stopPosition: '1.0'
-      // Inherits hide settings from new defaults unless explicitly set here
-    }
-  },
-  {
-    id: 'realtime_overview',
-    name: 'Realtime Overview',
-    description: 'Visualize activity at approximately realtime speed.',
-    isSystemProfile: true,
-    settings: {
-      // Merge new defaults, keeping specific overrides
-      ...newDefaultSettings,
-      // --- Specific overrides for this profile --- 
-      realtime: true, // Key setting
-      secondsPerDay: '1', // Use a fixed reasonable speed with realtime
-      autoSkipSeconds: 1, // Slightly longer skip for realtime
-      title: '{projectName} - Realtime'
-      // Inherits hide settings from new defaults unless explicitly set here
     }
   }
   // Add more system profiles here if needed

@@ -114,19 +114,74 @@ const ConfigFilesPage = () => {
       });
     } else {
       setIsEditing(false);
-      // Initialize with defaults, then explicitly set title to false
-      const initialFormSettings = convertApiToFormParams({ ...defaultSettings });
-      initialFormSettings.title = false; // Ensure title is false for new profiles
+      // Initialize with the NEW desired defaults for user-created profiles
+      const initialUserSettings = {
+        // General/Video Tab Defaults
+        resolution: '1920x1080',
+        framerate: 60,
+        secondsPerDay: 1, // Default speed for user profiles
+        autoSkipSeconds: 0.1,
+        elasticity: 0.3, // Default from old settings, keep?
+        
+        // Captions/Overlays Tab Defaults
+        title: false, // Explicitly false as requested before
+        titleText: '', // Explicitly empty
+        key: false, // Default to false
+        showDates: true, // Default to true
+
+        // Visual Style Tab Defaults
+        background: '#000000', // Default black
+        fontScale: 1,
+        userScale: 1,
+        timeScale: 1,
+        highlightUsers: true, // From new defaults
+        highlightDirs: true, // From new defaults
+        hideUsers: '',
+        hideFilesRegex: '',
+        hideRoot: false, // Explicitly false, as it's in the 'hide' array now
+        maxUserCount: 0,
+        disableProgress: false, // Explicitly false, as it's in the 'hide' array now
+        disableAutoRotate: false,
+        showLines: true,
+        followUsers: false,
+        maxFilelag: 0.5,
+        multiSampling: true,
+        bloom: true, // From new defaults
+        bloomIntensity: 0.5, // From new defaults
+        bloomMultiplier: 0.7, // Default from old settings, keep?
+        filenameTime: 4,
+
+        // Camera/Nav Tab Defaults
+        cameraMode: 'overview', // From new defaults
+
+        // Users/Files Tab Defaults (Some overlap with Visual Style)
+        userFontSize: 13, // From new defaults
+        dirnameFontSize: 20, // From new defaults
+        dirNamePosition: 1.0, // From new defaults
+        dirNameDepth: 1, // From new defaults
+
+        // Timeline/Speed Tab Defaults (Some overlap with General/Video)
+        stopAtEnd: true, // From new defaults
+        loopDelaySeconds: 10, // From new defaults
+        hide: ["progress", "mouse", "filenames", "root"], // From new defaults!
+        
+        // Advanced/Output Tab Defaults
+        outputFramerate: 30, // Common default
+        extraArgs: '',
+        
+        // Internal state management helpers (keep existing)
+        useRelativeStartDate: false,
+        relativeStartDateValue: '',
+        startDate: null,
+        stopDate: null,
+      };
       
       setCurrentProfile({
         id: null,
         name: '',
         description: '',
-        settings: {
-          ...initialFormSettings,
-          useRelativeStartDate: false, // Keep specific initializations if needed
-          relativeStartDateValue: ''
-        }
+        // Directly use the new user defaults object
+        settings: initialUserSettings 
       });
     }
     setOpenProfileDialog(true);
