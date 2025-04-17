@@ -394,14 +394,17 @@ const FFmpegEditorPage = () => {
           Your Videos
         </Typography>
         <Tooltip title="Refresh video list">
-          <IconButton 
-            size="small" 
-            onClick={fetchVideos} 
-            disabled={refreshing}
-            color="primary"
-          >
-            <RefreshIcon />
-          </IconButton>
+          <Box component="span" sx={{ display: 'inline-flex' }}> 
+            <IconButton 
+              size="small" 
+              onClick={fetchVideos} 
+              disabled={refreshing}
+              color="primary"
+              aria-label="Refresh video list" 
+            >
+              <RefreshIcon />
+            </IconButton>
+          </Box>
         </Tooltip>
       </Box>
       
