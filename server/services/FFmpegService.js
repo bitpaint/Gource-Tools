@@ -136,72 +136,96 @@ class FFmpegService {
   
   /**
    * Apply FFmpeg filters to a render
-   * @param {string} renderId - The ID of the render to process
+   * @param {string} renderId - The ID of the *original* render to process
    * @param {Object} filters - FFmpeg filter options
-   * @returns {Object} Processing result
+   * @returns {Promise<Object>} Promise resolving with the new render ID and initial status
    */
-  async applyFilters(renderId, filters) {
-    // Get render from database
-    const db = Database.getDatabase(); // Utiliser l'instance partagée
-    const render = db.get('renders')
-      .find({ id: renderId })
+  async applyFilters(originalRenderId, filters) {
+    const db = Database.getDatabase(); 
+    const originalRender = db.get('renders')
+      .find({ id: originalRenderId })
       .value();
-    
-    if (!render) {
-      throw new Error('Render not found');
+
+    if (!originalRender) {
+      throw new Error('Original render not found');
     }
-    
-    if (!fs.existsSync(render.filePath)) {
-      throw new Error('Render file not found');
+    if (!fs.existsSync(originalRender.filePath)) {
+      throw new Error('Original render file not found');
     }
-    
-    // Generate output filename
-    const outputFileName = this.generateOutputFileName(render.fileName, filters);
+
+    // 1. Generate output details and NEW render ID first
+    const outputFileName = this.generateOutputFileName(originalRender.fileName, filters);
     const outputFilePath = path.join(this.exportsDir, outputFileName);
-    
+    const newRenderId = Date.now().toString(); // Use timestamp as unique ID for the new processed render
+
+    // 2. Create the initial DB entry for the NEW render
+    const newRenderEntry = {
+      id: newRenderId,
+      projectId: originalRender.projectId,
+      projectName: originalRender.projectName,
+      fileName: outputFileName, // Store planned filename
+      filePath: null, // File path is not ready yet
+      status: 'queued', // Start as 'queued' or 'initializing'
+      progress: 0,
+      startTime: new Date().toISOString(),
+      endTime: null,
+      isProcessed: true,
+      originalRenderId: originalRenderId,
+      appliedFilters: filters,
+      message: 'Waiting to start processing...'
+    };
+
     try {
-      // Update render status
-      this.updateRenderStatus(renderId, 'processing', 'Applying FFmpeg filters', 0);
-      
-      // Build FFmpeg command
-      const ffmpegCommand = this.buildFFmpegCommand(render.filePath, outputFilePath, filters, false);
-      
-      // Execute FFmpeg command
-      await this.executeFFmpegCommand(ffmpegCommand, outputFileName, renderId);
-      
-      // Create a new render entry for the processed video
-      const processedRender = {
-        id: Date.now().toString(),
-        projectId: render.projectId,
-        projectName: render.projectName,
-        fileName: outputFileName,
-        filePath: outputFilePath,
-        status: 'completed',
-        progress: 100,
-        startTime: new Date().toISOString(),
-        endTime: new Date().toISOString(),
-        isProcessed: true,
-        originalRenderId: renderId,
-        appliedFilters: filters
-      };
-      
-      // Add to database
-      db.get('renders')
-        .push(processedRender)
-        .write();
-      
-      // Return result
+      db.get('renders').push(newRenderEntry).write();
+      console.log(`Created initial DB entry for new render: ${newRenderId}`);
+
+      // 3. Start the FFmpeg process asynchronously
+      // We don't await here, let it run in the background.
+      // Pass the NEW renderId for progress updates.
+      this.executeFFmpegCommand(
+        this.buildFFmpegCommand(originalRender.filePath, outputFilePath, filters, false),
+        outputFileName, // This might be less relevant now, use newRenderId for tracking
+        newRenderId // IMPORTANT: Pass the new ID for status updates
+      ).then(result => {
+          console.log(`FFmpeg process completed successfully for render ${newRenderId}`);
+          // Update the final details in the DB upon successful completion
+          db.get('renders')
+            .find({ id: newRenderId })
+            .assign({ 
+              filePath: outputFilePath, // Set the actual file path
+              status: 'completed', // Status is likely already set by executeFFmpegCommand, but ensure it
+              progress: 100,
+              endTime: new Date().toISOString(),
+              message: 'Video processed successfully'
+            })
+            .write();
+        }).catch(error => {
+          console.error(`FFmpeg process failed for render ${newRenderId}:`, error);
+          // Update status to 'failed' in the DB
+          this.updateRenderStatus(newRenderId, 'failed', `FFmpeg failed: ${error.message || 'Unknown error'}`, 0);
+          // Optionally delete the potentially incomplete output file
+          if (fs.existsSync(outputFilePath)) {
+            try {
+              fs.unlinkSync(outputFilePath);
+            } catch (unlinkErr) {
+              console.error(`Failed to delete incomplete output file ${outputFilePath}:`, unlinkErr);
+            }
+          }
+        });
+
+      // 4. Return the NEW render ID immediately to the frontend
+      console.log(`Returning new render ID ${newRenderId} to frontend for polling.`);
       return {
         success: true,
-        message: 'Filters applied successfully',
-        renderId: processedRender.id,
-        fileName: outputFileName,
-        filePath: outputFilePath
+        message: 'FFmpeg processing started',
+        renderId: newRenderId // Return the ID of the new entry
       };
+
     } catch (error) {
-      console.error('Error applying filters:', error);
-      this.updateRenderStatus(renderId, 'completed', `Failed to apply filters: ${error.message}`, 0);
-      throw new Error(`Failed to apply filters: ${error.message}`);
+      console.error('Error initiating filter application:', error);
+      // If DB write fails or other initial error occurs, update status if possible
+      this.updateRenderStatus(newRenderId, 'failed', `Initialization failed: ${error.message}`, 0);
+      throw new Error(`Failed to initiate filter application: ${error.message}`);
     }
   }
   
@@ -213,16 +237,18 @@ class FFmpegService {
    */
   generateOutputFileName(originalFileName, filters) {
     const timestamp = Date.now();
-    const fileExt = path.extname(originalFileName);
+    const fileExt = path.extname(originalFileName) || '.mp4'; // Ensure extension exists
     const baseName = path.basename(originalFileName, fileExt);
-    let suffix = '';
+    let suffix = '_edited'; // Simpler suffix
+
+    // Optional: Add more specific suffix based on filters if needed
+    // if (filters.fade && filters.fade.enabled) suffix += '_fade';
+    // if (filters.music && filters.music.enabled) suffix += '_music';
     
-    // Add filter info to filename
-    if (filters.title) suffix += '_titled';
-    if (filters.audioTrack) suffix += '_audio';
-    if (filters.fadeIn || filters.fadeOut) suffix += '_faded';
-    
-    return `${baseName}${suffix}_${timestamp}${fileExt}`;
+    // Sanitize baseName just in case
+    const safeBaseName = baseName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+    return `${safeBaseName}${suffix}_${timestamp}${fileExt}`;
   }
   
   /**
@@ -234,264 +260,310 @@ class FFmpegService {
    * @returns {Array} FFmpeg command arguments
    */
   buildFFmpegCommand(inputPath, outputPath, filters, isPreview = false) {
-    const args = ['-y'];
+    const args = ['-y']; // Overwrite output without asking
     const complexFilterParts = [];
-    let videoStreamMap = '0:v';
-    let audioStreamMap = null;
-    
-    // Input file
+    let videoInputStream = '[0:v]';
+    let audioInputStream = null;
+    let videoOutputStream = '[vout]'; // Default output stream names
+    let audioOutputStream = '[aout]';
+
+    // Input file (video)
     args.push('-i', inputPath);
     
-    // Add audio file if specified
-    if (filters.audioTrack) {
-      args.push('-i', path.join(__dirname, '../../', filters.audioTrack.replace(/^\//, '')));
-      audioStreamMap = '1:a';
-    } else {
-      // Use original audio if available
-      try {
-        const probeCmd = `ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "${inputPath}"`;
+    // Try to detect original audio stream
+    try {
+      const probeCmd = `ffprobe -v error -select_streams a:0 -show_entries stream=index -of csv=p=0 \"${inputPath}\"`;
         const hasAudio = execSync(probeCmd, { encoding: 'utf8' }).trim() !== '';
         if (hasAudio) {
-          audioStreamMap = '0:a';
+        audioInputStream = '[0:a]';
         }
       } catch (error) {
-        console.log('No audio stream in original file:', error.message);
+      console.log('No audio stream detected in original file.');
+    }
+
+    // Input file (music)
+    if (filters.music && filters.music.enabled && filters.music.file) {
+      if (fs.existsSync(filters.music.file)) {
+        args.push('-i', filters.music.file);
+        // If music is added, it becomes the primary audio source (input 1)
+        audioInputStream = '[1:a]'; 
+      } else {
+        console.warn(`Music file not found: ${filters.music.file}`);
+        // Keep original audio if music file not found
       }
     }
-    
-    // Add fade effects if specified
-    if (filters.fadeIn || filters.fadeOut) {
+
+    let currentVideoFilter = videoInputStream;
+    let currentAudioFilter = audioInputStream;
+
+    // --- Apply Video Filters --- 
+
+    // Apply Video Fade
+    if (filters.fade && filters.fade.enabled) {
+      const durationIn = filters.fade.durationIn || 0;
+      const durationOut = filters.fade.durationOut || 0;
       const videoFilters = [];
-      const audioFilters = [];
-      
-      // Apply video fade in/out
-      if (filters.fadeIn && filters.fadeIn > 0) {
-        videoFilters.push(`fade=t=in:st=0:d=${filters.fadeIn}`);
+      if (durationIn > 0) {
+        videoFilters.push(`fade=t=in:st=0:d=${durationIn}`);
       }
-      
-      if (filters.fadeOut && filters.fadeOut > 0) {
-        // Get video duration to calculate fade out start time
+      if (durationOut > 0) {
         try {
-          const durationCmd = `ffprobe -v error -show_entries format=duration -of csv=p=0 "${inputPath}"`;
+          const durationCmd = `ffprobe -v error -show_entries format=duration -of csv=p=0 \"${inputPath}\"`;
           const duration = parseFloat(execSync(durationCmd, { encoding: 'utf8' }).trim());
-          
           if (!isNaN(duration)) {
-            const fadeOutStart = Math.max(0, duration - filters.fadeOut);
-            videoFilters.push(`fade=t=out:st=${fadeOutStart}:d=${filters.fadeOut}`);
+            const fadeOutStart = Math.max(0, duration - durationOut);
+            videoFilters.push(`fade=t=out:st=${fadeOutStart}:d=${durationOut}`);
           }
         } catch (error) {
-          console.error('Error getting video duration:', error);
+          console.error('Error getting video duration for fade-out:', error);
         }
       }
-      
-      // Apply the same fade effects to audio if it exists
-      if (audioStreamMap && (filters.fadeIn > 0 || filters.fadeOut > 0)) {
-        if (filters.fadeIn > 0) {
-          audioFilters.push(`afade=t=in:st=0:d=${filters.fadeIn}`);
-        }
-        
-        if (filters.fadeOut > 0) {
-          try {
-            const durationCmd = `ffprobe -v error -show_entries format=duration -of csv=p=0 "${inputPath}"`;
-            const duration = parseFloat(execSync(durationCmd, { encoding: 'utf8' }).trim());
-            
-            if (!isNaN(duration)) {
-              const fadeOutStart = Math.max(0, duration - filters.fadeOut);
-              audioFilters.push(`afade=t=out:st=${fadeOutStart}:d=${filters.fadeOut}`);
-            }
-          } catch (error) {
-            console.error('Error getting audio duration:', error);
-          }
-        }
-      }
-      
-      // Add video filters to the complex filter
       if (videoFilters.length > 0) {
-        complexFilterParts.push(`[0:v]${videoFilters.join(',')}[v]`);
-        videoStreamMap = '[v]';
-      }
-      
-      // Add audio filters to the complex filter
-      if (audioFilters.length > 0 && audioStreamMap) {
-        const audioStreamIndex = audioStreamMap.replace(/\D/g, '');
-        complexFilterParts.push(`[${audioStreamIndex}:a]${audioFilters.join(',')}[a]`);
-        audioStreamMap = '[a]';
+        complexFilterParts.push(`${currentVideoFilter}${videoFilters.join(',')}[vfade]`);
+        currentVideoFilter = '[vfade]';
       }
     }
     
-    // Add title if specified
-    if (filters.title && filters.title.text) {
-      const {
-        text,
-        fontSize = 24,
-        fontColor = 'white',
-        backgroundColor = 'black@0.5',
-        position = 'center',
-        duration = 5
-      } = filters.title;
-      
-      const fontSizeValue = fontSize || 24;
-      const fontColorValue = fontColor || 'white';
-      const backgroundColorValue = backgroundColor || 'black@0.5';
-      
-      let titleFilter;
-      
-      // Position calculation
-      let x, y;
-      switch (position) {
-        case 'top':
-          x = '(w-text_w)/2';
-          y = '10';
-          break;
-        case 'bottom':
-          x = '(w-text_w)/2';
-          y = 'h-th-10';
-          break;
-        case 'top-left':
-          x = '10';
-          y = '10';
-          break;
-        case 'top-right':
-          x = 'w-tw-10';
-          y = '10';
-          break;
-        case 'bottom-left':
-          x = '10';
-          y = 'h-th-10';
-          break;
-        case 'bottom-right':
-          x = 'w-tw-10';
-          y = 'h-th-10';
-          break;
-        case 'center':
-        default:
-          x = '(w-text_w)/2';
-          y = '(h-text_h)/2';
-          break;
+    // --- Apply Audio Filters --- 
+    let audioFilterChain = '';
+
+    // Apply Audio Fade (if audio exists)
+    if (currentAudioFilter && filters.fade && filters.fade.enabled) {
+      const durationIn = filters.fade.durationIn || 0;
+      const durationOut = filters.fade.durationOut || 0;
+      const audioFilters = [];
+      if (durationIn > 0) {
+        audioFilters.push(`afade=t=in:st=0:d=${durationIn}`);
       }
-      
-      // Create title filter
-      titleFilter = `drawtext=text='${text.replace(/'/g, "\\'")}':fontcolor=${fontColorValue}:fontsize=${fontSizeValue}:x=${x}:y=${y}:box=1:boxcolor=${backgroundColorValue}:enable='between(t,0,${duration})'`;
-      
-      if (videoStreamMap === '0:v') {
-        complexFilterParts.push(`[0:v]${titleFilter}[v]`);
-        videoStreamMap = '[v]';
+      if (durationOut > 0) {
+        try {
+           // Use the same duration logic as video fade
+          const durationCmd = `ffprobe -v error -show_entries format=duration -of csv=p=0 \"${inputPath}\"`;
+            const duration = parseFloat(execSync(durationCmd, { encoding: 'utf8' }).trim());
+            if (!isNaN(duration)) {
+             const fadeOutStart = Math.max(0, duration - durationOut);
+             audioFilters.push(`afade=t=out:st=${fadeOutStart}:d=${durationOut}`);
+          }
+        } catch (error) {
+           console.error('Error getting audio duration for afade-out:', error);
+        }
+      }
+      if (audioFilters.length > 0) {
+        audioFilterChain += (audioFilterChain ? ',' : '') + audioFilters.join(',');
+      }
+    }
+
+    // Apply Music Volume (if music was added)
+    if (filters.music && filters.music.enabled && filters.music.file && audioInputStream === '[1:a]') { 
+      const volume = (filters.music.volume !== undefined && filters.music.volume >= 0) ? filters.music.volume : 0.8;
+      audioFilterChain += (audioFilterChain ? ',' : '') + `volume=${volume}`;
+    }
+
+    // Add audio filter chain to complex filter if needed
+    if (currentAudioFilter && audioFilterChain) {
+      complexFilterParts.push(`${currentAudioFilter}${audioFilterChain}${audioOutputStream}`);
+    } else if (currentAudioFilter) {
+      // If no filters applied, just pass the input stream
+      complexFilterParts.push(`${currentAudioFilter}aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo${audioOutputStream}`); // Ensure consistent format
       } else {
-        // Append to existing video stream
-        const lastStreamName = videoStreamMap;
-        complexFilterParts.push(`${lastStreamName}${titleFilter}[v]`);
-        videoStreamMap = '[v]';
+       audioOutputStream = null; // No audio output if no input and no music
       }
+
+    // Final video output stream name
+    if (currentVideoFilter !== videoOutputStream) {
+       complexFilterParts.push(`${currentVideoFilter}copy${videoOutputStream}`); // Ensure last video filter output is named correctly
     }
     
-    // Apply complex filter if needed
+    // Add complex filter argument if any filters were used
     if (complexFilterParts.length > 0) {
       args.push('-filter_complex', complexFilterParts.join(';'));
     }
     
     // Map streams
-    args.push('-map', videoStreamMap);
-    
-    if (audioStreamMap) {
-      args.push('-map', audioStreamMap);
+    if (videoOutputStream && complexFilterParts.length > 0) {
+      args.push('-map', videoOutputStream);
+    } else {
+      args.push('-map', '0:v'); // Map original video if no complex filter
+    }
+
+    if (audioOutputStream && complexFilterParts.length > 0) {
+      args.push('-map', audioOutputStream);
+    } else if (audioInputStream && !complexFilterParts.length && audioInputStream === '[1:a]') {
+       // Map music directly if no other audio filters and music was added
+       args.push('-map', '1:a');
+    } else if (audioInputStream && !complexFilterParts.length && audioInputStream === '[0:a]'){
+        // Map original audio directly if no other audio filters
+       args.push('-map', '0:a');
     }
     
     // Set codec and quality for preview or final output
-    if (isPreview) {
-      // Preview: lower quality, faster encoding
+    let preset = 'medium';
+    let crf = '23';
+    let audioBitrate = '192k';
+
+    if (!isPreview) {
+        switch (filters.quality) {
+            case 'low':
+                preset = 'fast'; // faster encoding
+                crf = '28';
+                audioBitrate = '128k';
+                break;
+            case 'high':
+                preset = 'medium'; // Slower encoding, better quality
+                crf = '20';
+                audioBitrate = '256k';
+                break;
+            case 'medium': // Default
+            default:
+                preset = 'medium';
+                crf = '23';
+                audioBitrate = '192k';
+                break;
+        }
+        args.push('-c:v', 'libx264', '-preset', preset, '-crf', crf);
+        if (audioOutputStream || audioInputStream) {
+             args.push('-c:a', 'aac', '-b:a', audioBitrate);
+      }
+    } else {
+      // Preview settings (lower quality, faster)
       args.push(
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
-        '-crf', '28',
-        '-t', '30', // Limit preview to 30 seconds
-        '-s', '854x480' // 480p
+        '-crf', '30', // Higher CRF for faster preview
+        '-t', '15', // Limit preview to 15 seconds
+        '-s', '640x360' // Lower resolution for preview
       );
-      
-      if (audioStreamMap) {
-        args.push('-c:a', 'aac', '-b:a', '128k');
-      }
-    } else {
-      // Final output: maintain quality
-      args.push(
-        '-c:v', 'libx264',
-        '-preset', 'medium',
-        '-crf', '23'
-      );
-      
-      if (audioStreamMap) {
-        args.push('-c:a', 'aac', '-b:a', '192k');
+      if (audioOutputStream || audioInputStream) {
+        args.push('-c:a', 'aac', '-b:a', '96k'); // Lower audio bitrate for preview
       }
     }
     
     // Output file
     args.push(outputPath);
     
+    console.log('Built FFmpeg command:', args.join(' ')); // Log the final command
     return args;
   }
   
   /**
    * Execute an FFmpeg command
    * @param {Array} args - FFmpeg command arguments
-   * @param {string} outputId - Identifier for the output
-   * @param {string} renderId - Render ID for status updates
+   * @param {string} outputId - Identifier for the output (less critical now)
+   * @param {string} renderId - Render ID for status updates (MUST be the NEW render ID)
    * @returns {Promise} Promise resolving when command completes
    */
-  executeFFmpegCommand(args, outputId, renderId) {
-    return new Promise((resolve, reject) => {
-      console.log('Executing FFmpeg command:', 'ffmpeg', args.join(' '));
-      
-      const ffmpegProcess = spawn('ffmpeg', args, {
-        windowsHide: true
-      });
-      
-      let stdoutData = '';
-      let stderrData = '';
-      let progress = 0;
-      
-      ffmpegProcess.stdout.on('data', (data) => {
-        stdoutData += data.toString();
-      });
-      
-      ffmpegProcess.stderr.on('data', (data) => {
-        const output = data.toString();
-        stderrData += output;
-        
-        // Extract progress information
-        const timeMatch = output.match(/time=(\d+):(\d+):(\d+)\.\d+/);
-        if (timeMatch) {
-          const hours = parseInt(timeMatch[1]);
-          const minutes = parseInt(timeMatch[2]);
-          const seconds = parseInt(timeMatch[3]);
-          
-          // Calculate seconds
-          const currentTime = hours * 3600 + minutes * 60 + seconds;
-          
-          // Estimate progress (assuming 60 seconds video)
-          const estimatedDuration = 60;
-          progress = Math.min(Math.round((currentTime / estimatedDuration) * 100), 99);
-          
-          // Update render status
-          if (renderId) {
-            this.updateRenderStatus(renderId, 'processing', `Applying FFmpeg filters (${progress}%)`, progress);
-          }
-        }
-      });
-      
-      ffmpegProcess.on('close', (code) => {
-        if (code === 0) {
-          if (renderId) {
-            this.updateRenderStatus(renderId, 'completed', 'FFmpeg processing completed', 100);
-          }
-          resolve({ success: true, outputId });
+  executeFFmpegCommand(args, outputId, renderId) { // Ensure renderId is the new one
+    return new Promise(async (resolve, reject) => {
+      // Ensure renderId is provided
+      if (!renderId) {
+        console.error("executeFFmpegCommand called without a renderId!");
+        return reject(new Error("Missing renderId for FFmpeg execution tracking."));
+      }
+
+      console.log(`Executing FFmpeg for renderId ${renderId}:`, 'ffmpeg', args.join(' '));
+
+      // --- Get Duration ---
+      const inputPathIndex = args.findIndex(arg => arg === '-i') + 1;
+      const inputPath = args[inputPathIndex];
+      let totalDuration = null; 
+
+      try {
+        // Initial status update: Queued -> Processing
+        this.updateRenderStatus(renderId, 'processing', 'Detecting video duration...', 1);
+
+        const durationCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`;
+        const durationOutput = execSync(durationCmd, { encoding: 'utf8' }).trim();
+        const duration = parseFloat(durationOutput);
+        if (!isNaN(duration) && duration > 0) {
+          totalDuration = duration;
+          console.log(`[Render ${renderId}] Detected video duration: ${totalDuration} seconds.`);
+          this.updateRenderStatus(renderId, 'processing', 'Starting FFmpeg process...', 5); // Update status before spawn
         } else {
-          console.error('FFmpeg process exited with code:', code);
-          console.error('FFmpeg stderr:', stderrData);
-          reject(new Error(`FFmpeg process failed with code ${code}`));
+          console.warn(`[Render ${renderId}] Could not parse duration from ffprobe output: ${durationOutput}. Progress calculation might be inaccurate.`);
+          this.updateRenderStatus(renderId, 'processing', 'Starting FFmpeg process (duration unknown)...', 5); // Still update status
+        }
+      } catch (error) {
+        console.error(`[Render ${renderId}] Error getting video duration with ffprobe for ${inputPath}:`, error.message);
+        console.warn(`[Render ${renderId}] Could not get video duration. Progress calculation might be inaccurate.`);
+        this.updateRenderStatus(renderId, 'processing', 'Starting FFmpeg process (duration error)...', 5); // Update status even on error
+      }
+
+      // --- Start FFmpeg ---
+      const ffmpegProcess = spawn('ffmpeg', args, {
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'pipe'] 
+      });
+
+      let stderrOutput = '';
+      let lastProgressUpdate = 0;
+      let lastReportedProgress = 5; // Start from 5% since we updated status before spawn
+      const progressUpdateInterval = 300; // Update progress slightly less frequently (300ms)
+
+      // --- Handle stderr ---
+      ffmpegProcess.stderr.on('data', (data) => {
+        const outputChunk = data.toString();
+        stderrOutput += outputChunk;
+
+        if (totalDuration !== null) {
+          const timeMatch = outputChunk.match(/time=(\d{2,}):(\d{2}):(\d{2}\.\d+)/);
+          if (timeMatch) {
+            try {
+              const hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              const seconds = parseFloat(timeMatch[3]); 
+              const currentTime = hours * 3600 + minutes * 60 + seconds;
+
+              if (currentTime >= 0) {
+                const rawProgress = Math.round((currentTime / totalDuration) * 100);
+                // Ensure progress increases and stays within 5-95 range during processing
+                const progress = Math.min(Math.max(Math.max(rawProgress, 5), lastReportedProgress), 95); 
+
+                if (progress > lastReportedProgress) { // Only update if progress actually increased
+                    lastReportedProgress = progress;
+                    const now = Date.now();
+                    if (now - lastProgressUpdate > progressUpdateInterval) {
+                      console.log(`[Render ${renderId}] FFmpeg Progress: ${progress}% (${currentTime.toFixed(2)}/${totalDuration.toFixed(2)}s)`);
+                      this.updateRenderStatus(renderId, 'processing', `Processing video (${progress}%)`, progress);
+                      lastProgressUpdate = now;
+                    }
+                }
+              }
+            } catch (parseError) {
+              // console.warn('Error parsing time from FFmpeg stderr:', parseError); // Reduce noise
+            }
+          }
+        } else {
+            // If duration is unknown, maybe log chunks occasionally but don't try to parse progress
+             // console.log(`[Render ${renderId}] FFmpeg stderr chunk (no duration):`, outputChunk.substring(0, 100)); 
         }
       });
-      
+
+      // --- Handle stdout (Drain) ---
+      ffmpegProcess.stdout.on('data', (data) => { /* Drain buffer */ });
+
+      // --- Handle Process Exit ---
+      ffmpegProcess.on('close', (code) => {
+        console.log(`[Render ${renderId}] FFmpeg process exited with code: ${code}`);
+        if (code === 0) {
+          // Final updates are handled in the .then() block of applyFilters
+          // Ensure progress hits 97-100 here for immediate feedback if needed
+          this.updateRenderStatus(renderId, 'processing', 'Finalizing video...', 97); 
+          // The final 'completed' status with 100% is set in applyFilters.then()
+          // This ensures the file path is also updated correctly.
+          console.log(`[Render ${renderId}] FFmpeg finished successfully.`);
+          resolve({ success: true, outputId: renderId }); // Resolve with the renderId
+        } else {
+          console.error(`[Render ${renderId}] FFmpeg process failed.`);
+          console.error(`[Render ${renderId}] FFmpeg stderr final output:`, stderrOutput.slice(-2000)); 
+          // Rejecting here will trigger the .catch() block in applyFilters
+          reject(new Error(`FFmpeg process failed with code ${code}.`));
+        }
+      });
+
+      // --- Handle Process Error ---
       ffmpegProcess.on('error', (error) => {
-        console.error('FFmpeg process error:', error);
+        console.error(`[Render ${renderId}] Failed to start FFmpeg process:`, error);
+        // Rejecting here will trigger the .catch() block in applyFilters
         reject(error);
       });
     });

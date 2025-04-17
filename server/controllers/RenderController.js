@@ -86,6 +86,38 @@ const getRenderById = (req, res) => {
 };
 
 /**
+ * Get the progress and status of a specific render
+ */
+const getRenderProgress = (req, res) => {
+  try {
+    const validation = Validator.validateId(req.params.id);
+    if (!Validator.handleValidation(validation, res)) {
+      logger.warn(`Invalid render ID for progress check: ${req.params.id}`);
+      return;
+    }
+
+    logger.info(`Checking progress for render ID: ${req.params.id}`);
+    const render = RenderService.getRenderById(req.params.id);
+
+    if (!render) {
+      logger.warn(`Render not found during progress check: ${req.params.id}`);
+      return res.status(404).json({ error: 'Render not found' });
+    }
+
+    logger.success(`Retrieved progress for render ${render.id}: Status=${render.status}, Progress=${render.progress}`);
+    res.json({
+      id: render.id,
+      status: render.status,
+      progress: render.progress || 0, // Default to 0 if progress is not set
+      message: render.message || ''
+    });
+  } catch (error) {
+    logger.error('Failed to fetch render progress by ID', error);
+    res.status(500).json({ error: 'Failed to fetch render progress' });
+  }
+};
+
+/**
  * Start a new render
  * @param {Object} req - Request object
  * @param {Object} res - Response object
@@ -379,5 +411,6 @@ module.exports = {
   uploadMusic,
   generateFFmpegPreview,
   applyFFmpegFilters,
-  openExportsFolder
+  openExportsFolder,
+  getRenderProgress
 }; 

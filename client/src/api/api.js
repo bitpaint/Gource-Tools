@@ -179,4 +179,10 @@ const apiExports = {
   settings: settingsApi,
 };
 
+// Function to get render progress
+export const getRenderProgress = (id) => {
+  console.log(`Making API call to get progress for render ID: ${id}`);
+  return api.get(`/renders/${id}/progress`);
+};
+
 export default apiExports;
