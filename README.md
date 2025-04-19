@@ -2,7 +2,15 @@
 
 # Gource-Tools
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2011-blue.svg)](https://www.microsoft.com/windows/windows-11)
+[![Node.js: 14+](https://img.shields.io/badge/Node.js-14%2B-green.svg)](https://nodejs.org/)
+[![Gource: 0.51+](https://img.shields.io/badge/Gource-0.51%2B-orange.svg)](https://gource.io/)
+[![FFmpeg: 4.x+](https://img.shields.io/badge/FFmpeg-4.x%2B-red.svg)](https://ffmpeg.org/)
+
 Complete application to visualize, customize, and export Git repository evolution visualizations using Gource.
+
+> 🛠️ **Current Compatibility:** This tool has primarily been tested on Windows 11. Cross-platform compatibility is a goal but not fully tested yet.
 
 ---
 
@@ -220,6 +228,10 @@ A real-time preview allows refining parameters before final application.
 
 Ensure `git`, `gource`, and `ffmpeg` are available in your system's PATH.
 
+### System Compatibility
+
+> ⚠️ **Note:** This application has been primarily tested on Windows 11. While the core functionality should work on other platforms, some features may require adjustments for Linux or macOS environments. Contributions to improve cross-platform compatibility are welcome!
+
 ### Setup
 
 1.  **Clone the repository:**
@@ -381,4 +393,6 @@ This section details the purpose and functionality of key files within the appli
 
 ## License
 
-MIT 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+This project is licensed under the MIT License - see the LICENSE file for details.
