@@ -4,6 +4,7 @@
  */
 
 const path = require('path');
+const fs = require('fs'); // Import fs module
 const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const Logger = require('./Logger'); // Import Logger
@@ -13,6 +14,19 @@ const logger = Logger.createComponentLogger('Database');
 class Database {
   constructor() {
     this.dbPath = path.join(__dirname, '../../db/db.json');
+    const dbDir = path.dirname(this.dbPath); // Get the directory path
+
+    // Ensure the directory exists before initializing the adapter
+    try {
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+        logger.info(`Created database directory: ${dbDir}`);
+      }
+    } catch (error) {
+      logger.error(`FATAL: Failed to create database directory: ${dbDir}`, error);
+      process.exit(1);
+    }
+
     // Initialize the single database instance here
     try {
       this.adapter = new FileSync(this.dbPath);

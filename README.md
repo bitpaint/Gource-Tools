@@ -28,7 +28,7 @@ The application provides an intuitive user interface to configure Gource visuali
 
 The application follows a client-server architecture:
 
-*   **Frontend**: React application (`client/`) providing a complete user interface.
+*   **Frontend**: React application (`client/`) built with Vite and TypeScript, providing a complete user interface.
 *   **Backend**: Node.js Express server (`server/`) managing Git, Gource, and FFmpeg operations.
 
 ### Backend (`server/`)
@@ -52,27 +52,29 @@ The server structure follows a layered architecture:
 
 #### Key Utilities
 
-*   `Database.js`: Singleton for data persistence with LowDB.
+*   `Database.js`: Singleton for data persistence with LowDB. Automatically creates the `db` directory.
 *   `Logger.js`: Structured logging system.
 *   `ErrorHandler.js`: Centralized error management.
 *   `processUtils.js`: Utilities for process management (e.g., killing process trees).
 
 ### Frontend (`client/`)
 
-The user interface is organized into functional pages (`client/src/pages/`):
+The user interface is built with React and TypeScript, using Vite for development and build processes.
 
-*   `DashboardPage`: Overview of repositories, projects, and renderings.
-*   `RepositoriesPage`: Management of Git repositories.
-*   `ProjectsPage`: Organization of repositories into projects.
-*   `ConfigFilesPage`: Creation and modification of render profiles.
-*   `RenderPage`: Launching and monitoring renderings.
-*   `FFmpegEditorPage`: Video post-processing.
-*   `ExportsPage`: Viewing completed renderings.
-*   `SettingsPage`: Global configuration.
+The UI is organized into functional pages (`client/src/pages/`):
 
-Reusable UI components are located in `client/src/components/`.
-API communication logic is centralized in `client/src/api/api.js`.
-Shared configuration between client and server can be found in `client/src/shared/`.
+*   `DashboardPage.tsx`: Overview of repositories, projects, and renderings.
+*   `RepositoriesPage.tsx`: Management of Git repositories.
+*   `ProjectsPage.tsx`: Organization of repositories into projects.
+*   `ConfigFilesPage.tsx`: Creation and modification of render profiles.
+*   `RenderPage.tsx`: Launching and monitoring renderings.
+*   `FFmpegEditorPage.tsx`: Video post-processing.
+*   `ExportsPage.tsx`: Viewing completed renderings.
+*   `SettingsPage.tsx`: Global configuration.
+
+Reusable UI components are located in `client/src/components/` (primarily `.tsx` files).
+API communication logic is centralized in `client/src/api/api.ts`.
+Shared configuration between client and server can be found in `client/src/shared/` (primarily `.ts` files).
 
 ### Data Storage
 
@@ -225,6 +227,7 @@ A real-time preview allows refining parameters before final application.
 *   **Git** (v2.x+)
 *   **Gource** (v0.51+)
 *   **FFmpeg** (v4.x+)
+*   **npm** (comes with Node.js)
 
 Ensure `git`, `gource`, and `ffmpeg` are available in your system's PATH.
 
@@ -275,11 +278,11 @@ Ensure `git`, `gource`, and `ffmpeg` are available in your system's PATH.
 2.  **Start the client (in another terminal):**
     ```bash
     cd client
-    npm start
+    npm start # Runs the Vite development server
     ```
 
 3.  **Access the application:**
-    Open your web browser and navigate to `http://localhost:3000` (or the port specified by React).
+    Open your web browser and navigate to `http://localhost:3000` (or the port specified by Vite, check the terminal output).
 
 ---
 
@@ -348,31 +351,33 @@ This section details the purpose and functionality of key files within the appli
 
 #### API (`client/src/api/`)
 
-*   `api.js`: Centralizes all communication with the backend API using Axios. Defines functions for each API endpoint.
+*   `api.ts`: Centralizes all communication with the backend API using Axios. Defines functions for each API endpoint.
 
 #### Pages (`client/src/pages/`)
 
-*   `DashboardPage.js`: Main landing page, displays summary statistics and recent activity.
-*   `RepositoriesPage.js`: UI for viewing, adding (single/bulk), and deleting Git repositories.
-*   `ProjectsPage.js`: UI for creating, viewing, editing, and deleting projects (groups of repositories).
-*   `ConfigFilesPage.js`: UI for managing Gource render profiles (viewing, creating, editing, deleting).
-*   `RenderPage.js`: UI for selecting a project and render profile to start a new Gource render, and monitoring progress.
-*   `FFmpegEditorPage.js`: UI for applying post-processing effects (titles, audio, fades) to completed renders using FFmpeg.
-*   `ExportsPage.js`: UI for viewing and managing completed video exports.
-*   `SettingsPage.js`: UI for managing application settings (e.g., GitHub token).
+*   `DashboardPage.tsx`: Main landing page, displays summary statistics and recent activity.
+*   `RepositoriesPage.tsx`: UI for viewing, adding (single/bulk), and deleting Git repositories.
+*   `ProjectsPage.tsx`: UI for creating, viewing, editing, and deleting projects (groups of repositories).
+*   `ConfigFilesPage.tsx`: UI for managing Gource render profiles (viewing, creating, editing, deleting).
+*   `RenderPage.tsx`: UI for selecting a project and render profile to start a new Gource render, and monitoring progress.
+*   `FFmpegEditorPage.tsx`: UI for applying post-processing effects (titles, audio, fades) to completed renders using FFmpeg.
+*   `ExportsPage.tsx`: UI for viewing and managing completed video exports.
+*   `SettingsPage.tsx`: UI for managing application settings (e.g., GitHub token).
 
 #### Components (`client/src/components/`)
 
-*   Contains reusable React components used across different pages (e.g., `GourcePreview.js`, form elements like `ColorPickerField.js`, `TooltipSlider.js`).
+*   Contains reusable React components used across different pages (e.g., `GourcePreview.tsx`, form elements like `ColorPickerField.tsx`, `TooltipSlider.tsx`). Files are primarily `.tsx`.
 
 ### Shared (`client/src/shared/`)
 
-*   `gourceConfig.js`: Contains shared logic and data structures related to Gource configuration, used by both frontend and backend (e.g., mapping Gource options, parameter descriptions, argument conversion).
+*   `gourceConfig.ts`: Contains shared logic and data structures related to Gource configuration, used by both frontend and backend (e.g., mapping Gource options, parameter descriptions, argument conversion). Files are primarily `.ts`.
 
 ---
 
 ## Recent Changes
 
+*   **Migrated Client to Vite + TypeScript:** Replaced Create React App (`react-scripts`) with Vite for faster development and builds. Converted client codebase from JavaScript (`.js`) to TypeScript (`.tsx`/`.ts`).
+*   **Database Directory Creation:** The server (`Database.js`) now automatically creates the `db` directory on startup if it doesn't exist.
 *   Corrected parameter mapping between camelCase and kebab-case formats.
 *   Improved parameter validation.
 *   Implemented dynamic system profiles ("Everything in 1 min", "Last Week/Month/Year in 1 min") with automatic date and speed calculation.

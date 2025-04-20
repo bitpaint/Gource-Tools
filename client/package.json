@@ -2,6 +2,7 @@
   "name": "gource-tools-client",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
@@ -12,22 +13,61 @@
     "react-color": "^2.19.3",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.11.1",
-    "react-scripts": "^5.0.1",
     "react-toastify": "^9.1.2",
     "recharts": "^2.15.2",
     "web-vitals": "^4.2.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "preview": "vite preview"
   },
   "eslintConfig": {
+    "root": true,
+    "env": {
+      "browser": true,
+      "es2020": true,
+      "node": true
+    },
     "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+      "eslint:recommended",
+      "plugin:@typescript-eslint/recommended",
+      "plugin:react/recommended",
+      "plugin:react-hooks/recommended"
+    ],
+    "ignorePatterns": [
+      "dist",
+      ".eslintrc.cjs",
+      "vite.config.ts"
+    ],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module"
+    },
+    "settings": {
+      "react": {
+        "version": "detect"
+      }
+    },
+    "plugins": [
+      "react-refresh",
+      "@typescript-eslint"
+    ],
+    "rules": {
+      "react/jsx-uses-react": "off",
+      "react/react-in-jsx-scope": "off",
+      "react-refresh/only-export-components": [
+        "warn",
+        {
+          "allowConstantExport": true
+        }
+      ],
+      "react/prop-types": "off",
+      "@typescript-eslint/no-unused-vars": "warn"
+    }
   },
   "browserslist": {
     "production": [
@@ -41,5 +81,22 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5000"
+  "devDependencies": {
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^22.14.1",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.30.1",
+    "@typescript-eslint/parser": "^8.30.1",
+    "@vitejs/plugin-react": "^4.4.1",
+    "@vitest/ui": "^3.1.1",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.2",
+    "vitest": "^3.1.1"
+  }
 }
