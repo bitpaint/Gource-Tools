@@ -13,9 +13,9 @@ const logger = Logger.createComponentLogger('SettingsController');
 /**
  * Get application settings
  */
-const getSettings = (req, res) => {
+const getSettings = async (req, res) => {
   try {
-    const settings = SettingsService.getSettings();
+    const settings = await SettingsService.getSettings();
     res.json(settings);
   } catch (error) {
     logger.error('Error fetching settings', error);

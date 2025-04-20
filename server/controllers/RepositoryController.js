@@ -445,6 +445,23 @@ async function processRepositoryClone(cloneId, url) {
       step: 0,
     });
 
+    // Ensure GitHub token is properly loaded - get fresh from database if needed
+    let githubToken = process.env.GITHUB_TOKEN;
+    if (!githubToken && url.includes("github.com")) {
+      try {
+        const settingsService = require('../services/SettingsService');
+        const settings = settingsService.getSettings();
+        if (settings && settings.githubToken) {
+          githubToken = settings.githubToken;
+          // Make it available for this process
+          process.env.GITHUB_TOKEN = githubToken;
+          logger.info('Loaded GitHub token from database for cloning');
+        }
+      } catch (tokenError) {
+        logger.warn('Could not load GitHub token from settings:', tokenError);
+      }
+    }
+
     // Parse URL to get folder name and owner
     let folderName = "";
     let owner = "";

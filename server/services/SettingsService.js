@@ -76,45 +76,69 @@ class SettingsService {
 
   /**
    * Load settings from .env file AND database
-   * @returns {Object} Settings (merged)
+   * @returns {Promise<Object>} Settings (merged) with validated token status
    */
-  getSettings() {
+  async getSettings() {
     try {
-      // Check if .env file exists
-      if (!fs.existsSync(this.envPath)) {
-        logger.warn('No .env file found');
-        return {
-          githubToken: '',
-          tokenStatus: 'missing'
-        };
-      }
-      
-      // Read .env file
-      const envConfig = dotenv.parse(fs.readFileSync(this.envPath));
-      const token = envConfig.GITHUB_TOKEN || '';
-      
-      // Check token validity
-      let tokenStatus = 'unknown';
-      if (!token) {
-        tokenStatus = 'missing';
-      } else if (token.length < 30) {
-        tokenStatus = 'invalid_format';
+      let token = '';
+      let tokenStatus = 'missing'; // Default to missing
+
+      // Check if .env file exists and read it
+      if (fs.existsSync(this.envPath)) {
+        const envConfig = dotenv.parse(fs.readFileSync(this.envPath));
+        token = envConfig.GITHUB_TOKEN || '';
       } else {
-        tokenStatus = 'present';
+        logger.warn('No .env file found, GitHub token cannot be loaded.');
       }
-      
-      // Get settings from Database
+
+      // Validate the token if it exists
+      if (token) {
+        logger.info('Found existing GitHub token, attempting validation...');
+        try {
+          const octokit = new Octokit({ auth: token });
+          const { data } = await octokit.users.getAuthenticated(); // Validate by fetching user info
+          if (data && data.login) {
+            tokenStatus = 'valid';
+            logger.info(`Token validated successfully for user: ${data.login}`);
+          } else {
+            // This case might not happen if the request fails, but good to have
+            tokenStatus = 'invalid'; 
+            logger.warn('Token validation succeeded but no login info returned.');
+          }
+        } catch (apiError) {
+          tokenStatus = 'invalid';
+          logger.warn(`Token validation failed: ${apiError.message || 'Error connecting to GitHub API'}`);
+          // Log the error status code if available
+          if (apiError.status) {
+             logger.warn(`GitHub API returned status: ${apiError.status}`);
+          }
+        }
+      } else {
+        tokenStatus = 'missing'; // Explicitly set status if token is empty string after reading .env
+        logger.info('No GitHub token found in .env file.');
+      }
+
+      // Get settings from Database (like default profile ID)
       const db = Database.getDatabase();
-      const dbSettings = db.get('settings').value() || { defaultProjectProfileId: null };
-      
+      // Ensure settings object exists before accessing properties
+      const dbSettings = db.has('settings').value() 
+                         ? db.get('settings').value() 
+                         : { defaultProjectProfileId: null };
+
       return {
-        githubToken: token,
-        tokenStatus,
-        defaultProjectProfileId: dbSettings.defaultProjectProfileId
+        githubToken: token, // Return the actual token
+        tokenStatus, // Return the validated status
+        defaultProjectProfileId: dbSettings.defaultProjectProfileId || null // Ensure fallback
       };
     } catch (error) {
-      logger.error('Error loading settings', error);
-      throw new Error('Failed to load settings');
+      logger.error('Error loading settings:', error);
+      // Don't re-throw generic error, return a state indicating failure
+      return {
+        githubToken: '',
+        tokenStatus: 'unknown', // Indicate an error occurred during fetch/validation
+        defaultProjectProfileId: null,
+        error: 'Failed to load settings due to an internal error.'
+      };
     }
   }
 
@@ -174,6 +198,16 @@ class SettingsService {
       
       // Update environment variables in current process
       process.env.GITHUB_TOKEN = githubToken;
+      
+      // Force reload environment variables to ensure they're available across the application
+      try {
+        // Reload dotenv from the file we just wrote
+        dotenv.config({ path: this.envPath, override: true });
+        logger.info('Environment variables reloaded successfully');
+      } catch (reloadError) {
+        logger.warn('Error reloading environment variables:', reloadError);
+        // Even if reload fails, we've manually set process.env.GITHUB_TOKEN above
+      }
       
       return { 
         success: true, 
