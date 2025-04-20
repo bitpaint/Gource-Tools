@@ -4,8 +4,117 @@
  * This file serves as a single source of truth for Gource default settings
  */
 
-// Default settings for Gource
-const defaultSettings = {
+// Define an interface for the settings object for better type safety
+interface GourceSettings {
+  resolution?: string;
+  framerate?: number;
+  secondsPerDay?: number;
+  autoSkipSeconds?: number;
+  elasticity?: number;
+  title?: boolean | string; // Can be boolean or string for custom title
+  key?: boolean;
+  background?: string;
+  fontScale?: number;
+  cameraMode?: 'overview' | 'track' | 'follow';
+  userScale?: number;
+  timeScale?: number;
+  highlightUsers?: boolean;
+  hideUsers?: string;
+  hideProgress?: boolean;
+  hideMouse?: boolean;
+  hideFilenames?: boolean;
+  hideRoot?: boolean;
+  hideFiles?: boolean;
+  hideDirnames?: boolean;
+  hideUsernames?: boolean;
+  hideDate?: boolean;
+  hideTree?: boolean;
+  hideBloom?: boolean;
+  maxUserCount?: number;
+  titleText?: string;
+  showDates?: boolean;
+  disableProgress?: boolean;
+  disableAutoRotate?: boolean;
+  showLines?: boolean;
+  followUsers?: boolean;
+  maxFilelag?: number;
+  multiSampling?: boolean;
+  bloom?: boolean;
+  bloomIntensity?: number;
+  bloomMultiplier?: number;
+  extraArgs?: string;
+  dateFormat?: string;
+  timePeriod?: 'all' | 'week' | 'month' | 'year';
+  startDate?: string; // YYYY-MM-DD or relative marker
+  stopDate?: string; // YYYY-MM-DD
+  startPosition?: string;
+  stopPosition?: string;
+  stopAtTime?: number;
+  loop?: boolean;
+  loopDelaySeconds?: number;
+  fontSize?: number;
+  filenameFontSize?: number;
+  dirnameFontSize?: number;
+  userFontSize?: number;
+  fontColor?: string;
+  dirColor?: string;
+  highlightColor?: string;
+  selectionColor?: string;
+  filenameColor?: string;
+  transparent?: boolean;
+  dirNameDepth?: number;
+  dirNamePosition?: number;
+  filenameTime?: number;
+  maxFiles?: number;
+  fileIdleTime?: number;
+  fileIdleTimeAtEnd?: number;
+  fileExtensions?: boolean;
+  fileExtensionFallback?: boolean;
+  useUserImageDir?: boolean;
+  defaultUserImage?: string;
+  fixedUserSize?: boolean;
+  colourImages?: boolean;
+  userFriction?: number;
+  maxUserSpeed?: number;
+  backgroundImage?: string;
+  logo?: string;
+  logoOffset?: string;
+  fullscreen?: boolean;
+  screenNum?: number;
+  noVsync?: boolean;
+  windowPosition?: string;
+  frameless?: boolean;
+  cropAxis?: 'vertical' | 'horizontal' | '';
+  padding?: number;
+  stopAtEnd?: boolean;
+  dontStop?: boolean;
+  disableAutoSkip?: boolean;
+  realtime?: boolean;
+  noTimeTravel?: boolean;
+  highlightDirs?: boolean;
+  disableInput?: boolean;
+  hashSeed?: string;
+  userFilter?: string;
+  userShowFilter?: string;
+  fileFilter?: string;
+  fileShowFilter?: string;
+  highlightUser?: string;
+  captionFile?: string;
+  captionSize?: number;
+  captionColour?: string;
+  captionDuration?: number;
+  captionOffset?: number;
+  fontFile?: string;
+  followUser?: string;
+  outputCustomLog?: string;
+  gitBranch?: string;
+  hide?: string[]; // Array of elements to hide
+  // Allow any other string keys for flexibility, though ideally map all known args
+  [key: string]: any;
+}
+
+// Default settings for Gource (typed)
+const defaultSettings: GourceSettings = {
   resolution: '1920x1080',
   framerate: 60,
   secondsPerDay: 1,
@@ -94,6 +203,7 @@ const defaultSettings = {
   highlightDirs: true,
   disableInput: false,
   hashSeed: '',
+  userFilter: '',
   userShowFilter: '',
   fileFilter: '(\\.svg$|\\/node_modules\\/)',
   fileShowFilter: '',
@@ -107,7 +217,7 @@ const defaultSettings = {
   followUser: '',
   outputCustomLog: '',
   gitBranch: '',
-  hide: []
+  hide: [] as string[] // Explicitly type the hide array
 };
 
 // Default configuration profile
@@ -122,7 +232,7 @@ const defaultGourceConfig = {
 };
 
 // Descriptions for each setting with detailed explanations
-const settingsDescriptions = {
+const settingsDescriptions: { [key: string]: string } = {
   resolution: "Sets the video resolution in WIDTHxHEIGHT format (e.g. 1920x1080)",
   framerate: "Number of frames per second in the exported video",
   secondsPerDay: "Number of seconds allocated to each day of activity",
@@ -203,6 +313,7 @@ const settingsDescriptions = {
   highlightDirs: "Highlight the names of all directories (Now enabled by default)",
   disableInput: "Disable keyboard and mouse input during visualization",
   hashSeed: "Seed for the hash function (affects layout)",
+  userFilter: "Regular expression to filter users (hides matches)",
   userShowFilter: "Show only usernames matching this regex",
   fileShowFilter: "Show only file paths matching this regex",
   highlightUser: "Highlight a specific user by name",
@@ -232,7 +343,7 @@ const settingsDescriptions = {
  * @param {string} period - La période ('week', 'month', 'year', 'all')
  * @returns {Object} startDate et stopDate
  */
-function calculateDatesFromPeriod(period) {
+function calculateDatesFromPeriod(period: 'week' | 'month' | 'year' | 'all'): { startDate: string; stopDate: string } {
   if (period === 'all') {
     return { startDate: '', stopDate: '' };
   }
@@ -258,10 +369,10 @@ function calculateDatesFromPeriod(period) {
 /**
  * Convertit les paramètres de configuration en arguments pour la ligne de commande Gource
  * Version simplifiée pour éviter les problèmes de conversion
- * @param {Object} settings - Paramètres de configuration
+ * @param {GourceSettings} settings - Paramètres de configuration
  * @returns {string} Arguments pour Gource au format ligne de commande
  */
-function convertToGourceArgs(settings) {
+function convertToGourceArgs(settings: GourceSettings): string {
   const AVATAR_DIR_PATH = './avatars'; // Define the fixed relative path
 
   if (!settings) {
@@ -271,7 +382,8 @@ function convertToGourceArgs(settings) {
   let args = '';
   
   // Explicit mapping for clarity and control (fixed mapping with Gource command flags)
-  const mapping = {
+  // Use a type assertion for the mapping object keys
+  const mapping: { [key in keyof GourceSettings]?: string } & { [key: string]: string } = {
     // Basic parameters
     resolution: '--viewport',
     fullscreen: '-f',
@@ -297,7 +409,7 @@ function convertToGourceArgs(settings) {
     dateFormat: '--date-format',
     
     // User & avatar options
-    userImageDir: '--user-image-dir',
+    userImageDir: '--user-image-dir', // Note: Value handled specially later
     defaultUserImage: '--default-user-image',
     fixedUserSize: '--fixed-user-size',
     colourImages: '--colour-images',
@@ -313,9 +425,9 @@ function convertToGourceArgs(settings) {
     fileIdleTime: '-i',
     fileIdleTimeAtEnd: '--file-idle-time-at-end',
     maxFiles: '--max-files',
-    maxFileLag: '--max-file-lag',
+    maxFileLag: '--max-file-lag', // Corrected typo maxFilelag -> maxFileLag
     filenameTime: '--filename-time',
-    fileExtensions: '--file-extensions',
+    fileExtensions: '--file-extensions', // Note: Boolean flag handled specially later
     fileExtensionFallback: '--file-extension-fallback',
     
     // Filters & regex
@@ -374,7 +486,7 @@ function convertToGourceArgs(settings) {
   };
 
   // --- NEW HIDE LOGIC --- 
-  let elementsToHide = [];
+  let elementsToHide: string[] = []; // Explicitly type array
   // Check if the direct 'hide' array exists in settings
   if (Array.isArray(settings.hide) && settings.hide.length > 0) {
     elementsToHide = [...settings.hide]; // Use the array directly
@@ -399,27 +511,28 @@ function convertToGourceArgs(settings) {
 
   // Now process other settings, skipping those we've already handled (or are part of the new hide logic)
   for (const key of Object.keys(settings)) {
-    // Skip title/titleText (handled above) and the 'hide' array itself
-    if (key === 'title' || key === 'titleText' || key === 'hide') continue; 
-    
+    // Skip title/titleText (handled above), the 'hide' array itself,
+    // and keys handled specially later (useUserImageDir, fileExtensions)
+    if (key === 'title' || key === 'titleText' || key === 'hide' || key === 'useUserImageDir' || key === 'fileExtensions') continue;
+
     const value = settings[key];
 
     // Skip if value is null, undefined, or empty string (unless it's a boolean we might need)
     if (value === null || value === undefined || (value === '' && typeof value !== 'boolean')) continue;
 
-    const gourceArg = mapping[key];
+    const gourceArg = mapping[key as keyof GourceSettings]; // Use type assertion here
     if (!gourceArg) {
       // Skip unmapped settings
       continue;
     }
 
-    // Handle boolean flags 
+    // Handle boolean flags
     if (typeof value === 'boolean') {
       if (value) {
         // Add only if true (e.g., --highlight-users)
         // We don't add --hide-something=true, that's handled by the hide array logic now.
-        if (!gourceArg.startsWith('--hide-') && !gourceArg.startsWith('--disable-')){
-             args += ` ${gourceArg}`;
+        if (!gourceArg.startsWith('--hide-') && !gourceArg.startsWith('--disable-')) {
+          args += ` ${gourceArg}`;
         }
       }
       // Don't add anything if false (e.g., --highlight-users=false is implicit)
@@ -447,7 +560,7 @@ function convertToGourceArgs(settings) {
         if (dateMatch && dateMatch[1]) {
           // If time component is missing, add it
           const dateStr = dateMatch[1].includes(' ') ? dateMatch[1] : `${dateMatch[1]} 00:00:00`;
-          args += ` ${gourceArg} "${dateStr}"`; 
+          args += ` ${gourceArg} "${dateStr}"`;
         } else {
           console.warn(`Invalid date format for ${key}: ${value}. Skipping.`);
         }
@@ -456,7 +569,7 @@ function convertToGourceArgs(settings) {
     }
 
     // For all other arguments, add them with their values
-    args += ` ${gourceArg} ${value}`;
+    args += ` ${gourceArg} ${String(value)}`; // Ensure value is stringified
   }
 
   // Add collected hide elements if any, using the new logic
@@ -465,31 +578,37 @@ function convertToGourceArgs(settings) {
     const uniqueHideElements = [...new Set(elementsToHide)];
     args += ` --hide ${uniqueHideElements.join(',')}`;
   }
-  
+
   // Ensure framerate is present for output
-  if (!args.includes('--output-framerate')) {
-    args += ` --output-framerate ${settings.framerate || 60}`;
+  if (!args.includes('--output-framerate') && settings.framerate) {
+    args += ` --output-framerate ${settings.framerate}`;
   }
 
   // Add --user-image-dir if enabled
-  if (settings.useUserImageDir === true) {
-    args += ` --user-image-dir "${AVATAR_DIR_PATH}"`;
+  if (settings.useUserImageDir === true && mapping.userImageDir) {
+    args += ` ${mapping.userImageDir} "${AVATAR_DIR_PATH}"`;
+  }
+
+  // Special handling for file-extensions flag
+  if (settings.fileExtensions === true && mapping.fileExtensions && !args.includes(mapping.fileExtensions)) {
+    args += ` ${mapping.fileExtensions}`;
   }
   
-  // Special handling for file-extensions flag
-  if (settings.fileExtensions === true && !args.includes('--file-extensions')) {
-    args += ` --file-extensions`;
+  // Add extra arguments if present
+  if (settings.extraArgs && typeof settings.extraArgs === 'string' && settings.extraArgs.trim() !== '') {
+    args += ` ${settings.extraArgs.trim()}`;
   }
 
   // Remove leading/trailing spaces
   return args.trim();
 }
 
-// Use standard ES Module exports for the client-side (CRA)
+// Use standard ES Module exports for the client-side (Vite)
 export {
   defaultGourceConfig,
   defaultSettings,
   settingsDescriptions,
   convertToGourceArgs,
-  calculateDatesFromPeriod
+  calculateDatesFromPeriod,
+  GourceSettings // Also export the interface
 }; 

@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2016",                 // Target modern Node.js versions
+    "module": "CommonJS",               // Output format for Node.js server
+    "outDir": "./dist",                 // Output directory for compiled JS
+    "rootDir": "./",                   // Source directory is the shared folder itself
+    "declaration": true,               // Generate .d.ts files (good practice)
+    "strict": true,                    // Enable strict type-checking
+    "esModuleInterop": true,           // Allows default imports from CommonJS modules
+    "skipLibCheck": true,              // Skip type checking of declaration files
+    "forceConsistentCasingInFileNames": true // Enforce consistent file naming
+  },
+  "include": ["./**/*.ts"],            // Compile all .ts files in the shared directory
+  "exclude": ["node_modules", "dist"] // Exclude node_modules and the output directory
+} 

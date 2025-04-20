@@ -14,6 +14,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
+import { defaultSettings, GourceSettings } from '../../../../shared/defaultGourceConfig';
 
 // Import tab components
 import GourceGeneralVideoTab from './tabs/GourceGeneralVideoTab';
@@ -24,10 +25,20 @@ import GourceUsersFilesTab from './tabs/GourceUsersFilesTab';
 import GourceCaptionsOverlaysTab from './tabs/GourceCaptionsOverlaysTab';
 import GourceAdvancedOutputTab from './tabs/GourceAdvancedOutputTab';
 import GourceTabPanel from './GourceTabPanel';
-import { defaultSettings } from '../../shared/gourceConfig';
+
+// Define preset types
+interface PresetConfig {
+  name: string;
+  settings: Partial<GourceSettings>;
+}
+
+// Preset map type
+interface PresetMap {
+  [key: string]: PresetConfig;
+}
 
 // Define Presets
-const presets = {
+const presets: PresetMap = {
   default: {
     name: 'Default Settings',
     settings: { ...defaultSettings }
@@ -69,15 +80,31 @@ const presets = {
   }
 };
 
+// Profile definition
+interface GourceProfile {
+  id: string | null;
+  name: string;
+  description: string;
+  settings: Record<string, any>;
+  isSystemProfile?: boolean;
+  updatedAt?: string;
+}
+
 // Helper function to reconstruct relative date string
-const buildRelativeString = (number, unit) => {
+const buildRelativeString = (number: number, unit: string): string => {
   const num = number || 1;
   const u = unit || 'day';
   return `relative-${num}-${u}${num > 1 ? 's' : ''}`;
 };
 
 // Styled components (using a simple styling approach)
-const StyledDialogTitle = ({ children, onClose, ...other }) => (
+interface StyledDialogTitleProps {
+  children: React.ReactNode;
+  onClose?: () => void;
+  [key: string]: any;
+}
+
+const StyledDialogTitle = ({ children, onClose, ...other }: StyledDialogTitleProps) => (
   <DialogTitle 
     sx={{ 
       display: 'flex', 
@@ -96,6 +123,18 @@ const StyledDialogTitle = ({ children, onClose, ...other }) => (
   </DialogTitle>
 );
 
+// Define component props
+interface GourceConfigEditorDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  currentProfile: GourceProfile;
+  setCurrentProfile: React.Dispatch<React.SetStateAction<GourceProfile>>;
+  isEditing: boolean;
+  savingProfile: boolean;
+  settingsDescriptions: Record<string, string>;
+}
+
 /**
  * Dialog component for creating and editing Gource configuration files
  */
@@ -108,7 +147,7 @@ const GourceConfigEditorDialog = ({
   isEditing,
   savingProfile,
   settingsDescriptions
-}) => {
+}: GourceConfigEditorDialogProps) => {
   // Track the active tab
   const [tabValue, setTabValue] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState('');
@@ -116,12 +155,12 @@ const GourceConfigEditorDialog = ({
   const [titleValidationFailed, setTitleValidationFailed] = useState(false);
   
   // Handle tab change
-  const handleTabChange = (event, newValue) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
   // Apply Preset Handler
-  const handleApplyPreset = (presetKey) => {
+  const handleApplyPreset = (presetKey: string) => {
     if (!presetKey || !presets[presetKey]) {
       setSelectedPreset('');
       return;
@@ -139,7 +178,7 @@ const GourceConfigEditorDialog = ({
   };
 
   // Handle profile name and description changes
-  const handleProfileInfoChange = (type, value) => {
+  const handleProfileInfoChange = (type: string, value: string) => {
     setCurrentProfile(prev => ({
       ...prev,
       [type]: value
@@ -171,7 +210,7 @@ const GourceConfigEditorDialog = ({
   };
 
   // Internal settings change handler
-  const handleInternalSettingsChange = (key, value) => {
+  const handleInternalSettingsChange = (key: string, value: any) => {
     if (!currentProfile) return;
 
     let processedValue = value;
@@ -231,7 +270,7 @@ const GourceConfigEditorDialog = ({
   };
 
   // Parse relative date string
-  const parseRelativeDate = (relativeDateString) => {
+  const parseRelativeDate = (relativeDateString: string) => {
     if (typeof relativeDateString !== 'string' || !relativeDateString.startsWith('relative-')) {
       return { isRelative: false, number: 1, unit: 'day' };
     }

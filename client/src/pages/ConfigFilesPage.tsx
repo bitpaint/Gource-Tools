@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -33,26 +33,44 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { renderProfilesApi, dateUtils, settingsApi } from '../api/api';
-import { defaultSettings, settingsDescriptions } from '../shared/defaultGourceConfig';
+import { defaultSettings, settingsDescriptions } from '../../../shared/defaultGourceConfig';
 import { convertFormToApiParams, convertApiToFormParams } from '../utils/gourceUtils';
 
 // Import the dialog component
 import GourceConfigEditorDialog from '../components/gource-config/GourceConfigEditorDialog';
 
+// Define profile interface
+interface GourceProfile {
+  id: string | null;
+  name: string;
+  description: string;
+  settings: Record<string, any>;
+  isSystemProfile?: boolean;
+  updatedAt?: string;
+}
+
+interface ApiErrorResponse {
+  response?: {
+    data?: {
+      error?: string;
+    }
+  }
+}
+
 const ConfigFilesPage = () => {
-  const [profiles, setProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [profiles, setProfiles] = useState<GourceProfile[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
   // State for default profile ID
-  const [defaultProfileId, setDefaultProfileId] = useState(null);
+  const [defaultProfileId, setDefaultProfileId] = useState<string | null>(null);
 
   // Profile dialog state
-  const [openProfileDialog, setOpenProfileDialog] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentProfile, setCurrentProfile] = useState({
-    id: null,
+  const [openProfileDialog, setOpenProfileDialog] = useState<boolean>(false);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [currentProfile, setCurrentProfile] = useState<GourceProfile>({
+    id: null as unknown as string,
     name: '',
     description: '',
     settings: {
@@ -61,12 +79,12 @@ const ConfigFilesPage = () => {
       relativeStartDateValue: ''
     }
   });
-  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingProfile, setSavingProfile] = useState<boolean>(false);
   
   // Delete dialog state
-  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [profileToDelete, setProfileToDelete] = useState(null);
-  const [deletingProfile, setDeletingProfile] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState<boolean>(false);
+  const [profileToDelete, setProfileToDelete] = useState<GourceProfile | null>(null);
+  const [deletingProfile, setDeletingProfile] = useState<boolean>(false);
 
   // Load profiles and default setting on component mount
   useEffect(() => {
@@ -101,10 +119,10 @@ const ConfigFilesPage = () => {
   };
 
   // Profile handlers
-  const handleOpenProfileDialog = (profile = null) => {
+  const handleOpenProfileDialog = (profile: GourceProfile | null = null) => {
     if (profile) {
       setIsEditing(true);
-      // Convertir les paramètres API au format du formulaire
+      // Convert API parameters to form format
       const formParams = convertApiToFormParams({ ...profile.settings });
       setCurrentProfile({
         id: profile.id,
@@ -177,7 +195,7 @@ const ConfigFilesPage = () => {
       };
       
       setCurrentProfile({
-        id: null,
+        id: null as unknown as string,
         name: '',
         description: '',
         // Directly use the new user defaults object
@@ -200,14 +218,14 @@ const ConfigFilesPage = () => {
     try {
       setSavingProfile(true);
       
-      // Convertir les paramètres de formulaire au format API
+      // Convert form parameters to API format
       const apiParams = convertFormToApiParams(currentProfile.settings);
       
-      // Vérification de débogage
-      console.log('Paramètres originaux:', currentProfile.settings);
-      console.log('Paramètres convertis pour API:', apiParams);
+      // Debug verification
+      console.log('Original parameters:', currentProfile.settings);
+      console.log('Converted parameters for API:', apiParams);
       
-      // Utiliser les paramètres convertis
+      // Use converted parameters
       const profileToSave = {
         ...currentProfile,
         settings: apiParams
@@ -215,7 +233,7 @@ const ConfigFilesPage = () => {
       
       if (isEditing) {
         // Update existing profile
-        const response = await renderProfilesApi.update(profileToSave.id, profileToSave);
+        const response = await renderProfilesApi.update(profileToSave.id as string, profileToSave);
         
         // Update profiles array
         const updatedProfiles = profiles.map(profile => 
@@ -232,16 +250,17 @@ const ConfigFilesPage = () => {
       }
       
       handleCloseProfileDialog();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error saving profile:', err);
-      toast.error(err.response?.data?.error || 'Failed to save config file');
+      const apiErr = err as ApiErrorResponse;
+      toast.error(apiErr.response?.data?.error || 'Failed to save config file');
     } finally {
       setSavingProfile(false);
     }
   };
 
   // Delete profile handlers
-  const handleOpenDeleteDialog = (profile) => {
+  const handleOpenDeleteDialog = (profile: GourceProfile) => {
     setProfileToDelete(profile);
     setOpenDeleteDialog(true);
   };
@@ -252,20 +271,21 @@ const ConfigFilesPage = () => {
   };
 
   const handleDeleteProfile = async () => {
-    if (!profileToDelete) return;
+    if (!profileToDelete || !profileToDelete.id) return;
     
     try {
       setDeletingProfile(true);
-      await renderProfilesApi.delete(profileToDelete.id);
+      await renderProfilesApi.delete(profileToDelete.id as string);
       
       setProfiles(profiles.filter(profile => profile.id !== profileToDelete.id));
       toast.success('Config file deleted successfully');
       handleCloseDeleteDialog();
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error deleting profile:', err);
       
       // Specific error message for default profile
-      if (err.response?.data?.error === 'The default Gource config file cannot be deleted') {
+      const apiErr = err as ApiErrorResponse;
+      if (apiErr.response?.data?.error === 'The default Gource config file cannot be deleted') {
         toast.error('The default Gource config file cannot be deleted');
       } else {
         toast.error('Failed to delete config file');
@@ -276,7 +296,7 @@ const ConfigFilesPage = () => {
   };
 
   // Handler for duplicating a profile
-  const handleDuplicateProfile = async (profileToDuplicate) => {
+  const handleDuplicateProfile = async (profileToDuplicate: GourceProfile) => {
     const newProfileName = `${profileToDuplicate.name} (Copy)`;
     // Ensure the new profile isn't marked as a system profile
     const newProfileSettings = { ...profileToDuplicate.settings };
@@ -293,16 +313,17 @@ const ConfigFilesPage = () => {
       const response = await renderProfilesApi.create(newProfile);
       setProfiles([...profiles, response.data]);
       toast.success(`Profile "${profileToDuplicate.name}" duplicated successfully as "${newProfileName}"`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error duplicating profile:', err);
-      toast.error(err.response?.data?.error || 'Failed to duplicate config file');
+      const apiErr = err as ApiErrorResponse;
+      toast.error(apiErr.response?.data?.error || 'Failed to duplicate config file');
     } finally {
       setLoading(false);
     }
   };
 
   // Handler for setting a profile as the default
-  const handleSetDefaultProfile = async (profileId) => {
+  const handleSetDefaultProfile = async (profileId: string) => {
     // Optimistic update
     const previousDefaultId = defaultProfileId;
     setDefaultProfileId(profileId);
@@ -324,7 +345,7 @@ const ConfigFilesPage = () => {
     (profile.description && profile.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
     return dateUtils.formatLocaleDate(new Date(dateString));
   };
@@ -338,7 +359,7 @@ const ConfigFilesPage = () => {
   }
 
   // Utility function to display profile properties with dashes
-  const getProfileSetting = (profile, key) => {
+  const getProfileSetting = (profile: GourceProfile, key: string) => {
     // For properties with dashes, use bracket notation
     if (key.includes('-')) {
       return profile.settings[key];
@@ -509,7 +530,7 @@ const ConfigFilesPage = () => {
                         <Tooltip title="Set as default profile for new projects">
                           <Button 
                             size="small" 
-                            onClick={() => handleSetDefaultProfile(profile.id)}
+                            onClick={() => handleSetDefaultProfile(profile.id as string)}
                             startIcon={<CheckCircleIcon sx={{ color: 'action.disabled' }} />}
                           >
                             Set Default

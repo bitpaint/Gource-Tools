@@ -14,7 +14,7 @@ const { v4: uuidv4 } = require('uuid');
 const { killProcessTree } = require('../utils/processUtils');
 const os = require('os');
 const axios = require('axios');
-const { convertToGourceArgs } = require('../../client/src/shared/gourceConfig');
+const { convertToGourceArgs } = require('../../shared/dist/defaultGourceConfig');
 const GourceConfigService = require('./gourceConfigService');
 const config = require('../config/config');
 const Logger = require('../utils/Logger');
@@ -389,7 +389,8 @@ const startRender = async (projectId, customName = null, options = {}) => {
   
   // Handle time period filtering
   if (options.timePeriod && options.timePeriod !== 'all') {
-    const { calculateDatesFromPeriod } = require('../../client/src/shared/gourceConfig');
+    // Import from the *compiled* shared code (CORRECTED FILENAME)
+    const { calculateDatesFromPeriod } = require('../../shared/dist/defaultGourceConfig'); 
     const dates = calculateDatesFromPeriod(options.timePeriod);
     options.startDate = dates.startDate;
     options.stopDate = dates.stopDate;

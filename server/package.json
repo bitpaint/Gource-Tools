@@ -6,8 +6,20 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:shared": "tsc --project ../shared/tsconfig.json",
+    "prestart": "npm run build:shared"
   },
+  "keywords": [
+    "gource",
+    "git",
+    "visualization",
+    "server",
+    "node",
+    "express"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
   "dependencies": {
     "@bull-board/api": "^6.9.1",
     "@bull-board/express": "^6.9.1",
@@ -29,6 +41,7 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9"
+    "nodemon": "^3.1.9",
+    "typescript": "^5.0.0"
   }
 }
