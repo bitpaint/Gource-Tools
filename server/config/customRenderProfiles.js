@@ -52,6 +52,7 @@ const newDefaultSettings = {
   key: false,
   highlightDirs: true,
   highlightUsers: true,
+  useUserImageDir: true, // Explicitly enable avatar directory support
 };
 
 // -- Custom Render Profiles --

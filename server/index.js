@@ -15,17 +15,30 @@ const logger = Logger.createComponentLogger('Server');
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 logger.info('Environment variables loaded');
 
-// Initialize database
-const dbPath = path.join(__dirname, '../db');
-if (!fs.existsSync(dbPath)) {
-  fs.mkdirSync(dbPath, { recursive: true });
-  logger.info('Created database directory');
-}
+// Ensure essential directories exist
+const rootDir = path.join(__dirname, '../'); // Define root directory
+const directoriesToEnsure = [
+  path.join(rootDir, 'db'),
+  path.join(rootDir, 'avatars'),
+  path.join(rootDir, 'gource_videos'),
+  // Add other essential directories here if needed
+];
+
+directoriesToEnsure.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      logger.info(`Created required directory: ${dir}`);
+    } catch (error) {
+      logger.error(`FATAL: Failed to create required directory: ${dir}`, error);
+      process.exit(1);
+    }
+  }
+});
 
 // Import the SINGLETON instance of the Database class
+// Note: Database constructor now ONLY handles DB related setup
 const DatabaseInstance = require('./utils/Database');
-// Initialization is now handled within the Database class constructor
-logger.info('Database initialization triggered by require.');
 
 // Get the shared DB instance for operations within index.js
 const db = DatabaseInstance.getDatabase(); 

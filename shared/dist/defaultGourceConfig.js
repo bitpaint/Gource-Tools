@@ -84,7 +84,6 @@ const defaultSettings = {
     logo: '',
     logoOffset: '',
     fullscreen: false,
-    screenNum: 0,
     noVsync: false,
     windowPosition: '',
     frameless: false,
@@ -184,7 +183,7 @@ const settingsDescriptions = {
     fileIdleTimeAtEnd: "Time files remain on screen at the very end (seconds, default 0)",
     fileExtensions: "Show only file extensions instead of full filenames",
     fileExtensionFallback: "Use filename if extension is missing (requires --file-extensions)",
-    useUserImageDir: "Attempt to load user avatars from the ./avatars directory",
+    useUserImageDir: "Attempt to load user avatars from the ../avatars directory (relative to the temp directory)",
     defaultUserImage: "Path to an image file to use if a specific user avatar is not found",
     fixedUserSize: "Users avatars maintain a fixed size instead of scaling",
     colourImages: "Apply coloring to user avatars",
@@ -266,7 +265,7 @@ function calculateDatesFromPeriod(period) {
  * @returns {string} Arguments pour Gource au format ligne de commande
  */
 function convertToGourceArgs(settings) {
-    const AVATAR_DIR_PATH = './avatars'; // Define the fixed relative path
+    const AVATAR_DIR_PATH = '../avatars'; // Define the fixed relative path to work from temp directory
     if (!settings) {
         return '';
     }
@@ -397,8 +396,12 @@ function convertToGourceArgs(settings) {
             continue;
         const value = settings[key];
         // Skip if value is null, undefined, or empty string (unless it's a boolean we might need)
-        if (value === null || value === undefined || (value === '' && typeof value !== 'boolean'))
+        if (value === null ||
+            value === undefined ||
+            (value === '' && typeof value !== 'boolean') ||
+            (key === 'stopAtTime' && value === 0)) {
             continue;
+        }
         const gourceArg = mapping[key]; // Use type assertion here
         if (!gourceArg) {
             // Skip unmapped settings

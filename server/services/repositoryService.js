@@ -11,6 +11,7 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const Logger = require('../utils/Logger');
 const Database = require('../utils/Database'); // Import Database utility
+const logService = require('./logService'); // Import LogService
 
 // Create a component logger
 const logger = Logger.createComponentLogger('RepositoryService');
@@ -120,7 +121,7 @@ const isValidGitRepository = (repoPath) => {
  * @param {Object} repoData - Repository data to create
  * @returns {Object} Created repository
  */
-const createRepository = (repoData) => {
+const createRepository = async (repoData) => {
   const db = Database.getDatabase(); // Utiliser l'instance partagée
   
   // Validate required data
@@ -166,6 +167,22 @@ const createRepository = (repoData) => {
   db.get('repositories')
     .push(newRepository)
     .write();
+  
+  // Generate Gource log after successful creation
+  try {
+    logger.info(`Queueing log generation for new repository: ${newRepository.name}`);
+    await logService.generateRepoLog(newRepository.id);
+    logger.success(`Initial log generation completed for: ${newRepository.name}`);
+  } catch (logError) {
+    // Log the error but don't fail the repository creation
+    logger.error(`Initial log generation failed for ${newRepository.name}: ${logError.message}`);
+    // Optionally mark the repo as having an invalid log immediately
+    const currentDb = Database.getDatabase(); // Re-get DB instance if needed
+    currentDb.get('repositories')
+      .find({ id: newRepository.id })
+      .assign({ hasValidLog: false, logError: `Initial log generation failed: ${logError.message}` })
+      .write();
+  }
   
   return newRepository;
 };
@@ -518,6 +535,72 @@ const bulkImport = (baseDirectoryPath, skipConfirmation = false) => {
   });
 };
 
+/**
+ * Pull latest changes for a repository using git pull
+ * @param {string} id - ID of the repository to pull
+ * @returns {Object} Result object with status and message
+ */
+const gitPull = async (id) => {
+  const db = Database.getDatabase();
+  const repository = db.get('repositories')
+    .find({ id: id.toString() })
+    .value();
+
+  if (!repository) {
+    throw new Error(`Repository not found: ${id}`);
+  }
+
+  const repoPath = repository.path;
+  if (!fs.existsSync(repoPath) || !isValidGitRepository(repoPath)) {
+    throw new Error(`Invalid or missing repository path: ${repoPath}`);
+  }
+
+  logger.info(`Pulling latest changes for ${repository.name} in ${repoPath}`);
+  let output;
+  try {
+    // Using PowerShell/pwsh.exe explicitly for git operations
+    output = execSync(`cd \'${repoPath}\'; git pull`, {
+      shell: 'C:\\\\Program Files\\\\PowerShell\\\\7\\\\pwsh.exe', 
+      encoding: 'utf8',
+      timeout: 120000 // 2 minutes timeout
+    });
+    logger.git(`Git pull output for ${repository.name}: ${output}`);
+
+    // Update last updated timestamp
+    const currentDb = Database.getDatabase(); // Re-get DB instance
+    currentDb.get('repositories')
+      .find({ id: id.toString() })
+      .assign({ lastUpdated: new Date().toISOString() })
+      .write();
+
+    // Regenerate Gource log after successful pull
+    try {
+      logger.info(`Queueing log regeneration for updated repository: ${repository.name}`);
+      await logService.generateRepoLog(repository.id);
+      logger.success(`Log regeneration completed for: ${repository.name}`);
+    } catch (logError) {
+      // Log the error but don't fail the pull operation itself
+      logger.error(`Log regeneration failed after pull for ${repository.name}: ${logError.message}`);
+      // Mark repo log as invalid
+      const currentDbAfterLogFail = Database.getDatabase(); // Re-get DB instance
+      currentDbAfterLogFail.get('repositories')
+        .find({ id: repository.id })
+        .assign({ hasValidLog: false, logError: `Log regeneration failed after pull: ${logError.message}` })
+        .write();
+    }
+
+    return { status: 'success', message: `Successfully pulled changes for ${repository.name}. ${output}` };
+  } catch (error) {
+    logger.error(`Error pulling repository ${repository.name}: ${error.message}`);
+    // Log stderr if available
+    if (error.stderr) {
+      logger.error(`Git pull stderr: ${error.stderr}`);
+    }
+    // Re-throw error to be caught by the route handler
+    throw new Error(`Failed to pull repository ${repository.name}: ${error.message}`);
+  }
+};
+
 // Initialize the service
 init();
 
@@ -530,5 +613,6 @@ module.exports = {
   updateRepository,
   deleteRepository,
   generateGitLog,
-  bulkImport
+  bulkImport,
+  gitPull
 }; 

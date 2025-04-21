@@ -5,11 +5,13 @@
 
 const path = require('path');
 const fs = require('fs');
+const fsp = require('fs').promises; // Use promises for async file operations
 const { execSync } = require('child_process');
 const os = require('os');
 const { Worker } = require('worker_threads');
 const Database = require('../utils/Database');
 const Logger = require('../utils/Logger');
+const avatarService = require('./avatarService'); // Import AvatarService
 
 // Create a component logger
 const logger = Logger.createComponentLogger('LogService');
@@ -34,7 +36,7 @@ class LogService {
    * Create necessary directories for logs
    */
   createDirectories() {
-    const directories = [logsDir, repoLogsDir, projectLogsDir, tempLogsDir];
+    const directories = [logsDir, repoLogsDir, projectLogsDir, tempLogsDir]; 
     
     for (const dir of directories) {
       if (!fs.existsSync(dir)) {
@@ -182,6 +184,9 @@ class LogService {
         .write();
       
       logger.success(`Log generation complete for ${repository.name}. Size: ${finalStats.size / 1024} KB, Entries: ${finalEntryCount}`);
+      
+      // After successful log generation, trigger avatar download via AvatarService
+      avatarService.triggerAvatarDownloads(outputPath);
       
       return {
         path: outputPath,
@@ -386,6 +391,10 @@ class LogService {
       .write();
 
     logger.success(`Combined log file generated for project ${project.name}: ${outputPath}`);
+    
+    // After successful log generation, trigger avatar download via AvatarService
+    avatarService.triggerAvatarDownloads(outputPath);
+    
     return outputPath;
   }
 

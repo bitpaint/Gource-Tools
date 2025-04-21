@@ -3,57 +3,124 @@
  * Utilities to validate configurations before sending them to the server
  */
 
+// Define the expected structure of the config object
+interface GourceConfig {
+  [key: string]: any; // Allow any Gource parameter
+  secondsPerDay?: number | string;
+  autoSkipSeconds?: number | string;
+  elasticity?: number | string;
+  fontScale?: number | string;
+  userScale?: number | string;
+  timeScale?: number | string;
+  maxUserCount?: number | string;
+  framerate?: number | string;
+  bloomIntensity?: number | string;
+  bloomMultiplier?: number | string;
+  stopAtTime?: number | string;
+  resolution?: string;
+  cameraMode?: 'overview' | 'track' | 'follow';
+  background?: string;
+  startDate?: string | null; // Allow null
+  stopDate?: string | null; // Allow null
+  fontColor?: string;
+  titleColor?: string;
+  dirColor?: string;
+  highlightColor?: string;
+  selectionColor?: string;
+  title?: boolean;
+  key?: boolean;
+  showLines?: boolean;
+  disableAutoRotate?: boolean;
+}
+
 /**
  * Validates a Gource configuration and returns any errors found
- * @param {Object} config - Gource configuration to validate
- * @returns {Object} Validation result with errors
+ * @param {GourceConfig} config - Gource configuration to validate
+ * @returns {{ isValid: boolean, errors: string[] }} Validation result with errors
  */
-export function validateGourceConfig(config) {
+export function validateGourceConfig(config: GourceConfig | null | undefined): { isValid: boolean, errors: string[] } {
   if (!config) {
     return { isValid: false, errors: ['Invalid or missing configuration'] };
   }
   
-  const errors = [];
+  const errors: string[] = [];
   
   // Numeric parameter validations
-  if (config.secondsPerDay !== undefined && (isNaN(config.secondsPerDay) || config.secondsPerDay <= 0)) {
-    errors.push(`"seconds-per-day" must be a positive number (current: ${config.secondsPerDay})`);
+  if (config.secondsPerDay !== undefined) {
+    const val = parseFloat(String(config.secondsPerDay));
+    if (isNaN(val) || val <= 0) {
+      errors.push(`"seconds-per-day" must be a positive number (current: ${config.secondsPerDay})`);
+    }
   }
   
-  if (config.autoSkipSeconds !== undefined && (isNaN(config.autoSkipSeconds) || config.autoSkipSeconds < 0)) {
-    errors.push(`"auto-skip-seconds" must be a non-negative number (current: ${config.autoSkipSeconds})`);
+  if (config.autoSkipSeconds !== undefined) {
+    const val = parseFloat(String(config.autoSkipSeconds));
+    if (isNaN(val) || val < 0) {
+      errors.push(`"auto-skip-seconds" must be a non-negative number (current: ${config.autoSkipSeconds})`);
+    }
   }
   
-  if (config.elasticity !== undefined && (isNaN(config.elasticity) || config.elasticity < 0 || config.elasticity > 1)) {
-    errors.push(`"elasticity" must be a number between 0 and 1 (current: ${config.elasticity})`);
+  if (config.elasticity !== undefined) {
+    const val = parseFloat(String(config.elasticity));
+    if (isNaN(val) || val < 0 || val > 1) {
+      errors.push(`"elasticity" must be a number between 0 and 1 (current: ${config.elasticity})`);
+    }
   }
   
-  if (config.fontScale !== undefined && (isNaN(config.fontScale) || config.fontScale <= 0)) {
-    errors.push(`"font-scale" must be a positive number (current: ${config.fontScale})`);
+  if (config.fontScale !== undefined) {
+    const val = parseFloat(String(config.fontScale));
+    if (isNaN(val) || val <= 0) {
+      errors.push(`"font-scale" must be a positive number (current: ${config.fontScale})`);
+    }
   }
   
-  if (config.userScale !== undefined && (isNaN(config.userScale) || config.userScale <= 0)) {
-    errors.push(`"user-scale" must be a positive number (current: ${config.userScale})`);
+  if (config.userScale !== undefined) {
+    const val = parseFloat(String(config.userScale));
+    if (isNaN(val) || val <= 0) {
+      errors.push(`"user-scale" must be a positive number (current: ${config.userScale})`);
+    }
   }
   
-  if (config.timeScale !== undefined && (isNaN(config.timeScale) || config.timeScale <= 0)) {
-    errors.push(`"time-scale" must be a positive number (current: ${config.timeScale})`);
+  if (config.timeScale !== undefined) {
+    const val = parseFloat(String(config.timeScale));
+    if (isNaN(val) || val <= 0) {
+      errors.push(`"time-scale" must be a positive number (current: ${config.timeScale})`);
+    }
   }
   
-  if (config.maxUserCount !== undefined && (isNaN(config.maxUserCount) || config.maxUserCount < 0)) {
-    errors.push(`"max-user-count" must be a non-negative number (current: ${config.maxUserCount})`);
+  if (config.maxUserCount !== undefined) {
+    const val = parseInt(String(config.maxUserCount), 10);
+    if (isNaN(val) || val < 0) {
+      errors.push(`"max-user-count" must be a non-negative number (current: ${config.maxUserCount})`);
+    }
   }
   
-  if (config.framerate !== undefined && (isNaN(config.framerate) || config.framerate < 24 || config.framerate > 120)) {
-    errors.push(`"framerate" must be a number between 24 and 120 (current: ${config.framerate})`);
+  if (config.framerate !== undefined) {
+    const val = parseInt(String(config.framerate), 10);
+    if (isNaN(val) || val < 24 || val > 120) {
+      errors.push(`"framerate" must be a number between 24 and 120 (current: ${config.framerate})`);
+    }
   }
   
-  if (config.bloomIntensity !== undefined && (isNaN(config.bloomIntensity) || config.bloomIntensity < 0 || config.bloomIntensity > 1)) {
-    errors.push(`"bloom-intensity" must be a number between 0 and 1 (current: ${config.bloomIntensity})`);
+  if (config.bloomIntensity !== undefined) {
+    const val = parseFloat(String(config.bloomIntensity));
+    if (isNaN(val) || val < 0 || val > 1) {
+      errors.push(`"bloom-intensity" must be a number between 0 and 1 (current: ${config.bloomIntensity})`);
+    }
   }
   
-  if (config.bloomMultiplier !== undefined && (isNaN(config.bloomMultiplier) || config.bloomMultiplier < 0 || config.bloomMultiplier > 1)) {
-    errors.push(`"bloom-multiplier" must be a number between 0 and 1 (current: ${config.bloomMultiplier})`);
+  if (config.bloomMultiplier !== undefined) {
+    const val = parseFloat(String(config.bloomMultiplier));
+    if (isNaN(val) || val < 0 || val > 1) {
+      errors.push(`"bloom-multiplier" must be a number between 0 and 1 (current: ${config.bloomMultiplier})`);
+    }
+  }
+  
+  if (config.stopAtTime !== undefined) {
+    const val = parseFloat(String(config.stopAtTime));
+    if (isNaN(val) || val < 0) {
+      errors.push(`"stop-at-time" must be a non-negative number (current: ${config.stopAtTime})`);
+    }
   }
   
   // Resolution format validation
@@ -88,53 +155,57 @@ export function validateGourceConfig(config) {
 
 /**
  * Fixes a Gource configuration to ensure it is valid
- * @param {Object} config - Gource configuration to fix
- * @returns {Object} Fixed configuration
+ * @param {GourceConfig} config - Gource configuration to fix
+ * @returns {GourceConfig} Fixed configuration
  */
-export function fixGourceConfig(config) {
+export function fixGourceConfig(config: GourceConfig | null | undefined): GourceConfig {
   if (!config) return {};
   
-  const fixedConfig = { ...config };
+  const fixedConfig: GourceConfig = { ...config };
   
   // Fix numeric parameters
-  if (fixedConfig.secondsPerDay === undefined || isNaN(fixedConfig.secondsPerDay) || fixedConfig.secondsPerDay <= 0) {
+  if (fixedConfig.secondsPerDay === undefined || isNaN(parseFloat(String(fixedConfig.secondsPerDay))) || parseFloat(String(fixedConfig.secondsPerDay)) <= 0) {
     fixedConfig.secondsPerDay = 1;
   }
   
-  if (fixedConfig.autoSkipSeconds === undefined || isNaN(fixedConfig.autoSkipSeconds) || fixedConfig.autoSkipSeconds < 0) {
+  if (fixedConfig.autoSkipSeconds === undefined || isNaN(parseFloat(String(fixedConfig.autoSkipSeconds))) || parseFloat(String(fixedConfig.autoSkipSeconds)) < 0) {
     fixedConfig.autoSkipSeconds = 0.1;
   }
   
-  if (fixedConfig.elasticity === undefined || isNaN(fixedConfig.elasticity) || fixedConfig.elasticity < 0 || fixedConfig.elasticity > 1) {
+  if (fixedConfig.elasticity === undefined || isNaN(parseFloat(String(fixedConfig.elasticity))) || parseFloat(String(fixedConfig.elasticity)) < 0 || parseFloat(String(fixedConfig.elasticity)) > 1) {
     fixedConfig.elasticity = 0.3;
   }
   
-  if (fixedConfig.fontScale === undefined || isNaN(fixedConfig.fontScale) || fixedConfig.fontScale <= 0) {
+  if (fixedConfig.fontScale === undefined || isNaN(parseFloat(String(fixedConfig.fontScale))) || parseFloat(String(fixedConfig.fontScale)) <= 0) {
     fixedConfig.fontScale = 1.0;
   }
   
-  if (fixedConfig.userScale === undefined || isNaN(fixedConfig.userScale) || fixedConfig.userScale <= 0) {
+  if (fixedConfig.userScale === undefined || isNaN(parseFloat(String(fixedConfig.userScale))) || parseFloat(String(fixedConfig.userScale)) <= 0) {
     fixedConfig.userScale = 1.0;
   }
   
-  if (fixedConfig.timeScale === undefined || isNaN(fixedConfig.timeScale) || fixedConfig.timeScale <= 0) {
+  if (fixedConfig.timeScale === undefined || isNaN(parseFloat(String(fixedConfig.timeScale))) || parseFloat(String(fixedConfig.timeScale)) <= 0) {
     fixedConfig.timeScale = 1.0;
   }
   
-  if (fixedConfig.maxUserCount === undefined || isNaN(fixedConfig.maxUserCount) || fixedConfig.maxUserCount < 0) {
+  if (fixedConfig.maxUserCount === undefined || isNaN(parseInt(String(fixedConfig.maxUserCount), 10)) || parseInt(String(fixedConfig.maxUserCount), 10) < 0) {
     fixedConfig.maxUserCount = 0;
   }
   
-  if (fixedConfig.framerate === undefined || isNaN(fixedConfig.framerate) || fixedConfig.framerate < 24 || fixedConfig.framerate > 120) {
+  if (fixedConfig.framerate === undefined || isNaN(parseInt(String(fixedConfig.framerate), 10)) || parseInt(String(fixedConfig.framerate), 10) < 24 || parseInt(String(fixedConfig.framerate), 10) > 120) {
     fixedConfig.framerate = 60;
   }
   
-  if (fixedConfig.bloomIntensity === undefined || isNaN(fixedConfig.bloomIntensity) || fixedConfig.bloomIntensity < 0 || fixedConfig.bloomIntensity > 1) {
+  if (fixedConfig.bloomIntensity === undefined || isNaN(parseFloat(String(fixedConfig.bloomIntensity))) || parseFloat(String(fixedConfig.bloomIntensity)) < 0 || parseFloat(String(fixedConfig.bloomIntensity)) > 1) {
     fixedConfig.bloomIntensity = 0.4;
   }
   
-  if (fixedConfig.bloomMultiplier === undefined || isNaN(fixedConfig.bloomMultiplier) || fixedConfig.bloomMultiplier < 0 || fixedConfig.bloomMultiplier > 1) {
+  if (fixedConfig.bloomMultiplier === undefined || isNaN(parseFloat(String(fixedConfig.bloomMultiplier))) || parseFloat(String(fixedConfig.bloomMultiplier)) < 0 || parseFloat(String(fixedConfig.bloomMultiplier)) > 1) {
     fixedConfig.bloomMultiplier = 0.7;
+  }
+  
+  if (fixedConfig.stopAtTime === undefined || isNaN(parseFloat(String(fixedConfig.stopAtTime))) || parseFloat(String(fixedConfig.stopAtTime)) < 0) {
+    fixedConfig.stopAtTime = 0; // 0 means disabled (though we handle command generation elsewhere)
   }
   
   // Fix resolution

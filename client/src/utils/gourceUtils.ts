@@ -76,7 +76,7 @@ const paramMapping = {
  * Reverse mapping for kebab to camel
  * @type {Object}
  */
-const reverseMapping = Object.entries(paramMapping).reduce((acc, [camel, kebab]) => {
+const reverseMapping: { [key: string]: string } = Object.entries(paramMapping).reduce((acc: { [key: string]: string }, [camel, kebab]) => {
   acc[kebab] = camel;
   return acc;
 }, {});
@@ -86,10 +86,10 @@ const reverseMapping = Object.entries(paramMapping).reduce((acc, [camel, kebab])
  * @param {Object} obj - Object with kebab-case keys
  * @returns {Object} Object with camelCase keys
  */
-export function convertToCamelCase(obj) {
+export function convertToCamelCase(obj: Record<string, any>): Record<string, any> {
   if (!obj || typeof obj !== 'object') return obj;
   
-  const result = {};
+  const result: Record<string, any> = {};
   Object.entries(obj).forEach(([key, value]) => {
     // Use mapping if available, or fallback to automatic conversion
     const camelKey = reverseMapping[key] || key.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
@@ -104,19 +104,19 @@ export function convertToCamelCase(obj) {
  * @param {Object} obj - Object with camelCase keys
  * @returns {Object} Object with kebab-case keys
  */
-export function convertToKebabCase(obj) {
+export function convertToKebabCase(obj: Record<string, any>): Record<string, any> {
   if (!obj || typeof obj !== 'object') return obj;
   
-  const result = {};
+  const result: Record<string, any> = {};
   
   for (const [key, value] of Object.entries(obj)) {
     // Use mapping if available, or fallback to automatic conversion
-    const kebabKey = paramMapping[key] || key.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
+    const kebabKey = paramMapping[key as keyof typeof paramMapping] || key.replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2').toLowerCase();
     
     // Special handling for secondsPerDay which must be a valid number ≥ 1
     if (key === 'secondsPerDay') {
       // Ensure the value is a valid number and at least 1
-      const numValue = parseFloat(value);
+      const numValue = parseFloat(String(value)); // Convert value to string before parseFloat
       result[kebabKey] = isNaN(numValue) || numValue < 1 ? 1 : numValue;
       continue;
     }
@@ -147,11 +147,11 @@ export function convertToKebabCase(obj) {
 
 /**
  * Generates the Gource command from parameters
- * @param {Object} settings - Gource parameters
+ * @param {Record<string, any>} settings - Gource parameters object
  * @param {string} logPath - Path to the log file
  * @returns {string} Complete Gource command
  */
-export const generateGourceCommand = (settings, logPath) => {
+export const generateGourceCommand = (settings: Record<string, any>, logPath: string): string => {
   if (!settings || !logPath) return '';
   
   // Create a copy of settings to avoid modifying the original
@@ -159,7 +159,7 @@ export const generateGourceCommand = (settings, logPath) => {
   
   // Fix the title issue - if title is enabled but no titleText is provided,
   // use a default value to prevent Gource from showing other args as title
-  if (settingsCopy.title === true && (!settingsCopy.titleText || settingsCopy.titleText.trim() === '')) {
+  if (settingsCopy.title === true && (!settingsCopy.titleText || String(settingsCopy.titleText).trim() === '')) {
     // If no titleText is provided but title is enabled, use a fallback
     settingsCopy.titleText = settingsCopy.name || 'Git Repository';
   }
@@ -170,13 +170,13 @@ export const generateGourceCommand = (settings, logPath) => {
   let command = 'gource';
   
   // Special handling for certain parameters that require conversion
-  const specialParams = {
-    'show-lines': (value) => {
+  const specialParams: { [key: string]: (value: any) => string | null } = {
+    'show-lines': (value: boolean | string | undefined): string | null => {
       // If showLines is false, add --hide-edges
       if (value === false || value === 'false') return '--hide-edges';
       return null; // Don't add anything if true (default behavior)
     },
-    'follow-users': (value) => {
+    'follow-users': (value: boolean | string | undefined): string | null => {
       // If followUsers is true, add --follow-users
       if (value === true || value === 'true') return '--follow-all-users';
       return null;
@@ -185,8 +185,10 @@ export const generateGourceCommand = (settings, logPath) => {
   
   // Add parameters
   Object.entries(kebabSettings).forEach(([key, value]) => {
-    // Ignore empty parameters
-    if (value === '' || value === null || value === undefined) return;
+    // Ignore empty parameters or stop-at-time if 0
+    if (value === '' || value === null || value === undefined || (key === 'stop-at-time' && value === 0)) {
+      return;
+    }
     
     // Special handling for certain parameters
     if (key in specialParams) {
@@ -213,6 +215,9 @@ export const generateGourceCommand = (settings, logPath) => {
       }
     } else {
       // Parameters with values
+      // Ensure value is properly escaped if it contains spaces, etc.
+      // For simplicity, we assume values are simple strings/numbers here.
+      // Gource might need specific escaping for certain values.
       command += ` --${key} ${value}`;
     }
   });
@@ -262,15 +267,15 @@ export function getAllGourceParameters() {
 
 /**
  * Converts UI parameters to the format expected by the API
- * @param {Object} formData - Edit form data
- * @returns {Object} Parameters formatted for the API
+ * @param {Record<string, any>} formData - Edit form data
+ * @returns {Record<string, any>} Parameters formatted for the API
  */
-export function convertFormToApiParams(formData) {
+export function convertFormToApiParams(formData: Record<string, any>): Record<string, any> {
   // Make a copy to avoid modifying the original
   const apiParams = { ...formData };
   
   // Conversion table for special parameters
-  const mappings = {
+  const mappings: { [key: string]: string } = {
     background: 'background-colour', // Color is stored in background-colour for the API
   };
   
@@ -295,16 +300,29 @@ export function convertFormToApiParams(formData) {
       }
     }
   });
+
+  // Ensure stopAtTime is a valid number if provided, otherwise leave it as is
+  if (apiParams.stopAtTime === '') {
+      apiParams.stopAtTime = undefined; // Convert empty string to undefined
+  } else if (apiParams.stopAtTime !== null && apiParams.stopAtTime !== undefined) {
+      if (typeof apiParams.stopAtTime === 'string') {
+          const numValue = parseFloat(apiParams.stopAtTime);
+          // If parsing fails, set to undefined, otherwise keep the number
+          apiParams.stopAtTime = isNaN(numValue) ? undefined : numValue;
+      }
+      // If it's already a number or something else non-empty, leave it
+  }
+  // If it was already null or undefined, it stays that way
   
   return apiParams;
 }
 
 /**
  * Converts API parameters to UI display format
- * @param {Object} apiParams - API parameters
- * @returns {Object} Parameters formatted for the UI
+ * @param {Record<string, any>} apiParams - API parameters
+ * @returns {Record<string, any>} Parameters formatted for the UI
  */
-export function convertApiToFormParams(apiParams) {
+export function convertApiToFormParams(apiParams: Record<string, any>): Record<string, any> {
   // Make a copy to avoid modifying the original
   const formParams = { ...apiParams };
   

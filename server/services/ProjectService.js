@@ -9,6 +9,11 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 const SettingsService = require('./SettingsService'); // Import SettingsService
 const Database = require('../utils/Database'); // Import Database
+const logService = require('./logService'); // Import LogService
+const Logger = require('../utils/Logger'); // Import Logger
+
+// Create component logger
+const logger = Logger.createComponentLogger('ProjectService');
 
 class ProjectService {
   constructor() {
@@ -109,7 +114,7 @@ class ProjectService {
    * @param {Object} projectData - Data for the project to create
    * @returns {Object} Created project
    */
-  createProject(projectData) {
+  async createProject(projectData) {
     const db = Database.getDatabase(); // Use shared instance
     
     // Validate required data
@@ -149,6 +154,17 @@ class ProjectService {
       .push(newProject)
       .write();
     
+    // Generate the combined log file after creating the project
+    try {
+      logger.info(`Queueing log generation for new project: ${newProject.name}`);
+      await logService.generateProjectLog(newProject.id);
+      logger.success(`Initial project log generation completed for: ${newProject.name}`);
+    } catch (logError) {
+      logger.error(`Initial project log generation failed for ${newProject.name}: ${logError.message}`);
+      // Log the error, but don't fail the project creation
+      // The project object itself doesn't store log status, logService handles it
+    }
+    
     return newProject;
   }
 
@@ -158,7 +174,7 @@ class ProjectService {
    * @param {Object} projectData - New project data
    * @returns {Object|null} Updated project or null if not found
    */
-  updateProject(id, projectData) {
+  async updateProject(id, projectData) {
     if (!id) return null;
     
     const db = Database.getDatabase(); // Use shared instance
@@ -191,6 +207,16 @@ class ProjectService {
       .find({ id: id.toString() })
       .assign(updatedProject)
       .write();
+    
+    // Regenerate the combined log file after updating the project
+    try {
+      logger.info(`Queueing log regeneration for updated project: ${updatedProject.name}`);
+      await logService.generateProjectLog(updatedProject.id);
+      logger.success(`Project log regeneration completed for: ${updatedProject.name}`);
+    } catch (logError) {
+      logger.error(`Project log regeneration failed for ${updatedProject.name}: ${logError.message}`);
+      // Log the error, but don't fail the project update
+    }
     
     return updatedProject;
   }

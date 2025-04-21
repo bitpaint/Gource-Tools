@@ -19,6 +19,10 @@ const GourceConfigService = require('./gourceConfigService');
 const config = require('../config/config');
 const Logger = require('../utils/Logger');
 const Database = require('../utils/Database'); // Import Database utility
+const logService = require('./logService'); // Import LogService
+
+// Get shared DB instance
+const db = Database.getDatabase();
 
 // Create a component logger
 const logger = Logger.createComponentLogger('RenderService');
@@ -54,10 +58,10 @@ try {
 let pid = null;
 
 // Import ProjectService module
-const ProjectService = require('./projectService');
+//const ProjectService = require('./projectService'); // Already included via Database?
 
 // Import RepositoryService after this service's declaration to avoid circular dependency
-let RepositoryService = null;
+// let RepositoryService = null; // Already included via Database?
 
 // Helper function to parse date strings (YYYY-MM-DD or relative)
 function calculateStartDate(startDateSetting) {
@@ -364,15 +368,46 @@ const startRender = async (projectId, customName = null, options = {}) => {
     throw new Error('Project ID is required');
   }
   
-  // Get project details
-  const project = ProjectService.getProjectWithDetails(projectId);
+  logger.info(`Starting render for project: ${projectId}`);
+
+  // Get project details using shared db instance
+  const project = db.get('projects')
+    .find({ id: projectId.toString() })
+    .value();
+
   if (!project) {
-    throw new Error('Project not found');
+    logger.error(`Project not found: ${projectId}`);
+    throw new Error(`Project not found: ${projectId}`);
   }
   
-  if (!project.repositories || project.repositories.length === 0 || !project.repositoryDetails || project.repositoryDetails.length === 0) {
-    throw new Error('Project does not contain any valid repositories');
+  logger.info(`Project found: ${project.name}`);
+
+  // --- Log Validation Step ---
+  const projectLogPath = project.logPath;
+  let isLogValid = false;
+
+  if (projectLogPath && fs.existsSync(projectLogPath)) {
+    try {
+      isLogValid = await logService.isProjectLogValid(project); 
+    } catch (validationError) {
+      logger.warn(`Error validating project log for ${project.name}: ${validationError.message}`);
+      // Consider it invalid if validation fails
+      isLogValid = false; 
+    }
+  } else {
+    logger.warn(`Log file path not found or file does not exist for project ${project.name}. Path: ${projectLogPath}`);
+    isLogValid = false;
   }
+
+  if (!isLogValid) {
+    const errorMessage = `Project log for "${project.name}" is missing, empty, or outdated. Please update the project or its repositories first.`;
+    logger.error(errorMessage);
+    // Optionally update render status to failed here?
+    throw new Error(errorMessage);
+  }
+  
+  logger.info(`Project log validation successful for ${project.name}. Path: ${projectLogPath}`);
+  // --- End Log Validation ---
   
   // Generate a unique ID for the render
   const id = Date.now().toString();
@@ -443,40 +478,25 @@ const startRender = async (projectId, customName = null, options = {}) => {
  * @returns {Object} - The updated render object
  */
 const processRender = async (project, render, options = {}) => {
+  const { renderProfileId } = options;
+  
   try {
-    logger.render(`Processing render: ${render.id} for project: ${project.name}`);
+    logger.info(`[Render ${render.id}] Processing render for project: ${project.name}`);
     
-    // Create output directory
-    const outputDir = path.join(exportsDir, render.id.toString());
-    const renderLogsDir = path.join(logsDir, render.id.toString());
-    
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-      logger.file(`Created output directory: ${outputDir}`);
+    // Step 1: Prepare - Get settings and log file
+    updateRenderStatus(render.id, 'preparing', 'Preparing render environment...', 5);
+
+    // --- Log File Path Retrieval (Already validated in startRender) ---
+    const validatedLogPath = project.logPath;
+    if (!validatedLogPath || !fs.existsSync(validatedLogPath)) {
+      // This check is a safeguard
+      logger.error(`[Render ${render.id}] Critical Error: Validated log file path is missing or invalid post-validation. Path: ${validatedLogPath}`);
+      throw new Error('Log file missing or invalid after initial validation.');
     }
-    
-    if (!fs.existsSync(renderLogsDir)) {
-      fs.mkdirSync(renderLogsDir, { recursive: true });
-      logger.file(`Created logs directory: ${renderLogsDir}`);
-    }
-    
-    logger.render(`Generating combined logs for render ${render.id}`);
-    await updateRenderStatus(render.id, 'generating_logs', 'Generating Gource logs...', 10);
-    
-    // Use LogService to ensure the project has a valid log or generate a new one
-    const LogService = require('./logService');
-    const combinedLogPath = await LogService.ensureProjectLog(project);
-    render.logPath = combinedLogPath;
-    await updateRenderStatus(render.id, 'generating_logs', 'Gource logs generated', 20);
-    
-    // Execute Gource render
-    logger.render(`Executing Gource render for ${render.id}`);
-    await updateRenderStatus(render.id, 'rendering', 'Generating video...', 30);
-    
-    const outputPath = path.join(outputDir, 'output.mp4'); // Consistent output path
-    
-    // --- Corrected Render Profile Selection Logic ---
-    const db = Database.getDatabase();
+    logger.info(`[Render ${render.id}] Using validated log file: ${validatedLogPath}`);
+    // --- End Log File Path Retrieval ---
+
+    // Determine render settings
     let selectedProfileId = null;
     let renderProfile = null;
 
@@ -516,7 +536,6 @@ const processRender = async (project, render, options = {}) => {
         throw new Error(`No render profile could be determined for render ${render.id}`);
       }
     }
-    // --- End Corrected Logic ---
 
     // Use the selected render profile's settings
     let initialSettings = { ...(renderProfile.settings || {}) };
@@ -534,19 +553,11 @@ const processRender = async (project, render, options = {}) => {
     // Calculate dynamic parameters ONCE using the combined settings
     let processedSettings = {};
     try {
-        processedSettings = await calculateDynamicParams(render.logPath, initialSettings, render);
+        processedSettings = await calculateDynamicParams(validatedLogPath, initialSettings, render);
         logger.info('Successfully calculated dynamic parameters for Gource execution.');
     } catch (error) {
-        logger.error(`Error calculating dynamic parameters: ${error.message}. Render might use incorrect dates/speed.`);
-        // Fallback to initial settings if calculation fails
-        processedSettings = { ...initialSettings }; 
-        // Remove markers if calculation failed
-        if (typeof processedSettings.startDate === 'string' && processedSettings.startDate.startsWith('relative-')) {
-             processedSettings.startDate = null; 
-        }
-        if (typeof processedSettings.secondsPerDay === 'string' && processedSettings.secondsPerDay.startsWith('auto-')) {
-             processedSettings.secondsPerDay = '1'; // Default SPD
-        }
+        logger.error(`Error calculating dynamic parameters: ${error.message}`);
+        throw new Error('Failed to calculate dynamic render parameters.');
     }
 
     // Ensure title is set if dynamic processing failed to set it
@@ -555,10 +566,10 @@ const processRender = async (project, render, options = {}) => {
     }
     
     // Use the render's definitive file path
-    const finalOutputFilePath = render.filePath;
+    const finalOutputFilePath = path.join(render.filePath, render.fileName);
     logger.config(`Final output path: ${finalOutputFilePath}`);
     
-    await executeGourceRender(render.logPath, render, finalOutputFilePath, processedSettings);
+    await executeGourceRender(validatedLogPath, render, finalOutputFilePath, processedSettings);
     
     // Update render status to completed
     render.status = 'completed';
@@ -863,7 +874,7 @@ logger.start('Initializing Render Service');
 init();
 
 // Import RepositoryService here to avoid circular dependency
-RepositoryService = require('./repositoryService');
+// RepositoryService = require('./repositoryService');
 
 // Export the module functions
 module.exports = {

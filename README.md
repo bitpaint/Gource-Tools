@@ -393,6 +393,8 @@ This section details the purpose and functionality of key files within the appli
 *   Fixed `settingsService.js` initialization logic.
 *   Ensured consistent behavior across server startup, purge, and UI regarding default profiles.
 *   **Updated export path configuration**: Standardized the export directory path across `renderService.js`, `ffmpegService.js`, and `RenderController.js` to ensure consistency and reliability in file handling.
+*   **Improved avatar support**: Updated avatar path reference in the configuration to use `../avatars` (relative to the temp directory) for consistent avatar loading across all rendering profiles. Fixed parameter handling to ensure proper GitHub avatar loading in all visualizations.
+*   **Fixed profile creation issue**: Resolved a bug with numeric parameter handling during profile creation that could result in invalid `stop-at-time` values.
 
 ---
 

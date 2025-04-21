@@ -11,21 +11,30 @@ const Logger = require('./Logger'); // Import Logger
 
 const logger = Logger.createComponentLogger('Database');
 
+// Define paths at the top for clarity
+const rootDir = path.join(__dirname, '../../');
+const dbPath = path.join(rootDir, 'db/db.json');
+// const avatarsPath = path.join(rootDir, 'avatars'); // Moved to server/index.js
+const dbDir = path.dirname(dbPath);
+
 class Database {
   constructor() {
-    this.dbPath = path.join(__dirname, '../../db/db.json');
-    const dbDir = path.dirname(this.dbPath); // Get the directory path
+    this.dbPath = dbPath; // Use defined path
 
-    // Ensure the directory exists before initializing the adapter
-    try {
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-        logger.info(`Created database directory: ${dbDir}`);
+    // Ensure ONLY the database directory exists (other dirs handled in index.js)
+    // const directoriesToEnsure = [dbDir, avatarsPath]; // OLD
+    const directoriesToEnsure = [dbDir]; // Keep only dbDir
+    directoriesToEnsure.forEach(dir => {
+      try {
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+          logger.info(`Created required directory: ${dir}`);
+        }
+      } catch (error) {
+        logger.error(`FATAL: Failed to create required directory: ${dir}`, error);
+        process.exit(1);
       }
-    } catch (error) {
-      logger.error(`FATAL: Failed to create database directory: ${dbDir}`, error);
-      process.exit(1);
-    }
+    });
 
     // Initialize the single database instance here
     try {
