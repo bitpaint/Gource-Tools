@@ -376,6 +376,8 @@ This section details the purpose and functionality of key files within the appli
 
 ## Recent Changes
 
+*   **GitHub Username Integration:** Added GitHub API integration to map Git author names to GitHub usernames in Gource logs, enabling reliable avatar downloads and eliminating GitHub rate-limiting issues.
+*   **Optimized Avatar Management:** Completely refactored avatar downloading process with global queue, controlled concurrency, and GitHub username validation.
 *   **Migrated Client to Vite + TypeScript:** Replaced Create React App (`react-scripts`) with Vite for faster development and builds. Converted client codebase from JavaScript (`.js`) to TypeScript (`.tsx`/`.ts`).
 *   **Database Directory Creation:** The server (`Database.js`) now automatically creates the `db` directory on startup if it doesn't exist.
 *   Corrected parameter mapping between camelCase and kebab-case formats.
@@ -395,6 +397,50 @@ This section details the purpose and functionality of key files within the appli
 *   **Updated export path configuration**: Standardized the export directory path across `renderService.js`, `ffmpegService.js`, and `RenderController.js` to ensure consistency and reliability in file handling.
 *   **Improved avatar support**: Updated avatar path reference in the configuration to use `../avatars` (relative to the temp directory) for consistent avatar loading across all rendering profiles. Fixed parameter handling to ensure proper GitHub avatar loading in all visualizations.
 *   **Fixed profile creation issue**: Resolved a bug with numeric parameter handling during profile creation that could result in invalid `stop-at-time` values.
+
+---
+
+## Avatar Management System
+
+The application now includes an optimized system for managing GitHub avatars in Gource visualizations:
+
+### Workflow
+
+1. **GitHub Username Mapping:** When generating Gource logs, the system automatically:
+   * Extracts GitHub repository information from Git remotes
+   * Fetches contributor data via GitHub API
+   * Creates a mapping between Git author names and GitHub usernames
+   * Replaces author names in Gource logs with their GitHub usernames
+
+2. **Efficient Avatar Downloads:**
+   * Uses a global queue to prevent duplicate downloads
+   * Implements controlled concurrency (max 3 simultaneous downloads)
+   * Adds delays between requests to avoid GitHub rate limits
+   * Validates GitHub usernames against GitHub's username requirements
+   * Automatically applies the badge effect to downloaded avatars
+
+3. **Persistent Mapping:**
+   * Stores GitHub username mappings in JSON files for future use
+   * Caches mappings in memory for faster access
+   * Reuses existing avatars when already downloaded
+
+### Benefits
+
+* **No More GitHub DDOS:** Controlled rate and concurrency prevents overwhelming GitHub with requests
+* **Higher Success Rate:** Direct GitHub username usage eliminates guesswork and reduces 404 errors
+* **Improved Performance:** Global queue prevents redundant downloads across different repositories
+* **Better Visualization:** More consistent appearance with proper avatars for all users
+
+### Regenerating Logs
+
+To update existing repositories with GitHub username mapping:
+
+```bash
+cd server
+node scripts/regenerateAllLogs.js
+```
+
+This will recreate all Gource logs with GitHub usernames, enabling proper avatar downloads.
 
 ---
 
