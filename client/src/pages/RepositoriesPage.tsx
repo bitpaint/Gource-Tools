@@ -20,6 +20,7 @@ import {
   TextField,
   CircularProgress,
   Alert,
+  AlertTitle,
   InputAdornment,
   Collapse,
   LinearProgress,
@@ -59,12 +60,44 @@ import {
 import { toast } from 'react-toastify';
 import { repositoriesApi, dateUtils, settingsApi } from '../api/api';
 
+// Define types for repository and bulk import status
+interface Repository {
+  id: string;
+  name: string;
+  description?: string;
+  url: string;
+  owner: string;
+  dateAdded: string;
+  lastUpdated: string;
+  newCommitsCount?: number;
+  updating?: boolean;
+  path: string;
+}
+
+interface CloneStep {
+  label: string;
+  completed: boolean;
+}
+
+interface BulkImportStatus {
+  progress: number;
+  status: string;
+  message: string;
+  owner?: string;
+  repositories?: any[];
+  createdProjects?: any[];
+  totalRepos?: number;
+  completedRepos?: number;
+  failedRepos?: number;
+  processingAssets?: boolean;
+}
+
 const RepositoriesPage = () => {
-  const [repositories, setRepositories] = useState([]);
+  const [repositories, setRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [groupedRepositories, setGroupedRepositories] = useState({});
-  const [expandedOwners, setExpandedOwners] = useState({});
+  const [error, setError] = useState<string | null>(null);
+  const [groupedRepositories, setGroupedRepositories] = useState<Record<string, Repository[]>>({});
+  const [expandedOwners, setExpandedOwners] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   
   // Add repository dialog
@@ -75,8 +108,8 @@ const RepositoriesPage = () => {
   // Cloning progress tracking
   const [cloneProgress, setCloneProgress] = useState(0);
   const [cloneStatus, setCloneStatus] = useState('');
-  const [cloneId, setCloneId] = useState(null);
-  const [cloneSteps, setCloneSteps] = useState([
+  const [cloneId, setCloneId] = useState<string | null>(null);
+  const [cloneSteps, setCloneSteps] = useState<CloneStep[]>([
     { label: 'Preparation', completed: false },
     { label: 'Cloning', completed: false },
     { label: 'Log Generation', completed: false },
@@ -86,14 +119,14 @@ const RepositoriesPage = () => {
   
   // Bulk import
   const [bulkImportUrl, setBulkImportUrl] = useState('');
-  const [bulkImportId, setBulkImportId] = useState(null);
-  const [bulkImportStatus, setBulkImportStatus] = useState(null);
+  const [bulkImportId, setBulkImportId] = useState<string | null>(null);
+  const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
   const [isBulkImporting, setIsBulkImporting] = useState(false);
   const [dialogMode, setDialogMode] = useState('single'); // 'single' or 'bulk'
   
   // Delete repository dialog
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [repoToDelete, setRepoToDelete] = useState(null);
+  const [repoToDelete, setRepoToDelete] = useState<Repository | null>(null);
   const [deletingRepo, setDeletingRepo] = useState(false);
 
   // Project creation options
@@ -101,13 +134,15 @@ const RepositoriesPage = () => {
   const [projectNameTemplate, setProjectNameTemplate] = useState('{owner}');
   // Option to create a project when adding a single repository
   const [createProjectWithRepo, setCreateProjectWithRepo] = useState(false);
+  // Option to exclude forks when doing bulk imports
+  const [excludeForks, setExcludeForks] = useState(true);
   
   // Ajouter un état pour vérifier si un token GitHub est configuré
   const [hasGithubToken, setHasGithubToken] = useState(false);
   
   // Delete user repositories dialog
   const [openDeleteUserDialog, setOpenDeleteUserDialog] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [deletingUserRepos, setDeletingUserRepos] = useState(false);
   
   // Ajouter l'effet pour vérifier si un token GitHub est configuré
@@ -140,7 +175,7 @@ const RepositoriesPage = () => {
       if (Array.isArray(response.data)) {
           setRepositories(response.data);
           // Group repositories by owner
-          const grouped = response.data.reduce((acc, repo) => {
+          const grouped = response.data.reduce<Record<string, Repository[]>>((acc, repo) => {
             const owner = repo.owner || 'unknown';
             if (!acc[owner]) {
               acc[owner] = [];
@@ -157,7 +192,7 @@ const RepositoriesPage = () => {
           setGroupedRepositories({});
       }
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('[RepositoriesPage] Error during fetchRepositories:', err);
       // Log specific error details if available
       if (err.response) {
@@ -185,7 +220,7 @@ const RepositoriesPage = () => {
   
   // Initialize all owners as collapsed on load
   useEffect(() => {
-    const initialExpandedState = {};
+    const initialExpandedState: Record<string, boolean> = {};
     Object.keys(groupedRepositories).forEach(owner => {
       initialExpandedState[owner] = false;
     });
@@ -194,7 +229,7 @@ const RepositoriesPage = () => {
   
   // Polling for clone status if a clone is in progress
   useEffect(() => {
-    let interval;
+    let interval: NodeJS.Timeout | undefined;
     if (cloneId && addingRepo) {
       interval = setInterval(async () => {
         try {
@@ -217,7 +252,7 @@ const RepositoriesPage = () => {
           
           // If cloning is complete, stop polling
           if (status === 'completed' || status === 'failed') {
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
             
             if (status === 'completed') {
               // Mark all steps as completed
@@ -243,7 +278,7 @@ const RepositoriesPage = () => {
           }
         } catch (err) {
           console.error('Error fetching clone status:', err);
-          clearInterval(interval);
+          if (interval) clearInterval(interval);
         }
       }, 1000); // Poll every second
     }
@@ -255,7 +290,7 @@ const RepositoriesPage = () => {
   
   // Polling for bulk import status
   useEffect(() => {
-    let interval;
+    let interval: NodeJS.Timeout | undefined;
     if (bulkImportId && isBulkImporting) {
       console.log('Starting bulk import polling for:', bulkImportId);
       
@@ -271,13 +306,13 @@ const RepositoriesPage = () => {
             
             // If bulk import is complete, stop polling
             if (response.data.status === 'completed' || response.data.status === 'failed') {
-              clearInterval(interval);
+              if (interval) clearInterval(interval);
               
               if (response.data.status === 'completed') {
                 // Refresh repository list
                 await fetchRepositories();
                 
-                let successMessage = `Bulk import completed. Imported ${response.data.completedRepos - response.data.failedRepos}/${response.data.totalRepos} repositories.`;
+                let successMessage = `Import completed successfully. Imported ${response.data.completedRepos - response.data.failedRepos}/${response.data.totalRepos} repositories.`;
                 
                 // Add project creation info to success message
                 if (response.data.createdProjects && response.data.createdProjects.length > 0) {
@@ -286,16 +321,13 @@ const RepositoriesPage = () => {
                 
                 toast.success(successMessage);
                 
-                // Wait a short time to show the completed status before closing
-                setTimeout(() => {
-                  // First set importing to false
-                  setIsBulkImporting(false);
-                  // Then close the dialog
-                  setOpenAddDialog(false);
-                  // Reset bulk import state
-                  setBulkImportId(null);
-                  setBulkImportStatus(null);
-                }, 2000); // 2 seconds delay before closing
+                // Set importing to false but don't close the dialog
+                setIsBulkImporting(false);
+                // Update message to show success
+                setBulkImportStatus({
+                  ...response.data,
+                  message: successMessage
+                });
               } else {
                 toast.error(`Bulk import failed: ${response.data.error || 'Unknown error'}`);
                 setIsBulkImporting(false);
@@ -303,9 +335,9 @@ const RepositoriesPage = () => {
             }
           } catch (err) {
             console.error('Error fetching bulk import status:', err);
-            clearInterval(interval);
+            if (interval) clearInterval(interval);
           }
-        }, 3000); // Poll every 3 seconds instead of 2
+        }, 3000); // Poll every 3 seconds
       }, 2000); // Wait 2 seconds before starting polling
     }
     
@@ -350,7 +382,7 @@ const RepositoriesPage = () => {
         setOpenAddDialog(false);
         toast.success('Repository added successfully');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error adding repository:', err);
       
       // Check if the server is suggesting to use bulk import (username detected)
@@ -394,7 +426,7 @@ const RepositoriesPage = () => {
         progress: 0,
         status: 'initializing',
         message: 'Starting bulk import...'
-      });
+      } as BulkImportStatus);
       
       // Prepare name template for combined projects
       let finalTemplate = projectNameTemplate;
@@ -411,7 +443,8 @@ const RepositoriesPage = () => {
         projectCreationMode: projectCreationMode || 'none',
         projectNameTemplate: finalTemplate || '{owner}',
         skipConfirmation: true,
-        repoLimit: 99999
+        repoLimit: 99999,
+        excludeForks: excludeForks
       });
       
       if (response.data && response.data.bulkImportId) {
@@ -424,13 +457,13 @@ const RepositoriesPage = () => {
           progress: 5,
           status: 'processing',
           message: 'Import in progress...'
-        });
+        } as BulkImportStatus);
       } else {
         console.error('Import response without ID:', response.data);
         toast.error('Failed to start bulk import: No import ID received');
         setIsBulkImporting(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error starting bulk import:', err);
       const errorMessage = err.response?.data?.error 
         ? `${err.response.data.error}: ${err.response.data.details || ''}`
@@ -529,19 +562,30 @@ const RepositoriesPage = () => {
     setProjectCreationMode(mode === 'bulk' ? 'per_owner' : 'none');
     setProjectNameTemplate('{owner}');
     setCreateProjectWithRepo(false);
+    setExcludeForks(true);
     setOpenAddDialog(true);
   };
 
   const handleCloseAddDialog = () => {
-    if (!addingRepo && !isBulkImporting) {
-      setOpenAddDialog(false);
-      setCloneId(null);
-      setCloneProgress(0);
-      setCloneStatus('');
-      setBulkImportUrl('');
-      setBulkImportId(null);
-      setBulkImportStatus(null);
+    // Prevent closing while import is still in progress
+    if (addingRepo || isBulkImporting) {
+      return;
     }
+    
+    // Also prevent closing if import is completed but we still need to process assets
+    if (bulkImportStatus?.status === 'completed' && 
+        bulkImportStatus?.processingAssets) {
+      toast.warning('Please wait until all repository assets are processed');
+      return;
+    }
+    
+    setOpenAddDialog(false);
+    setCloneId(null);
+    setCloneProgress(0);
+    setCloneStatus('');
+    setBulkImportUrl('');
+    setBulkImportId(null);
+    setBulkImportStatus(null);
   };
 
   const handleOpenDeleteDialog = (repo) => {
@@ -1014,6 +1058,19 @@ const RepositoriesPage = () => {
                 }}
               />
               
+              {/* Repository Filter Options */}
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox 
+                      checked={excludeForks} 
+                      onChange={(e) => setExcludeForks(e.target.checked)}
+                    />
+                  }
+                  label="Exclude fork repositories"
+                />
+              </Box>
+              
               {/* Project Creation Options */}
               <Typography variant="subtitle1" sx={{ mt: 3, mb: 1 }}>
                 Project Creation Options
@@ -1193,15 +1250,36 @@ const RepositoriesPage = () => {
                   </Paper>
                 </Box>
               )}
+              
+              {/* Display processing assets message when applicable */}
+              {!isBulkImporting && bulkImportStatus.status === 'completed' && (
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                  <Alert severity="success" sx={{ mb: 2 }}>
+                    <AlertTitle>Import Completed Successfully</AlertTitle>
+                    Imported {bulkImportStatus.completedRepos - bulkImportStatus.failedRepos}/{bulkImportStatus.totalRepos} repositories
+                    {bulkImportStatus.createdProjects && bulkImportStatus.createdProjects.length > 0 && 
+                      ` and created ${bulkImportStatus.createdProjects.length} project(s)`}
+                  </Alert>
+                  
+                  {bulkImportStatus.processingAssets && (
+                    <>
+                      <Typography color="text.secondary" sx={{ mt: 2 }}>
+                        Please wait while repository assets are being processed...
+                      </Typography>
+                      <LinearProgress sx={{ mt: 2 }} />
+                    </>
+                  )}
+                </Box>
+              )}
             </Box>
           )}
         </DialogContent>
         <DialogActions>
           <Button 
             onClick={handleCloseAddDialog} 
-            disabled={addingRepo || isBulkImporting}
+            disabled={addingRepo || isBulkImporting || (bulkImportStatus?.status === 'completed' && bulkImportStatus?.processingAssets)}
           >
-            {bulkImportStatus?.status === 'completed' || bulkImportStatus?.status === 'failed' ? 'Close' : 'Cancel'}
+            {bulkImportStatus?.status === 'completed' ? 'Close' : 'Cancel'}
           </Button>
           
           {dialogMode === 'single' && !addingRepo && (

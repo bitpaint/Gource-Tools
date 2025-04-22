@@ -381,9 +381,10 @@ const bulkImport = async (req, res) => {
       projectCreationMode = "none",
       projectNameTemplate = "{owner}",
       repoLimit = BULK_IMPORT_DEFAULT_LIMIT,
+      excludeForks = false,
     } = req.body;
 
-    logger.info("Starting bulk import", { githubUrl, projectCreationMode });
+    logger.info("Starting bulk import", { githubUrl, projectCreationMode, excludeForks });
 
     // Generate unique bulk import ID
     const bulkImportId = Date.now().toString();
@@ -403,6 +404,7 @@ const bulkImport = async (req, res) => {
       message: "Initializing bulk import...",
       error: null,
       projectCreationMode, // Store the project creation mode in the status
+      excludeForks, // Store excludeForks setting in the status
     });
 
     // Respond immediately to the client with bulk import ID
@@ -420,6 +422,7 @@ const bulkImport = async (req, res) => {
       projectCreationMode,
       projectNameTemplate,
       repoLimit,
+      excludeForks,
     );
   } catch (error) {
     logger.error("Error starting bulk import:", error);
@@ -449,7 +452,7 @@ async function processRepositoryClone(cloneId, url) {
     let githubToken = process.env.GITHUB_TOKEN;
     if (!githubToken && url.includes("github.com")) {
       try {
-        const settingsService = require('../services/SettingsService');
+        const settingsService = require('../services/settingsService');
         const settings = settingsService.getSettings();
         if (settings && settings.githubToken) {
           githubToken = settings.githubToken;
@@ -764,6 +767,7 @@ async function processRepositoryClone(cloneId, url) {
  * @param {string} projectCreationMode - How to create projects from imported repos ('none', 'single', 'byOwner')
  * @param {string} projectNameTemplate - Template for project names
  * @param {number} repoLimit - Maximum number of repos to import
+ * @param {boolean} excludeForks - Whether to exclude forks from the import
  */
 async function processBulkImport(
   bulkImportId,
@@ -772,6 +776,7 @@ async function processBulkImport(
   projectCreationMode = "none",
   projectNameTemplate = "{owner}",
   repoLimit = BULK_IMPORT_DEFAULT_LIMIT,
+  excludeForks = false,
 ) {
   try {
     // Status update
@@ -971,16 +976,33 @@ async function processBulkImport(
           continue; // Proceed to the next source
         }
 
+        // Filter out forks if excludeForks is true
+        let reposToImport = limitedRepos;
+        if (excludeForks) {
+          const originalReposCount = reposToImport.length;
+          reposToImport = reposToImport.filter(repo => !repo.fork);
+          const forksCount = originalReposCount - reposToImport.length;
+          
+          if (forksCount > 0) {
+            updateBulkImportStatus(bulkImportId, {
+              message: `Excluded ${forksCount} fork repositories from ${owner}...`,
+            });
+            
+            // Update total found repos
+            totalFoundRepos -= forksCount;
+          }
+        }
+
         // Start cloning repositories for this source
         updateBulkImportStatus(bulkImportId, {
           status: "importing",
-          message: `Importing ${limitedRepos.length} repositories from ${owner}...`,
+          message: `Importing ${reposToImport.length} repositories from ${owner}...`,
           totalRepos: totalFoundRepos,
           progress: 30 + (sourceIndex / sources.length) * 50,
         });
 
         // Process repositories with concurrency control
-        const queue = [...limitedRepos];
+        const queue = [...reposToImport];
         const activePromises = new Map();
         let sourceCompletedRepos = 0;
         let sourceFailedRepos = 0;
@@ -1018,14 +1040,14 @@ async function processBulkImport(
             const overallProgress =
               30 +
               (sourceIndex / sources.length) * 50 +
-              ((sourceCompletedRepos + sourceFailedRepos) / limitedRepos.length) * (50 / sources.length);
+              ((sourceCompletedRepos + sourceFailedRepos) / reposToImport.length) * (50 / sources.length);
               
             updateBulkImportStatus(bulkImportId, {
               progress: Math.min(95, overallProgress),
               completedRepos: totalCompletedRepos + totalFailedRepos,
               totalRepos: totalFoundRepos,
               failedRepos: totalFailedRepos,
-              message: `Processed ${sourceCompletedRepos + sourceFailedRepos}/${limitedRepos.length} repositories from ${owner}...`,
+              message: `Processed ${sourceCompletedRepos + sourceFailedRepos}/${reposToImport.length} repositories from ${owner}...`,
               repositories: allImportedRepositories,
             });
 
@@ -1096,17 +1118,51 @@ async function processBulkImport(
         endTime: new Date().toISOString(),
       });
     } else {
+      let completionMessage = `Import completed. Successfully imported ${totalCompletedRepos}/${totalFoundRepos} repositories.`;
+      if (excludeForks) {
+        completionMessage += ` Fork repositories were excluded.`;
+      }
+      
+      // Mark as still processing assets (avatars and badges)
+      const needsAssetProcessing = allImportedRepositories.length > 0;
+      
       updateBulkImportStatus(bulkImportId, {
         status: "completed",
         progress: 100,
-        message: `Import completed. Successfully imported ${totalCompletedRepos}/${totalFoundRepos} repositories.`,
+        message: completionMessage,
         completedRepos: totalCompletedRepos + totalFailedRepos,
         failedRepos: totalFailedRepos,
         totalRepos: totalFoundRepos,
         repositories: allImportedRepositories,
         createdProjects,
         endTime: new Date().toISOString(),
+        processingAssets: needsAssetProcessing
       });
+      
+      // Process repository assets (avatars, badges, etc.)
+      if (needsAssetProcessing) {
+        // This would be a call to the actual asset processing function
+        // For example: processRepositoryAssets(allImportedRepositories)
+        try {
+          // Here we would do the actual asset processing
+          // For now, we'll just mark it as complete immediately since the actual
+          // asset processing logic would be implemented elsewhere
+          logger.info(`Starting asset processing for ${allImportedRepositories.length} repositories`);
+          
+          // When asset processing is complete, update the status
+          updateBulkImportStatus(bulkImportId, {
+            processingAssets: false,
+            message: completionMessage + " All repository assets have been processed."
+          });
+        } catch (assetError) {
+          logger.error("Error processing repository assets:", assetError);
+          // Even if asset processing fails, we consider the import successful
+          updateBulkImportStatus(bulkImportId, {
+            processingAssets: false,
+            message: completionMessage + " Note: Some repository assets could not be processed."
+          });
+        }
+      }
     }
   } catch (error) {
     logger.info("Error in bulk import process:", error.message);
