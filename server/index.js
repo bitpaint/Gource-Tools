@@ -43,6 +43,20 @@ const DatabaseInstance = require('./utils/Database');
 // Get the shared DB instance for operations within index.js
 const db = DatabaseInstance.getDatabase(); 
 
+// --- Initialisation robuste de la base ---
+const ensureDbKeys = (db, keys) => {
+  let changed = false;
+  keys.forEach(key => {
+    if (!db.has(key).value()) {
+      db.set(key, []).write();
+      changed = true;
+    }
+  });
+  return changed;
+};
+ensureDbKeys(db, ['renders', 'repositories', 'projects', 'renderProfiles']);
+// --- Fin init DB ---
+
 // Check if db instance is valid before proceeding
 if (!db) {
     logger.error('Failed to get database instance in index.js. Cannot proceed with initialization.');

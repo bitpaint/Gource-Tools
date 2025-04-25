@@ -33,7 +33,6 @@ const menuItems = [
   { text: 'Projects', icon: <FolderSpecialIcon />, path: '/projects' },
   { text: 'Render', icon: <MovieIcon />, path: '/render' },
   { text: 'Exports', icon: <VideoLibraryIcon />, path: '/exports' },
-  { text: 'FFmpeg Editor', icon: <VideoSettingsIcon />, path: '/ffmpeg-editor' },
 ];
 
 // Settings as a separate item
@@ -140,29 +139,6 @@ const Sidebar = ({ drawerOpen, handleDrawerToggle }) => {
         <Divider />
         <List>
           {menuItems.slice(5, 6).map((item) => (
-            <ListItem key={item.text} disablePadding>
-              <ListItemButton 
-                selected={location.pathname === item.path}
-                onClick={() => {
-                  navigate(item.path);
-                  if (isMobile) {
-                    handleDrawerToggle();
-                  }
-                }}
-              >
-                <ListItemIcon sx={{ 
-                  color: location.pathname === item.path ? 'primary.main' : 'text.primary'
-                }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-        <Divider />
-        <List>
-          {menuItems.slice(6, 7).map((item) => (
             <ListItem key={item.text} disablePadding>
               <ListItemButton 
                 selected={location.pathname === item.path}

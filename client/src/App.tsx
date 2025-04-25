@@ -17,7 +17,6 @@ import ConfigFilesPage from './pages/ConfigFilesPage';
 import RenderPage from './pages/RenderPage';
 import ExportsPage from './pages/ExportsPage';
 import SettingsPage from './pages/SettingsPage';
-import FFmpegEditorPage from './pages/FFmpegEditorPage';
 
 // Create a theme
 const theme = createTheme({
@@ -97,7 +96,6 @@ function App() {
               <Route path="/render-profiles" element={<ConfigFilesPage />} />
               <Route path="/render" element={<RenderPage />} />
               <Route path="/exports" element={<ExportsPage />} />
-              <Route path="/ffmpeg-editor" element={<FFmpegEditorPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Routes>
           </main>

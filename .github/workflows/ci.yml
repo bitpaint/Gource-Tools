@@ -1,0 +1,31 @@
+# CI Github Actions pour tests backend et frontend
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies (workspaces)
+        run: npm install
+      - name: Lancer les tests backend
+        run: |
+          cd server
+          npx jest
+      - name: Lancer les tests frontend
+        run: |
+          cd client
+          npx vitest run

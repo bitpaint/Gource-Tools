@@ -148,18 +148,8 @@ export const renderProfilesApi = {
 export const rendersApi = {
   getAll: () => api.get('/renders'),
   getById: (id) => api.get(`/renders/${id}`),
-  startRender: (data) => api.post('/renders/start', data),
-  openExportsFolder: () => api.post('/renders/open-exports'),
-  getCompletedRenders: () => api.get('/renders/completed'),
-  uploadMusicFile: (formData) => {
-    return api.post('/renders/upload-music', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  generateFFmpegPreview: (renderId, filters) => api.post(`/renders/${renderId}/ffmpeg-preview`, filters),
-  applyFFmpegFilters: (renderId, filters) => api.post(`/renders/${renderId}/ffmpeg-process`, filters),
+  startRender: (data) => api.post('/renders', data),
+  openExportsFolder: () => api.get('/renders/open/exports'),
 };
 
 // Settings API

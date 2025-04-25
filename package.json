@@ -1,23 +1,20 @@
 {
   "name": "gource-tools",
   "version": "0.3a",
+  "private": true,
   "description": "Gource visualization tools for Git repositories",
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "server": "cd server && \"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -Command npm start",
-    "client": "cd client && \"C:\\Program Files\\PowerShell\\7\\pwsh.exe\" -Command npm start",
-    "start": "concurrently \"npm run server\" \"npm run client\"",
-    "install-all": "npm install && cd server && npm install && cd ../client && npm install"
+    "start": "concurrently \"npm run start --workspace=server\" \"npm run start --workspace=client\"",
+    "start:server": "npm run start --workspace=server",
+    "start:client": "npm run start --workspace=client",
+    "build": "npm run build --workspace=client && npm run build --workspace=server",
+    "install-all": "npm install"
   },
-  "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^7.0.2",
-    "@mui/material": "^7.0.2",
-    "concurrently": "^8.2.2",
-    "p-limit": "^6.2.0",
-    "react-color": "^2.19.3",
-    "recharts": "^2.15.2",
-    "sharp": "^0.34.1",
-    "winston": "^3.17.0"
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

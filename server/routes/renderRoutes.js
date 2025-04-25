@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const RenderController = require('../controllers/RenderController');
-const { uploadMusic } = require('../middleware/uploadMiddleware');
 
 // Route to start a new render
 router.post('/start', RenderController.startRender);
