@@ -34,10 +34,18 @@ const emojis = {
   file: '📄'
 };
 
-// Define enhanced log format with emojis
+// Add max message length from env or default
+const MAX_MESSAGE_LENGTH = parseInt(process.env.LOG_MAX_LENGTH, 10) || 80;
+
+// Define enhanced log format with emojis and truncation
 const logFormat = printf(({ level, message, timestamp, label, emoji }) => {
   const levelEmoji = emoji || emojis[level] || '';
-  return `${levelEmoji} [${timestamp.split('T')[1].split('.')[0]}] ${message}`;
+  // Truncate long messages
+  let msg = typeof message === 'string' ? message : String(message);
+  if (msg.length > MAX_MESSAGE_LENGTH) {
+    msg = msg.slice(0, MAX_MESSAGE_LENGTH) + '...';
+  }
+  return `${levelEmoji} [${timestamp.split('T')[1].split('.')[0]}] ${msg}`;
 });
 
 // Create logger with file and console transport
@@ -54,7 +62,6 @@ const serverLogger = createLogger({
     }),
     new transports.Console({
       format: combine(
-        colorize(),
         timestamp(),
         logFormat
       )
@@ -76,7 +83,6 @@ const renderLogger = createLogger({
     }),
     new transports.Console({
       format: combine(
-        colorize(),
         timestamp(),
         logFormat
       )
@@ -99,7 +105,6 @@ const errorLogger = createLogger({
     }),
     new transports.Console({
       format: combine(
-        colorize(),
         timestamp(),
         logFormat
       )

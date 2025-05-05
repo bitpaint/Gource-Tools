@@ -1,16 +1,57 @@
 import { useState, useEffect, useCallback } from 'react';
-import { projectsApi } from '../api/api';
+import { projectsApi, repositoriesApi } from '../api/api';
 import { toast } from 'react-toastify';
 
-const useProjects = (repositoriesHook) => {
-  const [projects, setProjects] = useState([]);
+// Define interfaces for type safety
+interface Repository {
+  id: string;
+  name: string;
+  // Add other relevant repository fields if needed
+}
+
+interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  repositories: string[];
+  renderProfileId?: string | null;
+  // Add other relevant project fields like dateCreated, lastModified if needed
+}
+
+interface RepositoriesHook {
+  repositories: Repository[];
+  fetchRepositories: () => void;
+  updateRepositories: (repoIds: string[]) => Promise<boolean>;
+}
+
+// Define the type for the current project being edited/created
+interface CurrentProjectState {
+  id: string | null;
+  name: string;
+  repositories: string[];
+  renderProfileId: string | null | '';
+}
+
+// Define the type for the expanded projects state
+interface ExpandedProjectsState {
+  [key: string]: boolean;
+}
+
+const useProjects = (repositoriesHook: RepositoriesHook | null) => {
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   
+  // Progress state for bulk updates
+  const [isUpdatingAll, setIsUpdatingAll] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [totalReposToUpdate, setTotalReposToUpdate] = useState(0);
+  const [updateMessage, setUpdateMessage] = useState('');
+
   // Project form state
   const [openProjectDialog, setOpenProjectDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [currentProject, setCurrentProject] = useState({
+  const [currentProject, setCurrentProject] = useState<CurrentProjectState>({
     id: null,
     name: '',
     repositories: [],
@@ -20,17 +61,17 @@ const useProjects = (repositoriesHook) => {
 
   // Delete dialog state
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState(false);
 
   // Remove repository from project dialog state
   const [openRemoveRepoDialog, setOpenRemoveRepoDialog] = useState(false);
-  const [repoToRemove, setRepoToRemove] = useState(null);
-  const [projectToModify, setProjectToModify] = useState(null);
+  const [repoToRemove, setRepoToRemove] = useState<Repository | null>(null);
+  const [projectToModify, setProjectToModify] = useState<Project | null>(null);
   const [removingRepo, setRemovingRepo] = useState(false);
 
   // Expanded projects state for UI
-  const [expandedProjects, setExpandedProjects] = useState({});
+  const [expandedProjects, setExpandedProjects] = useState<ExpandedProjectsState>({});
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -38,13 +79,15 @@ const useProjects = (repositoriesHook) => {
     try {
       const response = await projectsApi.getAll();
       
+      // Type check the response data
       if (Array.isArray(response.data)) {
-        setProjects(response.data);
+        // Explicitly cast or validate the data structure if necessary
+        setProjects(response.data as Project[]); 
       } else {
         setError('Invalid projects data received');
         setProjects([]);
       }
-    } catch (err) {
+    } catch (err: any) { // Catch as any to access err.response
       console.error('Error fetching projects:', err);
       setError('Failed to load projects');
       toast.error('Failed to load projects');
@@ -62,16 +105,24 @@ const useProjects = (repositoriesHook) => {
   // Initialize expand state for projects when projects change
   useEffect(() => {
     if (projects.length > 0) {
-      const initialExpandedState = {};
+      // Create new state based *only* on the current projects list
+      const currentExpandedState = expandedProjects; // Keep track of current state
+      const newExpandedState: ExpandedProjectsState = {};
       projects.forEach(project => {
-        initialExpandedState[project.id] = expandedProjects[project.id] || false;
+        // Preserve existing expansion state if project still exists, default to false
+        newExpandedState[project.id] = currentExpandedState[project.id] || false; 
       });
-      setExpandedProjects(initialExpandedState);
+      // Only update if the structure has actually changed to avoid unnecessary triggers
+      // (Simple comparison, could be more sophisticated if needed)
+      if (JSON.stringify(newExpandedState) !== JSON.stringify(currentExpandedState)) {
+           setExpandedProjects(newExpandedState);
+      }
     }
-  }, [projects, expandedProjects]);
+    // Only depend on projects, not expandedProjects itself
+  }, [projects]); // Removed expandedProjects dependency
 
   // Project dialog handlers
-  const handleOpenProjectDialog = (project = null) => {
+  const handleOpenProjectDialog = (project: Project | null = null) => {
     // Refresh repositories first to ensure we have the latest data
     if (repositoriesHook && typeof repositoriesHook.fetchRepositories === 'function') {
       repositoriesHook.fetchRepositories();
@@ -82,8 +133,8 @@ const useProjects = (repositoriesHook) => {
       setCurrentProject({
         id: project.id,
         name: project.name,
-        repositories: project.repositories || [],
-        renderProfileId: project.renderProfileId || ''
+        repositories: project.repositories || [], // Ensure repositories is always an array
+        renderProfileId: project.renderProfileId || '' // Ensure renderProfileId is not undefined
       });
     } else {
       setIsEditing(false);
@@ -117,7 +168,7 @@ const useProjects = (repositoriesHook) => {
       
       console.log('Repositories selected for save:', currentProject.repositories);
       
-      if (isEditing) {
+      if (isEditing && currentProject.id) {
         // Update existing project
         const response = await projectsApi.update(currentProject.id, currentProject);
         
@@ -128,24 +179,28 @@ const useProjects = (repositoriesHook) => {
         setProjects(updatedProjects);
         
         toast.success('Project updated successfully');
-      } else {
+      } else if (!isEditing) {
         // Create new project
         const response = await projectsApi.create(currentProject);
         setProjects([...projects, response.data]);
         toast.success('Project created successfully');
+      } else {
+        // Handle the unlikely case where isEditing is true but id is null
+        throw new Error("Cannot update project without a valid ID.");
       }
       
       handleCloseProjectDialog();
     } catch (err) {
-      console.error('Error saving project:', err);
-      toast.error(err.response?.data?.error || 'Failed to save project');
+      const error = err as any; // Simple way to access properties
+      console.error('Error saving project:', error);
+      toast.error(error?.response?.data?.error || error?.message || 'Failed to save project');
     } finally {
       setSavingProject(false);
     }
   };
 
   // Delete project handlers
-  const handleOpenDeleteDialog = (project) => {
+  const handleOpenDeleteDialog = (project: Project) => {
     setProjectToDelete(project);
     setOpenDeleteDialog(true);
   };
@@ -166,15 +221,16 @@ const useProjects = (repositoriesHook) => {
       toast.success('Project deleted successfully');
       handleCloseDeleteDialog();
     } catch (err) {
-      console.error('Error deleting project:', err);
-      toast.error('Failed to delete project');
+      const error = err as any;
+      console.error('Error deleting project:', error);
+      toast.error(error?.message || 'Failed to delete project');
     } finally {
       setDeletingProject(false);
     }
   };
 
   // Remove repository from project handlers
-  const handleOpenRemoveRepoDialog = (project, repoId) => {
+  const handleOpenRemoveRepoDialog = (project: Project, repoId: string) => {
     if (!repositoriesHook || !repositoriesHook.repositories) {
       toast.error('Repository data not available');
       return;
@@ -203,29 +259,32 @@ const useProjects = (repositoriesHook) => {
       // Create updated project with repository removed
       const updatedProject = {
         ...projectToModify,
-        repositories: projectToModify.repositories.filter(id => id !== repoToRemove.id)
+        repositories: projectToModify.repositories.filter(repo_id => repo_id !== repoToRemove!.id)
       };
       
       // Update project in backend
-      const response = await projectsApi.update(projectToModify.id, updatedProject);
+      const { name, description, repositories, renderProfileId } = updatedProject;
+      const payload = { name, description, repositories, renderProfileId }; 
+      const response = await projectsApi.update(projectToModify.id, payload);
       
       // Update projects array in state
-      setProjects(projects.map(project => 
-        project.id === projectToModify.id ? response.data : project
+      setProjects(projects.map(p => // Use different variable name (p) to avoid shadowing
+        p.id === projectToModify!.id ? response.data : p // Add non-null assertion
       ));
       
       toast.success(`Repository "${repoToRemove.name}" removed from project "${projectToModify.name}"`);
       handleCloseRemoveRepoDialog();
     } catch (err) {
-      console.error('Error removing repository from project:', err);
-      toast.error('Failed to remove repository from project');
+      const error = err as any;
+      console.error('Error removing repository from project:', error);
+      toast.error(error?.response?.data?.error || 'Failed to remove repository from project');
     } finally {
       setRemovingRepo(false);
     }
   };
 
   // Function to regenerate logs for a project's repositories
-  const regenerateProjectLogs = async (projectId) => {
+  const regenerateProjectLogs = async (projectId: string) => {
     try {
       setLoading(true);
       const project = projects.find(p => p.id === projectId);
@@ -242,12 +301,17 @@ const useProjects = (repositoriesHook) => {
       if (repositoriesHook && typeof repositoriesHook.updateRepositories === 'function') {
         await repositoriesHook.updateRepositories(project.repositories);
       } else {
-        // Fallback if hook not provided
+        // Fallback if hook not provided (API needs adjustment if this path is used)
+        // Assuming projectsApi.update is for updating a *project*, not a repo
+        // This fallback seems incorrect based on API naming. Consider removing or fixing.
+        /*
         const updatePromises = project.repositories.map(repoId => 
-          projectsApi.update(repoId)
+          projectsApi.update(repoId) // This looks like it calls project update with a repo ID?
         );
-        
         await Promise.all(updatePromises);
+        */
+       console.warn('repositoriesHook.updateRepositories not available, cannot update individual repos in fallback.');
+       throw new Error('Repository update function not available.');
       }
       
       // Refresh projects to show updated timestamps
@@ -255,66 +319,86 @@ const useProjects = (repositoriesHook) => {
       
       toast.success(`Logs regenerated for project "${project.name}"`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error regenerating logs:', error);
-      toast.error('Failed to regenerate logs');
+      toast.error(error?.message || 'Failed to regenerate logs');
       return false;
     } finally {
       setLoading(false);
     }
   };
 
-  // Function to handle updating all projects
+  // Function to handle updating all projects using the bulk endpoint
   const updateAllProjects = async () => {
+    setIsUpdatingAll(true);
+    setUpdateProgress(0);
+    setTotalReposToUpdate(0);
+    setUpdateMessage('Starting update...');
+    toast.info('Updating all projects...');
+    
     try {
-      setLoading(true);
-      toast.info('Updating all projects...');
-      
-      // Process all project repositories to update them
-      const allRepoIds = new Set();
+      // Collect unique repo IDs
+      const allRepoIds = new Set<string>();
       for (const project of projects) {
         if (project.repositories && project.repositories.length > 0) {
           project.repositories.forEach(repoId => allRepoIds.add(repoId));
         }
       }
-      
-      // Convert Set to Array for updating
       const uniqueRepoIds = Array.from(allRepoIds);
       
       if (uniqueRepoIds.length === 0) {
         toast.info('No repositories to update');
-        setLoading(false);
+        setIsUpdatingAll(false);
+        setUpdateMessage('No repositories found in projects.');
         return;
       }
       
-      toast.info(`Updating ${uniqueRepoIds.length} unique repositories...`);
-      
-      // Use the repositories hook to update all repositories
-      if (repositoriesHook && typeof repositoriesHook.updateRepositories === 'function') {
-        await repositoriesHook.updateRepositories(uniqueRepoIds);
+      setTotalReposToUpdate(uniqueRepoIds.length);
+      setUpdateMessage(`Updating ${uniqueRepoIds.length} unique repositories...`);
+
+      // --- Call the new bulk update endpoint --- 
+      // NOTE: Assumes repositoriesApi has a bulkUpdate method mapped to the new endpoint
+      // This might require adding `bulkUpdate: (data: { repoIds: string[] }) => Promise<any>;` to the API definition
+      const response = await repositoriesApi.bulkUpdate({ repoIds: uniqueRepoIds });
+      // -----------------------------------------
+
+      // Process response (basic example, could use polling/SSE for real-time progress)
+      if (response.data.success) {
+        toast.success(response.data.message || 'All projects updated successfully');
+        setUpdateMessage('Update completed successfully.');
       } else {
-        // Fallback if hook not provided
-        const updatePromises = uniqueRepoIds.map(repoId => 
-          projectsApi.update(repoId)
-        );
-        
-        await Promise.all(updatePromises);
+        const errorMsg = response.data.message || 'Failed to update all projects';
+        toast.error(errorMsg);
+        setError(errorMsg); // Set hook error state
+        setUpdateMessage(`Update failed: ${errorMsg}`);
+        // Optionally show details about which repos failed from response.data.errors
+        if(response.data.errors && response.data.errors.length > 0) {
+            console.error("Failed Repositories:", response.data.errors);
+            toast.warn(`Details: ${response.data.errors.length} repositories failed. Check console.`);
+        }
       }
       
-      // Refresh projects to show updated timestamps
+      // Refresh projects list regardless of success/failure to get latest timestamps
+      setUpdateMessage('Refreshing project list...');
       await fetchProjects();
       
-      toast.success('All projects updated successfully');
     } catch (err) {
-      console.error('Error updating all projects:', err);
-      toast.error('Failed to update all projects');
+      const error = err as any;
+      const errorMsg = error?.response?.data?.message || error?.message || 'An unexpected error occurred during bulk update';
+      console.error('Error updating all projects:', error);
+      toast.error(errorMsg);
+      setError(errorMsg); // Set hook error state
+      setUpdateMessage(`Update error: ${errorMsg}`);
     } finally {
-      setLoading(false);
+      setIsUpdatingAll(false);
+      setUpdateProgress(100); // Mark as complete even on error for UI clarity
+      // Clear message after a delay?
+      // setTimeout(() => setUpdateMessage(''), 5000);
     }
   };
 
   // Toggle project expand state
-  const toggleProjectExpanded = (projectId) => {
+  const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects(prev => ({
       ...prev,
       [projectId]: !prev[projectId]
@@ -326,6 +410,10 @@ const useProjects = (repositoriesHook) => {
     projects,
     loading,
     error,
+    isUpdatingAll,
+    updateProgress,
+    totalReposToUpdate,
+    updateMessage,
     openProjectDialog,
     isEditing,
     currentProject,

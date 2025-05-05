@@ -14,8 +14,10 @@ const low = require('lowdb');
 const FileSync = require('lowdb/adapters/FileSync');
 // Import the list of system profiles that should always exist
 const customRenderProfiles = require('./config/customRenderProfiles');
+const { createComponentLogger } = require('./utils/Logger');
+const logger = createComponentLogger('Purge');
 
-console.log('🧹 Starting Gource-Tools purge...');
+logger.info('🧹 Starting Gource-Tools purge...');
 
 // Paths of folders to clean
 const basePath = path.resolve(__dirname, '../');
@@ -28,7 +30,7 @@ const dbPath = path.join(basePath, 'db/db.json');
 // Function to recursively delete a folder and its contents
 function cleanDirectory(directory) {
   if (!fs.existsSync(directory)) {
-    console.log(`📂 Folder ${directory} does not exist, creating...`);
+    logger.info(`📂 Folder ${directory} does not exist, creating...`);
     fs.mkdirSync(directory, { recursive: true });
     return;
   }
@@ -45,17 +47,17 @@ function cleanDirectory(directory) {
       if (stat.isDirectory()) {
         // Delete the folder and its contents recursively
         fs.rmSync(fullPath, { recursive: true, force: true });
-        console.log(`🗑️ Folder deleted: ${fullPath}`);
+        logger.info(`🗑️ Folder deleted: ${fullPath}`);
       } else {
         // Delete the file
         fs.unlinkSync(fullPath);
-        console.log(`🗑️ File deleted: ${fullPath}`);
+        logger.info(`🗑️ File deleted: ${fullPath}`);
       }
     }
     
-    console.log(`✅ Folder cleaned: ${directory}`);
+    logger.success(`✅ Folder cleaned: ${directory}`);
   } catch (error) {
-    console.error(`❌ Error cleaning folder ${directory}:`, error);
+    logger.error(`❌ Error cleaning folder ${directory}`, error);
   }
 }
 
@@ -65,24 +67,24 @@ function cleanDatabase() {
     try {
       // Directly delete the database file
       fs.unlinkSync(dbPath);
-      console.log(`🗑️ Database file deleted: ${dbPath}`);
+      logger.info(`🗑️ Database file deleted: ${dbPath}`);
     } catch (error) {
-      console.error(`❌ Error deleting database file ${dbPath}:`, error);
+      logger.error(`❌ Error deleting database file ${dbPath}`, error);
     }
   } else {
-    console.log(`📄 Database file does not exist, nothing to delete: ${dbPath}`);
+    logger.info(`📄 Database file does not exist, nothing to delete: ${dbPath}`);
   }
 }
 
 // Execute cleaning
-console.log('🔄 Cleaning folders...');
+logger.info('🔄 Cleaning folders...');
 cleanDirectory(reposDir);
 cleanDirectory(logsDir);
 cleanDirectory(exportsDir);
 cleanDirectory(tempDir);
 
-console.log('🔄 Cleaning database...');
+logger.info('🔄 Cleaning database...');
 cleanDatabase();
 
-console.log('✅ Purge completed! The application has been reset while preserving API keys and settings.');
-console.log('🚀 You can restart the server to apply the changes.'); 
+logger.success('✅ Purge completed! The application has been reset while preserving API keys and settings.');
+logger.start('🚀 You can restart the server to apply the changes.'); 

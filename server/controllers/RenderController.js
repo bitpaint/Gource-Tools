@@ -245,7 +245,7 @@ const openExportsFolder = async (req, res) => {
     
     res.json({ success: true, path: exportsDir });
   } catch (error) {
-    console.error('Error opening exports folder:', error);
+    logger.error('Error opening exports folder', error);
     res.status(500).json({ error: 'Failed to open exports folder' });
   }
 };

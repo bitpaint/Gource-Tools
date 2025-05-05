@@ -385,6 +385,18 @@ const RepositoriesPage = () => {
     } catch (err: any) {
       console.error('Error adding repository:', err);
       
+      // If the repository already exists, update it instead of erroring
+      if (err.response?.status === 400 && err.response?.data?.error === 'A repository with this URL already exists') {
+        const existingRepo = repositories.find((r) => r.url === newRepoUrl);
+        if (existingRepo) {
+          toast.info(`Repository already exists, updating ${existingRepo.name}`);
+          setAddingRepo(false);
+          handleUpdateRepo(existingRepo);
+          setOpenAddDialog(false);
+          return;
+        }
+      }
+      
       // Check if the server is suggesting to use bulk import (username detected)
       if (err.response?.status === 422 && err.response.data?.suggestBulkImport) {
         // Stop the single repo import process
@@ -1186,6 +1198,21 @@ const RepositoriesPage = () => {
                     {Math.round(bulkImportStatus.progress || 0)}%
                   </Typography>
                 </Box>
+                
+                {/* Add stage indicator */}
+                {bulkImportStatus.processingAssets ? (
+                  <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
+                    Stage: Processing Repository Assets (Generating logs and downloading avatars)
+                  </Typography>
+                ) : bulkImportStatus.status === 'completed' ? (
+                  <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                    Stage: Complete
+                  </Typography>
+                ) : (
+                  <Typography variant="body2" color="primary" sx={{ mt: 1 }}>
+                    Stage: Importing Repositories
+                  </Typography>
+                )}
               </Box>
               
               {bulkImportStatus.repositories && bulkImportStatus.repositories.length > 0 && (

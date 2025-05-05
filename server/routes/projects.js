@@ -7,6 +7,9 @@ const FileSync = require('lowdb/adapters/FileSync');
 const { defaultGourceConfig } = require('../config/defaultGourceConfig');
 const Database = require('../utils/Database');
 const ProjectService = require('../services/projectService');
+const logService = require('../services/logService');
+const { createComponentLogger } = require('../utils/Logger');
+const logger = createComponentLogger('ProjectsRoute');
 
 // Get a project with all its details (repositories and render profile)
 function getProjectWithDetails(projectId) {
@@ -37,16 +40,15 @@ router.post('/', (req, res) => {
     const db = Database.getDatabase();
 
     // Debug logs
-    console.log('Creating project - data received:');
-    console.log('name:', name);
-    console.log('description:', description);
-    console.log('repositories (type):', typeof repositories, Array.isArray(repositories));
-    console.log('repositories (content):', repositories);
-    console.log('renderProfileId:', renderProfileId);
+    logger.debug('Creating project - data received');
+    logger.debug(`name: ${name}`);
+    logger.debug(`description: ${description}`);
+    logger.debug(`repositories (type): ${typeof repositories}, ${Array.isArray(repositories)}`);
+    logger.debug(`repositories (content): ${JSON.stringify(repositories)}`);
+    logger.debug(`renderProfileId: ${renderProfileId}`);
 
-    // Display all available repositories
     const allRepos = db.get('repositories').value();
-    console.log('Available repositories in DB:', allRepos.map(r => ({ id: r.id, name: r.name })));
+    logger.debug(`Available repositories in DB: ${JSON.stringify(allRepos.map(r => ({ id: r.id, name: r.name })) )}`);
 
     // Validate input
     if (!name) {
@@ -70,21 +72,21 @@ router.post('/', (req, res) => {
     // Validate repositories if provided
     let validRepos = [];
     if (repositories && repositories.length > 0) {
-      console.log('Checking repositories:', repositories);
+      logger.debug(`Checking repositories: ${JSON.stringify(repositories)}`);
       repositories.forEach(repoId => {
         const repo = db.get('repositories')
           .find({ id: repoId.toString() })
           .value();
         
         if (repo) {
-          console.log('Valid repository found:', repo.name);
+          logger.debug(`Valid repository found: ${repo.name}`);
           validRepos.push(repoId);
         } else {
-          console.log('Invalid repository with ID:', repoId);
+          logger.debug(`Invalid repository with ID: ${repoId}`);
         }
       });
     }
-    console.log('Valid repositories:', validRepos);
+    logger.debug(`Valid repositories: ${JSON.stringify(validRepos)}`);
 
     // Ensure at least one repository is valid
     if (validRepos.length === 0) {
@@ -141,7 +143,7 @@ router.post('/', (req, res) => {
 
     res.status(201).json(newProject);
   } catch (error) {
-    console.error('Error creating project:', error);
+    logger.error('Error creating project', error);
     res.status(500).json({ error: 'Failed to create project', details: error.message });
   }
 });
@@ -152,12 +154,12 @@ router.put('/:id', (req, res) => {
     const { name, description, repositories = [], renderProfileId } = req.body;
     
     // Debug logs
-    console.log('Updating project - data received:');
-    console.log('name:', name);
-    console.log('description:', description);
-    console.log('repositories (type):', typeof repositories, Array.isArray(repositories));
-    console.log('repositories (content):', repositories);
-    console.log('renderProfileId:', renderProfileId);
+    logger.debug('Updating project - data received');
+    logger.debug(`name: ${name}`);
+    logger.debug(`description: ${description}`);
+    logger.debug(`repositories (type): ${typeof repositories}, ${Array.isArray(repositories)}`);
+    logger.debug(`repositories (content): ${JSON.stringify(repositories)}`);
+    logger.debug(`renderProfileId: ${renderProfileId}`);
     
     const db = Database.getDatabase();
     
@@ -197,14 +199,14 @@ router.put('/:id', (req, res) => {
         .value();
       
       if (repo) {
-        console.log('Valid repository found (update):', repo.name);
+        logger.debug(`Valid repository found (update): ${repo.name}`);
         return true;
       } else {
-        console.log('Invalid repository with ID (update):', repoId);
+        logger.debug(`Invalid repository with ID (update): ${repoId}`);
         return false;
       }
     });
-    console.log('Valid repositories (update):', validRepos);
+    logger.debug(`Valid repositories (update): ${JSON.stringify(validRepos)}`);
 
     // Ensure at least one repository is valid
     if (validRepos.length === 0) {
@@ -253,9 +255,14 @@ router.put('/:id', (req, res) => {
       .assign(updatedProject)
       .write();
 
+    // Regenerate the project log after updating repositories
+    logService.generateProjectLog(req.params.id)
+      .then(() => logger.info(`Project log regenerated for ${req.params.id} after PUT update`))
+      .catch(err => logger.error(`Error regenerating project log for ${req.params.id}:`, err));
+
     res.json(updatedProject);
   } catch (error) {
-    console.error('Error updating project:', error);
+    logger.error('Error updating project', error);
     res.status(500).json({ error: 'Failed to update project', details: error.message });
   }
 });
@@ -280,7 +287,7 @@ router.delete('/:id', (req, res) => {
 
     res.json({ message: 'Project deleted successfully' });
   } catch (error) {
-    console.error('Error deleting project:', error);
+    logger.error('Error deleting project', error);
     res.status(500).json({ error: 'Failed to delete project', details: error.message });
   }
 });

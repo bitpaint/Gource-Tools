@@ -483,18 +483,20 @@ const processRender = async (project, render, options = {}) => {
   try {
     logger.info(`[Render ${render.id}] Processing render for project: ${project.name}`);
     
-    // Step 1: Prepare - Get settings and log file
+    // Step 0: Ensure project log is up-to-date before proceeding
+    logger.info(`[Render ${render.id}] Ensuring project log is up-to-date for project ${project.id}...`);
+    const validatedLogPath = await logService.ensureProjectLog(project.id);
+    logger.success(`[Render ${render.id}] Project log is up-to-date: ${validatedLogPath}`);
+
+    // Step 1: Prepare - Get settings
     updateRenderStatus(render.id, 'preparing', 'Preparing render environment...', 5);
 
-    // --- Log File Path Retrieval (Already validated in startRender) ---
-    const validatedLogPath = project.logPath;
+    // Use the validated log path from ensureProjectLog
     if (!validatedLogPath || !fs.existsSync(validatedLogPath)) {
-      // This check is a safeguard
-      logger.error(`[Render ${render.id}] Critical Error: Validated log file path is missing or invalid post-validation. Path: ${validatedLogPath}`);
-      throw new Error('Log file missing or invalid after initial validation.');
+      logger.error(`[Render ${render.id}] Critical Error: Log file path from ensureProjectLog is missing or invalid. Path: ${validatedLogPath}`);
+      throw new Error('Log file missing or invalid after ensureProjectLog.');
     }
     logger.info(`[Render ${render.id}] Using validated log file: ${validatedLogPath}`);
-    // --- End Log File Path Retrieval ---
 
     // Determine render settings
     let selectedProfileId = null;
@@ -728,14 +730,14 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
     fs.writeFileSync(scriptPath, batchScript);
     
     // Execute batch script
-    console.log(`Executing batch script for Gource render: ${scriptPath}`);
+    logger.start(`Executing batch script for Gource render: ${scriptPath}`);
     updateRenderStatus(render.id, 'rendering', 'Generating Gource visualization...', 40);
     
     const startTime = Date.now();
     
     // Execute batch script with full path to cmd.exe
     const cmdPath = 'C:\\Windows\\System32\\cmd.exe';
-    console.log(`Using cmd.exe at: ${cmdPath}`);
+    logger.info(`Using cmd.exe at: ${cmdPath}`);
     const process = spawn(cmdPath, ['/c', scriptPath]);
     
     // Track output and error
@@ -745,7 +747,7 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
     process.stdout.on('data', (data) => {
       const chunk = data.toString();
       output += chunk;
-      console.log(`[Gource] ${chunk.trim()}`);
+      logger.info(`[Gource] ${chunk.trim()}`);
       
       // Update progress based on output
       if (chunk.includes('Processing:')) {
@@ -762,7 +764,7 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
     process.stderr.on('data', (data) => {
       const chunk = data.toString();
       errorOutput += chunk;
-      console.error(`[Gource Error] ${chunk.trim()}`);
+      logger.error(`[Gource Error] ${chunk.trim()}`);
     });
     
     // Handle process completion
@@ -774,18 +776,53 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
         try {
           fs.unlinkSync(scriptPath);
         } catch (err) {
-          console.warn(`Failed to delete script file: ${scriptPath}`);
+          logger.warn(`Failed to delete script file: ${scriptPath}`);
         }
         
         if (code === 0) {
-          console.log(`Gource render completed successfully in ${duration}s`);
-          // Ensure final status update reflects completion
-          updateRenderStatus(render.id, 'completed', 'Render completed successfully', 100);
+          logger.success(`Gource render completed successfully in ${duration}s`);
+          // At this point, the video is rendered. Now, re-encode at 3x speed using FFmpeg.
+          const spedUpFile = outputFilePath.replace(/(\.mp4|\.mkv|\.avi|\.mov)$/i, '_3x$1');
+          const cappedFramerate = settings.framerate || 60;
+          // Step 1: Determine the duration of the sped-up video for fade-out
+          let videoDuration = 0;
+          try {
+            const { execSync } = require('child_process');
+            const ffprobeCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${outputFilePath}"`;
+            const durationOutput = execSync(ffprobeCmd).toString().trim();
+            videoDuration = parseFloat(durationOutput) / 3; // anticipate 3x speed-up
+          } catch (probeErr) {
+            logger.warn(`Could not determine video duration for fade-out: ${probeErr.message}`);
+            videoDuration = 0; // fallback, fade-out will default to end
+          }
+          const fadeOutStart = videoDuration > 1 ? (videoDuration - 1) : 0;
+
+          // Step 2: Apply 3x speed, capped framerate, and fade in/out
+          const fadeFilter = `fade=t=in:st=0:d=1,fade=t=out:st=${fadeOutStart}:d=1`;
+          // Use lossless (or visually lossless) settings for post-edit
+          // For true lossless: -crf 0 -preset veryslow (huge files); for visually lossless: -crf 18 -preset veryslow
+          const ffmpegCmd = `ffmpeg -y -i "${outputFilePath}" -filter:v \"setpts=PTS/3,${fadeFilter}\" -r ${cappedFramerate} -c:v libx264 -crf 18 -preset veryslow -pix_fmt yuv420p -an "${spedUpFile}"`;
+          logger.info(`Re-encoding video at 3x speed with fade in/out, capped framerate (${cappedFramerate} fps), and visually lossless quality (-crf 18, veryslow): ${ffmpegCmd}`);
+          try {
+            const { execSync } = require('child_process');
+            execSync(ffmpegCmd, { stdio: 'inherit' });
+            logger.success('3x speed video created successfully.');
+            // Optionally, replace the original file with the sped up one
+            const fs = require('fs');
+            fs.unlinkSync(outputFilePath);
+            fs.renameSync(spedUpFile, outputFilePath);
+            logger.info('Replaced original video with 3x speed version.');
+            updateRenderStatus(render.id, 'completed', 'Render completed and sped up 3x', 100);
+          } catch (err) {
+            logger.error(`Failed to re-encode video at 3x speed: ${err.message}`);
+            updateRenderStatus(render.id, 'failed', `Render completed, but 3x speed conversion failed: ${err.message}`, 90);
+            return reject(new Error(`3x speed conversion failed: ${err.message}`));
+          }
           resolve();
         } else {
           // Construct a more detailed error message using the captured stderr
           const errorMsg = `Gource/FFmpeg process failed with code ${code} after ${duration}s. Error Output: ${errorOutput || 'No error output captured.'}`;
-          console.error(errorMsg);
+          logger.error(errorMsg);
           // Update status with the detailed error message (limit length for DB/UI)
           const statusMessage = `Render failed (code ${code}): ${errorOutput.substring(0, 500)}${errorOutput.length > 500 ? '...' : ''}`;
           updateRenderStatus(render.id, 'failed', statusMessage, 0);
@@ -796,7 +833,7 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
       process.on('error', (err) => {
         // Handle errors in spawning the process itself
         const spawnErrorMsg = `Failed to start Gource/FFmpeg process: ${err.message}`;
-        console.error(spawnErrorMsg);
+        logger.error(spawnErrorMsg);
         updateRenderStatus(render.id, 'failed', `Failed to start process: ${err.message}`, 0);
         // Cleanup script file if spawn failed
         try {
@@ -804,14 +841,14 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
             fs.unlinkSync(scriptPath);
           }
         } catch (unlinkErr) {
-          console.warn(`Failed to delete script file after spawn error: ${scriptPath}`);
+          logger.warn(`Failed to delete script file after spawn error: ${scriptPath}`);
         }
         reject(new Error(spawnErrorMsg));
       });
     });
   } catch (error) {
     // Catch synchronous errors during setup
-    console.error(`Error setting up Gource render execution: ${error.message}`);
+    logger.error(`Error setting up Gource render execution: ${error.message}`);
     updateRenderStatus(render.id, 'failed', `Setup error: ${error.message}`, 0);
     // Ensure script file is deleted if setup fails
     const scriptPath = path.join(tempDir, `gource_render_${render.id}.bat`);
@@ -820,7 +857,7 @@ const executeGourceRender = async (logFilePath, render, outputFilePath, settings
         fs.unlinkSync(scriptPath);
       }
     } catch (unlinkErr) {
-      console.warn(`Failed to delete script file after setup error: ${scriptPath}`);
+      logger.warn(`Failed to delete script file after setup error: ${scriptPath}`);
     }
     throw error;
   }
@@ -845,7 +882,7 @@ const deleteRender = (id) => {
     try {
       fs.unlinkSync(render.filePath);
     } catch (error) {
-      console.error(`Error deleting file ${render.filePath}:`, error);
+      logger.error(`Error deleting file ${render.filePath}:`, error);
       // Continue even if file cannot be deleted
     }
   }
@@ -856,7 +893,7 @@ const deleteRender = (id) => {
     try {
       fs.unlinkSync(logFile);
     } catch (error) {
-      console.error(`Error deleting log ${logFile}:`, error);
+      logger.error(`Error deleting log ${logFile}:`, error);
     }
   }
   

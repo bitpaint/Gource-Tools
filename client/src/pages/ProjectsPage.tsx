@@ -11,7 +11,8 @@ import {
   DialogActions,
   DialogContent,
   DialogContentText,
-  DialogTitle
+  DialogTitle,
+  LinearProgress
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -21,14 +22,37 @@ import {
 import { toast } from 'react-toastify';
 import { InputAdornment } from '@mui/material';
 
-// Import our new components and hooks
+// Import components and hooks
 import ProjectList from '../components/projects/ProjectList';
 import ProjectForm from '../components/projects/ProjectForm';
 import useProjects from '../hooks/useProjects';
 import useRepositories from '../hooks/useRepositories';
-
-// Import APIs
 import { renderProfilesApi, settingsApi } from '../api/api';
+
+// --- Define needed types locally --- 
+interface Repository {
+  id: string;
+  name: string;
+  // Add other fields used by repoHook.groupedRepositories if needed
+  // e.g., owner?: string;
+}
+
+interface RenderProfile {
+    id: string;
+    name: string;
+    isDefault?: boolean;
+    settings?: Record<string, any>; // Define more specifically if possible
+}
+// --- End Local Types --- 
+
+// Define types specific to this page
+interface GroupedRepositories {
+  [owner: string]: Repository[];
+}
+
+interface ExpandedOwnersState {
+  [owner: string]: boolean;
+}
 
 const ProjectsPage = () => {
   // Use our custom hooks
@@ -36,15 +60,23 @@ const ProjectsPage = () => {
   const projectHook = useProjects(repoHook);
   
   // State for render profiles
-  const [renderProfiles, setRenderProfiles] = useState([]);
+  const [renderProfiles, setRenderProfiles] = useState<RenderProfile[]>([]);
   
   // State for the application's default profile ID
-  const [defaultProfileId, setDefaultProfileId] = useState(null);
+  const [defaultProfileId, setDefaultProfileId] = useState<string | null>(null);
   
   // State for search and UI
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [repoSearchQuery, setRepoSearchQuery] = useState('');
-  const [expandedOwners, setExpandedOwners] = useState({});
+  const [expandedOwners, setExpandedOwners] = useState<ExpandedOwnersState>({});
+  
+  // Destructure progress state from projectHook
+  const {
+    isUpdatingAll,
+    // updateProgress, // Currently not updated in real-time
+    totalReposToUpdate,
+    updateMessage
+  } = projectHook;
   
   // Load render profiles
   useEffect(() => {
@@ -52,9 +84,10 @@ const ProjectsPage = () => {
       try {
         const response = await renderProfilesApi.getAll();
         if (Array.isArray(response.data)) {
-          setRenderProfiles(response.data);
+          setRenderProfiles(response.data as RenderProfile[]);
         } else {
           console.error('Invalid render profiles data received');
+          setRenderProfiles([]);
         }
       } catch (err) {
         console.error('Error fetching render profiles:', err);
@@ -69,7 +102,7 @@ const ProjectsPage = () => {
   useEffect(() => {
     settingsApi.getDefaultProfileId()
       .then(response => {
-        setDefaultProfileId(response.data.defaultProjectProfileId);
+        setDefaultProfileId(response.data.defaultProjectProfileId as string | null);
         console.log('Default profile ID fetched:', response.data.defaultProjectProfileId);
       })
       .catch(err => {
@@ -79,15 +112,16 @@ const ProjectsPage = () => {
   
   // Initialize expand state for repository groups in dialog
   useEffect(() => {
-    const initialExpandedState = {};
-    Object.keys(repoHook.groupedRepositories).forEach(owner => {
+    const initialExpandedState: ExpandedOwnersState = {};
+    const grouped = repoHook.groupedRepositories as GroupedRepositories;
+    Object.keys(grouped).forEach((owner: string) => {
       initialExpandedState[owner] = true;
     });
     setExpandedOwners(initialExpandedState);
   }, [repoHook.groupedRepositories]);
   
   // Owner expansion toggle handler for repository selection
-  const toggleOwnerExpanded = (owner) => {
+  const toggleOwnerExpanded = (owner: string) => {
     setExpandedOwners(prev => ({
       ...prev,
       [owner]: !prev[owner]
@@ -95,24 +129,27 @@ const ProjectsPage = () => {
   };
   
   // Helper functions for repository selection in project form
-  const areAllOwnerReposSelected = (owner) => {
-    const ownerRepos = repoHook.groupedRepositories[owner] || [];
-    return ownerRepos.every(repo => 
+  const areAllOwnerReposSelected = (owner: string): boolean => {
+    const grouped = repoHook.groupedRepositories as GroupedRepositories;
+    const ownerRepos = grouped[owner] || [];
+    return ownerRepos.every((repo: Repository) => 
       (projectHook.currentProject.repositories || []).includes(String(repo.id))
     );
   };
   
-  const areSomeOwnerReposSelected = (owner) => {
-    const ownerRepos = repoHook.groupedRepositories[owner] || [];
-    return ownerRepos.some(repo => 
+  const areSomeOwnerReposSelected = (owner: string): boolean => {
+    const grouped = repoHook.groupedRepositories as GroupedRepositories;
+    const ownerRepos = grouped[owner] || [];
+    return ownerRepos.some((repo: Repository) => 
       (projectHook.currentProject.repositories || []).includes(String(repo.id))
     ) && !areAllOwnerReposSelected(owner);
   };
   
-  const handleToggleAllOwnerRepos = (owner, e) => {
+  const handleToggleAllOwnerRepos = (owner: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent propagation to avoid closing/opening the group
     
-    const ownerRepos = repoHook.groupedRepositories[owner] || [];
+    const grouped = repoHook.groupedRepositories as GroupedRepositories;
+    const ownerRepos = grouped[owner] || [];
     const currentRepos = [...(projectHook.currentProject.repositories || [])];
     
     // Check current state to determine action
@@ -121,14 +158,14 @@ const ProjectsPage = () => {
     if (allSelected) {
       // Remove all repositories from this owner from selection
       const updatedRepos = currentRepos.filter(repoId => 
-        !ownerRepos.some(repo => String(repo.id) === repoId)
+        !ownerRepos.some((repo: Repository) => String(repo.id) === repoId)
       );
       projectHook.setCurrentProject({...projectHook.currentProject, repositories: updatedRepos});
     } else {
       // Add all repositories from this owner to selection
       const repoIdsToAdd = ownerRepos
-        .filter(repo => !currentRepos.includes(String(repo.id)))
-        .map(repo => String(repo.id));
+        .filter((repo: Repository) => !currentRepos.includes(String(repo.id)))
+        .map((repo: Repository) => String(repo.id));
       
       projectHook.setCurrentProject({
         ...projectHook.currentProject, 
@@ -150,7 +187,7 @@ const ProjectsPage = () => {
   };
   
   // Function to handle rendering a project
-  const handleRenderProject = (projectId) => {
+  const handleRenderProject = (projectId: string) => {
     try {
       const project = projectHook.projects.find(p => p.id === projectId);
       
@@ -211,8 +248,9 @@ const ProjectsPage = () => {
             startIcon={<RefreshIcon />}
             onClick={projectHook.updateAllProjects}
             sx={{ mr: 1 }}
+            disabled={isUpdatingAll}
           >
-            Update All Projects
+            {isUpdatingAll ? 'Updating...' : 'Update All Projects'}
           </Button>
           <Button
             variant="contained"
@@ -223,6 +261,16 @@ const ProjectsPage = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Progress Indicator for Bulk Update */}
+      {isUpdatingAll && (
+        <Box sx={{ width: '100%', mb: 2 }}>
+          <Typography variant="caption" display="block" gutterBottom>
+            {updateMessage || `Updating ${totalReposToUpdate} repositories...`}
+          </Typography>
+          <LinearProgress />
+        </Box>
+      )}
 
       {projectHook.error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -238,7 +286,7 @@ const ProjectsPage = () => {
         expandedProjects={projectHook.expandedProjects}
         projectSearchQuery={projectSearchQuery}
         onToggleExpand={projectHook.toggleProjectExpanded}
-        onEditProject={(id) => {
+        onEditProject={(id: string) => {
           const project = projectHook.projects.find(p => p.id === id);
           if (project) projectHook.handleOpenProjectDialog(project);
         }}
@@ -258,7 +306,7 @@ const ProjectsPage = () => {
         renderProfiles={renderProfiles}
         savingProject={projectHook.savingProject}
         onSave={projectHook.handleSaveProject}
-        groupedRepositories={repoHook.groupedRepositories}
+        groupedRepositories={repoHook.groupedRepositories as GroupedRepositories}
         expandedOwners={expandedOwners}
         onToggleOwnerExpanded={toggleOwnerExpanded}
         repoSearchQuery={repoSearchQuery}

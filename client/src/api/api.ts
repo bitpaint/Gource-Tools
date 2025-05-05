@@ -52,127 +52,96 @@ api.interceptors.response.use(response => {
   return Promise.reject(error);
 });
 
-// Utilities for date formatting
+// Date Utils (Assuming these exist or should be defined)
 export const dateUtils = {
-  /**
-   * Format a date as a relative time (e.g. "5 minutes ago", "3 days ago")
-   * @param {string|Date} dateString - The date to format
-   * @returns {string} The formatted relative date
-   */
-  formatRelativeTime: (dateString) => {
-    if (!dateString) return 'Never';
-    
-    const date = new Date(dateString);
-    const now = new Date();
-    
-    // Difference in milliseconds
-    const diffMs = now - date;
-    
-    // Convert to seconds, minutes, hours, days
-    const diffSec = Math.round(diffMs / 1000);
-    const diffMin = Math.round(diffSec / 60);
-    const diffHours = Math.round(diffMin / 60);
-    const diffDays = Math.round(diffHours / 24);
-    const diffWeeks = Math.round(diffDays / 7);
-    const diffMonths = Math.round(diffDays / 30);
-    const diffYears = Math.round(diffDays / 365);
-    
-    // Format based on difference
-    if (diffSec < 60) {
-      return 'Just now';
-    } else if (diffMin < 60) {
-      return diffMin === 1 ? '1 minute ago' : `${diffMin} minutes ago`;
-    } else if (diffHours < 24) {
-      return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-    } else if (diffDays < 7) {
-      return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
-    } else if (diffWeeks < 4) {
-      return diffWeeks === 1 ? '1 week ago' : `${diffWeeks} weeks ago`;
-    } else if (diffMonths < 12) {
-      return diffMonths === 1 ? '1 month ago' : `${diffMonths} months ago`;
-    } else {
-      return diffYears === 1 ? '1 year ago' : `${diffYears} years ago`;
+  formatRelativeTime: (dateString: string | null | undefined): string => {
+    if (!dateString) return 'N/A';
+    // Basic relative time logic (replace with a library like date-fns if needed)
+    try {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffSeconds = Math.round((now.getTime() - date.getTime()) / 1000);
+        
+        if (diffSeconds < 60) return `${diffSeconds} seconds ago`;
+        if (diffSeconds < 3600) return `${Math.round(diffSeconds / 60)} minutes ago`;
+        if (diffSeconds < 86400) return `${Math.round(diffSeconds / 3600)} hours ago`;
+        // Add more complex logic for days, weeks, etc. if desired
+        return date.toLocaleDateString(); // Fallback to date string
+    } catch (e) {
+        return dateString; // Return original if parsing fails
     }
   },
-  
-  /**
-   * Format a date in localized format
-   * @param {string|Date} dateString - The date to format
-   * @returns {string} The formatted date
-   */
-  formatLocaleDate: (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+  formatLocaleDate: (dateString: string | null | undefined): string => {
+      if (!dateString) return 'N/A';
+      try {
+          return new Date(dateString).toLocaleString();
+      } catch (e) {
+          return dateString;
+      }
   }
 };
 
 // Repositories API
 export const repositoriesApi = {
   getAll: () => api.get('/repositories'),
-  getById: (id) => api.get(`/repositories/${id}`),
-  create: (data) => api.post('/repositories', data),
-  getCloneStatus: (cloneId) => api.get(`/repositories/clone-status/${cloneId}`),
-  bulkImport: (data) => api.post('/repositories/bulk-import', data),
-  getBulkImportStatus: (bulkImportId) => api.get(`/repositories/bulk-import-status/${bulkImportId}`),
-  gitPull: (id) => api.post(`/repositories/${String(id)}/pull`),
-  update: (id) => api.post(`/repositories/update/${String(id)}`),
-  delete: (id) => api.delete(`/repositories/${id}`),
+  getById: (id: string) => api.get(`/repositories/${id}`),
+  create: (data: any) => api.post('/repositories', data),
+  update: (id: string, data: any) => api.put(`/repositories/${id}`, data),
+  delete: (id: string) => api.delete(`/repositories/${id}`),
+  pull: (id: string) => api.post(`/repositories/${id}/pull`),
+  updateAndLog: (id: string) => api.post(`/repositories/update/${id}`),
+  bulkUpdate: (data: { repoIds: string[] }) => api.post('/repositories/bulk-update', data),
+  getCloneStatus: (cloneId: string) => api.get(`/repositories/clone-status/${cloneId}`),
+  getBulkImportStatus: (bulkImportId: string) => api.get(`/repositories/bulk-import-status/${bulkImportId}`),
+  bulkImport: (data: any) => api.post('/repositories/bulk-import', data),
   getStats: () => api.get('/repositories/stats'),
 };
 
 // Projects API
 export const projectsApi = {
   getAll: () => api.get('/projects'),
-  getById: (id) => api.get(`/projects/${id}`),
-  create: (data) => {
-    console.log('Envoi de données pour création de projet:', data);
+  getById: (id: string) => api.get(`/projects/${id}`),
+  create: (data: any) => {
+    console.log('Sending data for project creation:', data);
     return api.post('/projects', data);
   },
-  update: (id, data) => {
-    console.log('Envoi de données pour mise à jour de projet:', data);
+  update: (id: string, data: any) => {
+    console.log('Sending data for project update:', data);
     return api.put(`/projects/${id}`, data);
   },
-  delete: (id) => api.delete(`/projects/${id}`),
+  delete: (id: string) => api.delete(`/projects/${id}`),
 };
 
-// Gource Config Files API
+// Render Profiles API
 export const renderProfilesApi = {
   getAll: () => api.get('/renderProfiles'),
-  getById: (id) => api.get(`/renderProfiles/${id}`),
-  create: (data) => api.post('/renderProfiles', data),
-  update: (id, data) => api.put(`/renderProfiles/${id}`, data),
-  delete: (id) => api.delete(`/renderProfiles/${id}`),
+  getById: (id: string) => api.get(`/renderProfiles/${id}`),
+  create: (data: any) => api.post('/renderProfiles', data),
+  update: (id: string, data: any) => api.put(`/renderProfiles/${id}`, data),
+  delete: (id: string) => api.delete(`/renderProfiles/${id}`),
 };
 
 // Renders API
 export const rendersApi = {
   getAll: () => api.get('/renders'),
-  getById: (id) => api.get(`/renders/${id}`),
-  startRender: (data) => api.post('/renders', data),
+  getById: (id: string) => api.get(`/renders/${id}`),
+  startRender: (data: any) => api.post('/renders', data),
   openExportsFolder: () => api.get('/renders/open/exports'),
 };
 
 // Settings API
 export const settingsApi = {
   get: () => api.get('/settings'),
-  update: (data) => api.put('/settings', data),
+  update: (data: any) => api.put('/settings', data),
   getDefaultProfileId: () => api.get('/settings/default-profile'),
-  setDefaultProfileId: (profileId) => api.put('/settings/default-profile', { profileId }),
+  setDefaultProfileId: (profileId: string) => api.put('/settings/default-profile', { profileId }),
 };
 
-// Create an object for default export
-const apiExports = {
-  repositories: repositoriesApi,
-  projects: projectsApi,
-  renderProfiles: renderProfilesApi,
-  renders: rendersApi,
-  settings: settingsApi,
-};
-
-// Function to get render progress
-export const getRenderProgress = (id) => {
+// Standalone API functions
+export const getRenderProgress = (id: string) => {
   console.log(`Making API call to get progress for render ID: ${id}`);
   return api.get(`/renders/${id}/progress`);
 };
 
-export default apiExports;
+// Note: Default export removed as individual exports are generally preferred
+// If a default export is needed, recreate the apiExports object

@@ -111,7 +111,7 @@ const isValidGitRepository = (repoPath) => {
     
     return true;
   } catch (error) {
-    console.error(`Error checking Git repository: ${repoPath}`, error.message);
+    logger.error(`Error checking Git repository: ${repoPath}`, error);
     return false;
   }
 };
@@ -175,7 +175,7 @@ const createRepository = async (repoData) => {
     logger.success(`Initial log generation completed for: ${newRepository.name}`);
   } catch (logError) {
     // Log the error but don't fail the repository creation
-    logger.error(`Initial log generation failed for ${newRepository.name}: ${logError.message}`);
+    logger.error(`Initial log generation failed for ${newRepository.name}`, logError);
     // Optionally mark the repo as having an invalid log immediately
     const currentDb = Database.getDatabase(); // Re-get DB instance if needed
     currentDb.get('repositories')
@@ -444,7 +444,7 @@ const bulkImport = (baseDirectoryPath, skipConfirmation = false) => {
         throw new Error(`${normalizedPath} is not a directory`);
       }
       
-      console.time('bulkImport');
+      logger.time('Bulk import started');
       
       // Read subdirectories (kept synchronous for simplicity of implementation)
       const dirents = fs.readdirSync(normalizedPath, { withFileTypes: true })
@@ -526,10 +526,10 @@ const bulkImport = (baseDirectoryPath, skipConfirmation = false) => {
       // Wait for all imports to complete
       await Promise.all(importPromises);
       
-      console.timeEnd('bulkImport');
+      logger.time('Bulk import completed');
       resolve(results);
     } catch (error) {
-      console.error('Error during bulk import:', error);
+      logger.error('Error during bulk import', error);
       reject(error);
     }
   });

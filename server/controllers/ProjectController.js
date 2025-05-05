@@ -5,6 +5,8 @@
 
 const ProjectService = require('../services/projectService');
 const Validator = require('../validators/RequestValidator');
+const Logger = require('../utils/Logger');
+const logger = Logger.createComponentLogger('ProjectController');
 
 /**
  * Get all projects
@@ -14,7 +16,7 @@ const getAllProjects = (req, res) => {
     const projects = ProjectService.getAllProjects();
     res.json(projects);
   } catch (error) {
-    console.error('Error fetching all projects:', error);
+    logger.error('Error fetching all projects', error);
     res.status(500).json({ error: 'Failed to fetch projects' });
   }
 };
@@ -35,7 +37,7 @@ const getProjectById = (req, res) => {
     
     res.json(project);
   } catch (error) {
-    console.error('Error fetching project by ID:', error);
+    logger.error('Error fetching project by ID', error);
     res.status(500).json({ error: 'Failed to fetch project' });
   }
 };
@@ -71,7 +73,7 @@ const createProject = (req, res) => {
       return res.status(400).json({ error: serviceError.message });
     }
   } catch (error) {
-    console.error('Error creating project:', error);
+    logger.error('Error creating project', error);
     res.status(500).json({ 
       error: 'Failed to create project', 
       details: error.message 
@@ -119,7 +121,7 @@ const updateProject = (req, res) => {
       return res.status(400).json({ error: serviceError.message });
     }
   } catch (error) {
-    console.error('Error updating project:', error);
+    logger.error('Error updating project', error);
     res.status(500).json({ 
       error: 'Failed to update project', 
       details: error.message 
@@ -150,7 +152,7 @@ const deleteProject = (req, res) => {
       res.status(500).json({ error: 'Failed to delete project' });
     }
   } catch (error) {
-    console.error('Error deleting project:', error);
+    logger.error('Error deleting project', error);
     res.status(500).json({ 
       error: 'Failed to delete project', 
       details: error.message 

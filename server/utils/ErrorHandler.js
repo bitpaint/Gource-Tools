@@ -3,6 +3,9 @@
  * Provides centralized error handling functions
  */
 
+const { createComponentLogger } = require('./Logger');
+const logger = createComponentLogger('ErrorHandler');
+
 /**
  * Standard HTTP error responses
  */
@@ -22,7 +25,7 @@ const HTTP_ERRORS = {
  * @param {Object} res - Express response object
  */
 function handleError(error, res) {
-  console.error('Application error:', error);
+  logger.error('Application error', error);
   
   // If the error has a status property, use it
   if (error.status) {

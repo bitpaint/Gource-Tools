@@ -813,6 +813,15 @@ async function processBulkImport(
       return;
     }
 
+    // Initialize a counter for total repositories that will be imported
+    // This will be updated as we discover repositories from each source
+    updateBulkImportStatus(bulkImportId, {
+      totalRepos: 0,
+      completedRepos: 0,
+      failedRepos: 0,
+      message: `Starting bulk import from ${sources.length} source(s)...`,
+    });
+    
     // Initialiser variables pour le suivi des référentiels
     let allImportedRepositories = [];
     let totalFoundRepos = 0;
@@ -934,10 +943,12 @@ async function processBulkImport(
               repos.push(...response.data);
               page++;
 
-              // Update status
+              // Update status with discovered repositories count
+              const currentTotalRepos = totalFoundRepos + repos.length;
               updateBulkImportStatus(bulkImportId, {
                 progress: Math.min(20, 5 + repos.length / 10),
                 message: `Found ${repos.length} repositories for ${owner} so far...`,
+                totalRepos: currentTotalRepos,
               });
             }
           } catch (pageError) {
@@ -952,6 +963,12 @@ async function processBulkImport(
         // Apply limit per source
         const limitedRepos = repos.slice(0, actualLimit);
         totalFoundRepos += limitedRepos.length;
+        
+        // Update status with the actual number of repositories to be imported
+        updateBulkImportStatus(bulkImportId, {
+          totalRepos: totalFoundRepos,
+          message: `Will import ${totalFoundRepos} repositories in total...`,
+        });
 
         // Check if we need confirmation (maintenant basé sur le total)
         if (
@@ -1141,25 +1158,73 @@ async function processBulkImport(
       
       // Process repository assets (avatars, badges, etc.)
       if (needsAssetProcessing) {
-        // This would be a call to the actual asset processing function
-        // For example: processRepositoryAssets(allImportedRepositories)
         try {
-          // Here we would do the actual asset processing
-          // For now, we'll just mark it as complete immediately since the actual
-          // asset processing logic would be implemented elsewhere
           logger.info(`Starting asset processing for ${allImportedRepositories.length} repositories`);
           
-          // When asset processing is complete, update the status
+          // Update status to indicate asset processing has started
+          updateBulkImportStatus(bulkImportId, {
+            processingAssets: true,
+            progress: 80, // Reset progress for asset processing phase
+            message: `Import complete. Now processing repository assets (avatars and logs)...`
+          });
+          
+          // Import required services
+          const LogService = require('../services/logService');
+          const AvatarService = require('../services/avatarService');
+          const avatarService = new AvatarService();
+          
+          // Process repositories one by one - first generating logs, then downloading avatars
+          let processedRepoCount = 0;
+          
+          for (const repo of allImportedRepositories) {
+            // Skip failed repositories
+            if (!repo.path) continue;
+            
+            try {
+              processedRepoCount++;
+              const progressPercent = 80 + Math.floor((processedRepoCount / allImportedRepositories.length) * 20);
+              
+              // Update status
+              updateBulkImportStatus(bulkImportId, {
+                progress: progressPercent,
+                message: `Processing assets for ${repo.name || repo.id} (${processedRepoCount}/${allImportedRepositories.length})...`
+              });
+              
+              // Generate log file
+              logger.info(`Generating log for repository: ${repo.name} (ID: ${repo.id})`);
+              const logResult = await LogService.generateRepoLog(repo);
+              
+              if (logResult && logResult.logPath) {
+                // Log file was generated, trigger avatar downloads
+                logger.info(`Log generated for ${repo.name}, triggering avatar downloads`);
+                
+                // This doesn't return a promise, so we can't await it
+                avatarService.triggerAvatarDownloads(logResult.logPath);
+              }
+            } catch (repoError) {
+              logger.error(`Error processing assets for repository ${repo.name || repo.id}:`, repoError);
+              // Continue with next repository
+            }
+          }
+          
+          // Wait a bit to allow avatar download queue to initialize
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // When all logs and avatar processing is initiated, update status
           updateBulkImportStatus(bulkImportId, {
             processingAssets: false,
-            message: completionMessage + " All repository assets have been processed."
+            progress: 100,
+            message: completionMessage + " All repository assets have been processed.",
+            endTime: new Date().toISOString()
           });
         } catch (assetError) {
           logger.error("Error processing repository assets:", assetError);
           // Even if asset processing fails, we consider the import successful
           updateBulkImportStatus(bulkImportId, {
             processingAssets: false,
-            message: completionMessage + " Note: Some repository assets could not be processed."
+            progress: 100,
+            message: completionMessage + " Note: Some repository assets could not be processed.",
+            endTime: new Date().toISOString()
           });
         }
       }
@@ -1323,8 +1388,22 @@ async function createProjectsFromRepositories(
       };
 
       // Add to database using ProjectService
-      const project = ProjectService.createProject(projectData);
-      createdProjects.push(project);
+      try {
+        const project = await ProjectService.createProject(projectData);
+        createdProjects.push(project);
+      } catch (err) {
+        if (err.message.includes('already exists')) {
+          const db = Database.getDatabase();
+          const existing = db.get('projects').find({ name: projectData.name }).value();
+          if (existing) {
+            const mergedRepos = Array.from(new Set([...existing.repositories, ...projectData.repositories]));
+            const updatedProject = await ProjectService.updateProject(existing.id, { repositories: mergedRepos });
+            createdProjects.push(updatedProject);
+          }
+        } else {
+          throw err;
+        }
+      }
     } else if (mode === "byOwner" || mode === "per_owner") {
       // Group repositories by owner
       const ownerGroups = {};
@@ -1352,8 +1431,22 @@ async function createProjectsFromRepositories(
         };
 
         // Add to database using ProjectService
-        const project = ProjectService.createProject(projectData);
-        createdProjects.push(project);
+        try {
+          const project = await ProjectService.createProject(projectData);
+          createdProjects.push(project);
+        } catch (err) {
+          if (err.message.includes('already exists')) {
+            const db = Database.getDatabase();
+            const existing = db.get('projects').find({ name: projectData.name }).value();
+            if (existing) {
+              const mergedRepos = Array.from(new Set([...existing.repositories, ...projectData.repositories]));
+              const updatedProject = await ProjectService.updateProject(existing.id, { repositories: mergedRepos });
+              createdProjects.push(updatedProject);
+            }
+          } else {
+            throw err;
+          }
+        }
       }
     }
 
@@ -1590,6 +1683,70 @@ const pullRepository = async (id) => {
   }
 };
 
+/**
+ * Bulk update repositories: Pull changes and regenerate logs
+ * @param {Object} req - Request object with body { repoIds: [...] }
+ * @param {Object} res - Response object
+ */
+const bulkUpdateRepositories = async (req, res) => {
+  const { repoIds } = req.body;
+
+  if (!Array.isArray(repoIds) || repoIds.length === 0) {
+    return res.status(400).json({ success: false, message: 'Array of repository IDs required' });
+  }
+
+  logger.info(`Starting bulk update for ${repoIds.length} repositories.`);
+  
+  const results = [];
+  const errors = [];
+  let successCount = 0;
+  let failCount = 0;
+
+  // Process sequentially to avoid overwhelming system/APIs
+  for (let i = 0; i < repoIds.length; i++) {
+    const repoId = repoIds[i];
+    const progressPercent = Math.round(((i + 1) / repoIds.length) * 100);
+    logger.info(`[Bulk Update ${progressPercent}%] Processing repository ID: ${repoId} (${i+1}/${repoIds.length})`);
+    
+    try {
+      const db = Database.getDatabase();
+      const repository = db.get("repositories")
+        .find({ id: repoId.toString() })
+        .value();
+
+      if (!repository) {
+        throw new Error('Repository not found in database');
+      }
+
+      // 1. Pull latest changes
+      logger.info(`[Bulk Update ${progressPercent}%] Pulling changes for ${repository.name}`);
+      const pullResult = await pullRepository(repoId);
+      
+      // 2. Regenerate log
+      logger.info(`[Bulk Update ${progressPercent}%] Regenerating log for ${repository.name}`);
+      const LogService = require('../services/logService'); // Re-require inside loop or move outside
+      const logResult = await LogService.generateRepoLog(repository);
+
+      results.push({ repoId, name: repository.name, success: true, pullResult, logResult });
+      successCount++;
+    } catch (error) {
+      logger.error(`[Bulk Update] Failed processing repository ${repoId}: ${error.message}`);
+      errors.push({ repoId, success: false, error: error.message });
+      failCount++;
+      // Continue to the next repository even if one fails
+    }
+  }
+
+  logger.info(`Bulk update completed. Success: ${successCount}, Failed: ${failCount}`);
+  
+  res.json({
+    success: failCount === 0, // Overall success if no errors
+    message: `Bulk update finished. ${successCount} succeeded, ${failCount} failed.`,
+    results,
+    errors
+  });
+};
+
 module.exports = {
   getAllRepositories,
   getRepositoryById,
@@ -1599,5 +1756,6 @@ module.exports = {
   bulkImport,
   getDashboardStats,
   deleteRepository,
-  pullRepository
+  pullRepository,
+  bulkUpdateRepositories
 };
